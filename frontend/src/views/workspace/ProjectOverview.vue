@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { updateProject } from '../../api/projectApi'
 
 /**
- * Overview: wallpaper cover, world-doc style fields, debounced auto-save.
+ * 概览: wallpaper cover, world-doc style fields, debounced auto-save.
  */
 const projectStore = useProjectStore()
 const { detail } = storeToRefs(projectStore)
@@ -84,7 +84,7 @@ async function persist() {
   }
 
   isSaving = true
-  saveState.value = 'Saving…'
+  saveState.value = '保存中…'
   try {
     await updateProject(detail.value.id, {
       name: name.value.trim(),
@@ -93,9 +93,9 @@ async function persist() {
     })
     await projectStore.loadProject(detail.value.id, true)
     coverDirty.value = false
-    saveState.value = 'Saved'
+    saveState.value = '已保存'
   } catch (error) {
-    saveState.value = error instanceof Error ? `Save failed: ${error.message}` : 'Save failed'
+    saveState.value = error instanceof Error ? `保存失败: ${error.message}` : '保存失败'
   } finally {
     isSaving = false
     if (saveQueued) {
@@ -111,7 +111,7 @@ async function handleFileChange(event: Event) {
   input.value = ''
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    saveState.value = 'Please choose an image file'
+    saveState.value = '请选择图片文件'
     return
   }
   try {
@@ -120,7 +120,7 @@ async function handleFileChange(event: Event) {
     saveState.value = ''
     await persist()
   } catch (error) {
-    saveState.value = error instanceof Error ? error.message : 'Failed to load image'
+    saveState.value = error instanceof Error ? error.message : '图片加载失败'
   }
 }
 
@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
       type="button"
       class="overview__hero"
       :class="{ 'has-cover': cover }"
-      :aria-label="cover ? 'Double-click to change cover image' : 'Double-click to add cover image'"
+      :aria-label="cover ? '双击更换封面图' : '双击添加封面图'"
       @dblclick.stop.prevent="openCoverPicker"
     >
       <div
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
       />
       <div class="overview__hero-fade" aria-hidden="true" />
       <span class="overview__hero-hint">
-        {{ cover ? 'Double-click to change cover' : 'Double-click to add cover' }}
+        {{ cover ? '双击更换封面' : '双击添加封面' }}
       </span>
     </button>
 
@@ -166,29 +166,29 @@ onBeforeUnmount(() => {
 
     <div class="overview__surface">
       <header class="overview__head">
-        <h2 class="overview__title">Overview</h2>
+        <h2 class="overview__title">概览</h2>
         <span v-if="saveState" class="overview__state">{{ saveState }}</span>
       </header>
 
       <label class="overview__block">
-        <span class="overview__label">Project name</span>
+        <span class="overview__label">项目名称</span>
         <input
           v-model="name"
           class="overview__name"
           type="text"
-          placeholder="Untitled project"
+          placeholder="未命名项目"
           spellcheck="false"
           @blur="scheduleSave"
         />
       </label>
 
       <label class="overview__block">
-        <span class="overview__label">Description</span>
+        <span class="overview__label">描述</span>
         <textarea
           v-model="description"
           class="overview__description"
           rows="6"
-          placeholder="Describe the world, tone and goals of this project…"
+          placeholder="描述这个项目的世界、基调和目标…"
           spellcheck="true"
           @blur="scheduleSave"
         />

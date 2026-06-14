@@ -1,8 +1,7 @@
-"""RAG prompt templates and context formatting.
+"""RAG prompt 模板与上下文格式化。
 
-This module is only responsible for assembling the already-filtered graph/vector
-context into a prompt for Agent preview. It does not read the database, nor does it
-trigger any real LLM call.
+本模块只负责将已过滤的图谱/向量上下文组装成 Agent 预览 prompt。它不读取数据库，也不触发
+真实 LLM 调用。
 """
 
 from __future__ import annotations
@@ -16,17 +15,16 @@ def build_inspiration_prompt(
     vector_context: list[RagVectorContextItem],
     user_query: str,
 ) -> str:
-    """Build the prompt for the Idea-guidance Agent.
+    """构建 Idea-guidance Agent 的 prompt。
 
-    Args:
-        current_node: The node currently requesting AI assistance.
-        graph_context: One-hop relation context extracted from the canvas edges.
-        vector_context: Semantically related nodes retrieved from the vector index.
-        user_query: The retrieval question entered by the user or generated as a
-            fallback by the service layer.
+    参数：
+        current_node: 当前请求 AI 辅助的节点。
+        graph_context: 从画布边提取的一跳关系上下文。
+        vector_context: 从向量索引检索到的语义相关节点。
+        user_query: 用户输入的检索问题，或服务层生成的兜底问题。
 
-    Returns:
-        The prompt text for frontend preview; this function does not call the LLM.
+    返回：
+        用于前端预览的 prompt 文本；本函数不调用 LLM。
     """
     graph_context_text = _format_graph_context(graph_context)
     vector_context_text = _format_vector_context(vector_context)
@@ -112,16 +110,16 @@ The JSON format is as follows:
 
 
 def _format_graph_context(context: list[RagGraphContextItem]) -> str:
-    """Format the graph relation context.
+    """格式化图关系上下文。
 
-    Args:
-        context: The filtered one-hop graph relation context.
+    参数：
+        context: 已过滤的一跳图关系上下文。
 
-    Returns:
-        The graph relation context fragment for the prompt.
+    返回：
+        prompt 中的图关系上下文片段。
     """
     if not context:
-        # Explicitly writing "none" helps the downstream LLM understand the context gap better than an empty string.
+        # 显式写“无”比空字符串更能帮助下游 LLM 理解上下文缺口。
         return "No directly connected related nodes"
 
     return "\n\n".join(
@@ -136,16 +134,16 @@ def _format_graph_context(context: list[RagGraphContextItem]) -> str:
 
 
 def _format_vector_context(context: list[RagVectorContextItem]) -> str:
-    """Format the vector retrieval context.
+    """格式化向量检索上下文。
 
-    Args:
-        context: The filtered vector retrieval results.
+    参数：
+        context: 已过滤的向量检索结果。
 
-    Returns:
-        The vector retrieval context fragment for the prompt.
+    返回：
+        prompt 中的向量检索上下文片段。
     """
     if not context:
-        # Keep a placeholder paragraph even with no results, to make it easier for the frontend to debug the prompt structure.
+        # 即使没有结果也保留占位段落，方便前端调试 prompt 结构。
         return "No vector retrieval results"
 
     return "\n\n".join(

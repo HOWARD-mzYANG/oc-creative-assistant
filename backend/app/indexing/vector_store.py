@@ -1,10 +1,8 @@
-"""ChromaDB vector store wrapper.
+"""ChromaDB 向量存储封装。
 
-Responsible only for ChromaDB collection initialization, project-isolation
-id/metadata conventions, and node document upsert/delete/query. Embedding
-computation and provider selection are handled by
-``app.indexing.embedding_provider``; index synchronization timing is decided by
-``app.indexing.sync``.
+只负责 ChromaDB collection 初始化、项目隔离的 id/metadata 约定，以及节点文档的
+upsert/delete/query。Embedding 计算和 provider 选择由
+``app.indexing.embedding_provider`` 处理；索引同步时机由 ``app.indexing.sync`` 决定。
 """
 
 from __future__ import annotations
@@ -31,44 +29,44 @@ logger = logging.getLogger(__name__)
 
 
 def _log(message: str) -> None:
-    """Print vector write info to make the real execution path observable during the PoC phase."""
+    """打印向量写入信息，使 PoC 阶段的真实执行路径可观察。"""
     if INDEXING_DEBUG_LOG:
         print(f"[vector-store] {message}", flush=True)
 
 
 def build_chroma_id(project_id: str, node_id: str) -> str:
-    """Build a ChromaDB record ID.
+    """构建 ChromaDB 记录 ID。
 
-    Args:
-        project_id: The ID of the project the node belongs to.
-        node_id: The node ID.
+    参数：
+        project_id: 节点所属项目 ID。
+        node_id: 节点 ID。
 
-    Returns:
-        A stable record ID composed of project and node, preventing same-named nodes from different projects from overwriting each other.
+    返回：
+        由项目和节点组成的稳定记录 ID，避免不同项目中的同名节点互相覆盖。
     """
     return f"{project_id}:{node_id}"
 
 
 def _resolve_collection_name(node_type: str) -> str:
-    """Route to the target collection name based on node_type, falling back to the default collection on a miss."""
+    """根据 node_type 路由到目标 collection 名称，未命中时回退到默认 collection。"""
     return COLLECTION_BY_NODE_TYPE.get(node_type, DEFAULT_COLLECTION_NAME)
 
 
 def _all_collection_names() -> tuple[str, ...]:
-    """Return all collection names that need to be managed, including the default collection."""
+    """返回所有需要管理的 collection 名称，包括默认 collection。"""
     return (*COLLECTION_BY_NODE_TYPE.values(), DEFAULT_COLLECTION_NAME)
 
 
 def _build_chroma_client() -> Any:
-    """Initialize the ChromaDB PersistentClient.
+    """初始化 ChromaDB PersistentClient。
 
-    Raises:
-        RuntimeError: Raised when ChromaDB is not installed.
+    抛出：
+        RuntimeError: 未安装 ChromaDB 时抛出。
     """
     try:
         import chromadb
     except ImportError as error:
-        raise RuntimeError("ChromaDB is not installed; cannot write to or query the vector index.") from error
+        raise RuntimeError("未安装 ChromaDB，无法写入或查询向量索引。") from error
 
     CHROMA_PATH.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(CHROMA_PATH))
@@ -78,7 +76,7 @@ _chroma_client_singleton: Any | None = None
 
 
 def _get_chroma_client() -> Any:
-    """Process-level singleton.
+    """进程级单例。
     """
     global _chroma_client_singleton
     if _chroma_client_singleton is None:
@@ -87,39 +85,37 @@ def _get_chroma_client() -> Any:
 
 
 def get_chroma_collection_by_name(name: str) -> Any:
-    """Get a collection by name, auto-creating it with cosine distance if it does not exist."""
+    """按名称获取 collection；不存在时自动以 cosine 距离创建。"""
     client = _get_chroma_client()
     return client.get_or_create_collection(name=name, metadata={"hnsw:space": "cosine"})
 
 
 def get_chroma_collection_for_node(node_type: str) -> Any:
-    """Route to the corresponding collection by node_type; the caller does not need to worry about naming."""
+    """按 node_type 路由到对应 collection；调用方无需关心命名。"""
     return get_chroma_collection_by_name(_resolve_collection_name(node_type))
 
 
 def get_all_chroma_collections() -> dict[str, Any]:
-    """Return all collections, used for cross-collection scans (sync status reads / full Lore Memory retrieval)."""
+    """返回所有 collection，用于跨 collection 扫描（同步状态读取 / 完整 Lore Memory 检索）。"""
     return {name: get_chroma_collection_by_name(name) for name in _all_collection_names()}
 
 
 def upsert_node(node: NodeORM, fingerprint: str | None = None) -> None:
-    """Write by routing to the corresponding collection based on node_type.
+    """根据 node_type 路由到对应 collection 并写入。
 
-    Uses a self-heal pattern: before writing to the target collection, delete the
-    same chroma_id from other collections, ensuring that when a node's type changes
-    it does not exist in multiple collections simultaneously; the caller does not
-    need to track old_node_type.
+    使用自修复模式：写入目标 collection 前，先从其他 collection 删除相同 chroma_id，确保节点
+    类型变化时不会同时存在于多个 collection；调用方无需追踪 old_node_type。
 
-    Args:
-        node: The latest node committed to SQLite.
-        fingerprint: The retrieval document fingerprint; computed from the current document when None.
+    参数：
+        node: 已提交到 SQLite 的最新节点。
+        fingerprint: 检索文档指纹；为 None 时根据当前文档计算。
     """
     document = node_to_document(node)
     node_fingerprint = fingerprint or hashlib.sha256(f"ID: {node.id}\n{document}".encode("utf-8")).hexdigest()
     chroma_id = build_chroma_id(node.project_id, node.id)
     target_name = _resolve_collection_name(node.node_type)
 
-    # Self-heal: remove the same chroma_id from non-target collections to handle migration when the node type changes
+    # 自修复：从非目标 collection 删除相同 chroma_id，以处理节点类型变化时的迁移。
     for name in _all_collection_names():
         if name == target_name:
             continue
@@ -146,20 +142,20 @@ def upsert_node(node: NodeORM, fingerprint: str | None = None) -> None:
 
 
 def upsert_nodes(nodes: list[NodeORM]) -> None:
-    """Batch-write nodes; no longer passes collection, routing internally by node_type."""
+    """批量写入节点；不再传 collection，内部按 node_type 路由。"""
     for node in nodes:
         upsert_node(node)
 
 
 def delete_node(project_id: str, node_id: str) -> None:
-    """Delete the specified chroma_id from all collections, without needing to know the node type in advance."""
+    """从所有 collection 删除指定 chroma_id，无需预先知道节点类型。"""
     chroma_id = build_chroma_id(project_id, node_id)
     for name in _all_collection_names():
         get_chroma_collection_by_name(name).delete(ids=[chroma_id])
 
 
 def delete_nodes(project_id: str, node_ids: list[str]) -> None:
-    """Batch-delete the specified list of chroma_ids from all collections."""
+    """从所有 collection 批量删除指定 chroma_id 列表。"""
     if not node_ids:
         return
 
@@ -175,26 +171,24 @@ def query_collection(
     top_k: int,
     query_embedding: list[float] | None = None,
 ) -> tuple[list[str], list[dict], list[float]]:
-    """Perform a project-level query within the specified collection.
+    """在指定 collection 内执行项目级查询。
 
-    Collections are already physically isolated by node_type, so a node_type
-    metadata filter is no longer needed; the project_id filter is still kept to
-    prevent cross-project data from leaking into the current prompt.
+    collection 已按 node_type 物理隔离，因此不再需要 node_type metadata 过滤；仍保留
+    project_id 过滤，防止跨项目数据泄漏到当前 prompt。
 
-    When the same query is used across multiple collections, the caller should
-    precompute query_embedding once with ``embedding_provider.embed`` and pass it
-    in, avoiding recomputing the same vector for each collection and cutting the
-    embedding API calls from N down to 1.
+    当同一查询跨多个 collection 使用时，调用方应先用 ``embedding_provider.embed`` 预计算一次
+    query_embedding 并传入，避免每个 collection 重复计算相同向量，把 embedding API 调用从 N
+    次降到 1 次。
 
-    Args:
-        collection: The specific collection already routed by node_type.
-        project_id: The current project ID.
-        query: The retrieval query, used for embedding only when query_embedding is not provided.
-        top_k: The maximum number of contexts expected to be returned.
-        query_embedding: A precomputed query vector; if not passed, it is embedded once internally.
+    参数：
+        collection: 已按 node_type 路由好的具体 collection。
+        project_id: 当前项目 ID。
+        query: 检索查询；仅在未提供 query_embedding 时用于 embedding。
+        top_k: 期望返回的上下文最大数量。
+        query_embedding: 预计算查询向量；未传入时内部嵌入一次。
 
-    Returns:
-        A list of ChromaDB IDs, a list of metadata, and a list of distances.
+    返回：
+        ChromaDB ID 列表、metadata 列表和 distance 列表。
     """
     total = collection.count()
     if total == 0:
@@ -205,7 +199,7 @@ def query_collection(
     embedding = query_embedding if query_embedding is not None else embed_query(query)
     result = collection.query(
         query_embeddings=[embedding],
-        # +1 leaves room for the current node itself, to be filtered by the caller as needed; clamp to total to avoid Chroma raising an out-of-range parameter error
+        # +1 为当前节点本身留出空间，供调用方按需过滤；同时夹到 total，避免 Chroma 抛越界参数错误。
         n_results=min(top_k + 1, total),
         where={"project_id": project_id},
         include=["metadatas", "distances"],

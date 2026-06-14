@@ -1,14 +1,11 @@
-"""Embedding provider.
+"""Embedding provider。
 
-Encapsulates "how to turn text into vectors" in a separate module, so that
-vector_store only cares about ChromaDB collections and document read/write. In
-production the real DashScope model is preferred; when configuration is missing or
-SDK initialization fails, it falls back to a local hash placeholder provider,
-ensuring the RAG pipeline still works in offline / CI scenarios.
+把“如何将文本转换为向量”封装到单独模块，让 vector_store 只关心 ChromaDB collections 和
+文档读写。生产环境优先使用真实 DashScope 模型；配置缺失或 SDK 初始化失败时，回退到本地
+hash 占位 provider，确保 RAG 流水线在离线 / CI 场景下仍可工作。
 
-The process-level singleton ``embedding_provider`` is determined at module import
-time and shared by both index synchronization and queries, to avoid vector-space
-inconsistency caused by different paths using different models.
+进程级单例 ``embedding_provider`` 在模块导入时确定，并由索引同步和查询共同使用，避免不同
+路径使用不同模型导致向量空间不一致。
 """
 
 from __future__ import annotations
@@ -34,20 +31,18 @@ logger = logging.getLogger(__name__)
 
 
 def _log(message: str) -> None:
-    """Print embedding API call info to make the real execution path observable; same source as vector_store._log."""
+    """打印 embedding API 调用信息，使真实执行路径可观察；来源与 vector_store._log 一致。"""
     if INDEXING_DEBUG_LOG:
         print(f"[embedding] {message}", flush=True)
 
 
 class HashEmbeddingProvider:
-    """PoC placeholder embedding provider.
+    """PoC 占位 embedding provider。
 
-    Used as a local fallback when the real embedding service (DashScope) is not
-    configured, a dependency is missing, or SDK initialization fails, ensuring
-    ChromaDB writes and queries are not interrupted by network/configuration issues.
-    Its attribute naming matches ``DashScopeEmbeddingProvider`` so that
-    ``app.indexing.sync`` can read ``name``/``model``/``dimension`` without
-    distinguishing the provider type.
+    当真实 embedding 服务（DashScope）未配置、依赖缺失或 SDK 初始化失败时用作本地回退，确保
+    ChromaDB 写入和查询不被网络 / 配置问题打断。其属性命名与 ``DashScopeEmbeddingProvider``
+    保持一致，使 ``app.indexing.sync`` 可直接读取 ``name``/``model``/``dimension``，无需区分
+    provider 类型。
     """
 
     name = "hash"
@@ -55,30 +50,30 @@ class HashEmbeddingProvider:
     model = "hash"
 
     def __init__(self, dimension: int = EMBEDDING_DIMENSION) -> None:
-        """Allow explicitly overriding the vector dimension in tests or fallback paths; defaults to the global EMBEDDING_DIMENSION."""
+        """允许测试或回退路径显式覆盖向量维度；默认使用全局 EMBEDDING_DIMENSION。"""
         self.dimension = dimension
 
     def embed(self, text: str) -> list[float]:
-        """Convert a single piece of text into a fixed-dimension vector."""
+        """将单段文本转换为固定维度向量。"""
         return self._embed_single(text)
 
     def embed_many(self, texts: list[str]) -> list[list[float]]:
-        """Batch-convert texts into fixed-dimension vectors; matches the real provider interface."""
+        """批量将文本转换为固定维度向量；与真实 provider 接口保持一致。"""
         return [self._embed_single(text) for text in texts]
 
     def _embed_single(self, text: str) -> list[float]:
-        """Token-hash a single text into a normalized vector.
+        """将单段文本做 token hash，得到归一化向量。
 
-        Args:
-            text: The text to vectorize.
-        Returns:
-            A normalized fixed-dimension vector; empty text returns an all-zero vector.
+        参数：
+            text: 要向量化的文本。
+        返回：
+            归一化后的固定维度向量；空文本返回全零向量。
         """
         tokens = self._tokenize(text)
         vector = [0.0] * self.dimension
 
         for token in tokens:
-            # Hashing into a fixed dimension keeps the same token landing in a stable slot, enabling reproducible retrieval for the PoC.
+            # hash 到固定维度可让同一 token 稳定落到同一槽位，便于 PoC 阶段可复现检索。
             digest = hashlib.sha256(token.encode("utf-8")).digest()
             index = int.from_bytes(digest[:4], "big") % self.dimension
             vector[index] += 1.0
@@ -91,12 +86,12 @@ class HashEmbeddingProvider:
         return [value / norm for value in vector]
 
     def _tokenize(self, text: str) -> list[str]:
-        """Generate tokens for hash embedding.
+        """为 hash embedding 生成 token。
 
-        Args:
-            text: The raw text.
-        Returns:
-            A combined token list of English/numeric words, single Chinese characters, and character bigrams.
+        参数：
+            text: 原始文本。
+        返回：
+            英文/数字词、单个中文字符和字符 bigram 的组合 token 列表。
         """
         lowered = text.lower()
         words = re.findall(r"[\w]+", lowered, flags=re.UNICODE)
@@ -106,17 +101,16 @@ class HashEmbeddingProvider:
 
 
 class DashScopeEmbeddingProvider:
-    """Alibaba DashScope embedding provider.
+    """阿里 DashScope embedding provider。
 
-    DashScope offers an OpenAI-compatible interface, so this reuses the openai SDK
-    to avoid adding a new dependency. This provider uses the same vector model for
-    both writing to ChromaDB and querying ChromaDB, ensuring vector-space consistency.
+    DashScope 提供 OpenAI 兼容接口，因此这里复用 openai SDK，避免新增依赖。该 provider 在写入
+    ChromaDB 和查询 ChromaDB 时使用同一个向量模型，确保向量空间一致。
     """
 
     name = "dashscope"
 
     def __init__(self, api_key: str, base_url: str, model: str, dimension: int) -> None:
-        """Store the embedding API config; actual client creation is deferred to the first call to avoid unrelated imports affecting startup."""
+        """保存 embedding API 配置；实际 client 创建延迟到首次调用，避免无关导入影响启动。"""
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
@@ -124,11 +118,11 @@ class DashScopeEmbeddingProvider:
         self._client: Any | None = None
 
     def embed(self, text: str) -> list[float]:
-        """Convert a single piece of text into a semantic vector."""
+        """将单段文本转换为语义向量。"""
         return self.embed_many([text])[0]
 
     def embed_many(self, texts: list[str]) -> list[list[float]]:
-        """Batch-call the Alibaba embedding API."""
+        """批量调用阿里 embedding API。"""
         if not texts:
             return []
 
@@ -147,7 +141,7 @@ class DashScopeEmbeddingProvider:
 
             if len(vector) != self.dimension:
                 raise RuntimeError(
-                    f"Embedding dimension mismatch: expected {self.dimension}, got {len(vector)}"
+                    f"Embedding 维度不匹配：期望 {self.dimension}，实际 {len(vector)}"
                 )
 
             vectors_by_index[int(index)] = vector
@@ -157,15 +151,15 @@ class DashScopeEmbeddingProvider:
         return vectors
 
     def _get_client(self) -> Any:
-        """Lazily initialize the OpenAI-compatible client to avoid exposing API key config issues at startup."""
+        """延迟初始化 OpenAI 兼容 client，避免启动时暴露 API key 配置问题。"""
         if not self.api_key:
-            raise RuntimeError("OC_EMBEDDING_API_KEY or DASHSCOPE_API_KEY is not set; cannot call the Alibaba embedding API")
+            raise RuntimeError("未设置 OC_EMBEDDING_API_KEY 或 DASHSCOPE_API_KEY，无法调用阿里 embedding API")
 
         if self._client is None:
             try:
                 from openai import OpenAI
             except ImportError as error:
-                raise RuntimeError("The openai dependency is not installed; cannot call the Alibaba embedding API") from error
+                raise RuntimeError("未安装 openai 依赖，无法调用阿里 embedding API") from error
 
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
@@ -173,18 +167,17 @@ class DashScopeEmbeddingProvider:
 
 
 def _build_embedding_provider() -> Any:
-    """Choose the real provider or the local hash placeholder provider based on .env config.
+    """根据 .env 配置选择真实 provider 或本地 hash 占位 provider。
 
-    Prefer a configured DashScope; when config is missing or SDK initialization
-    fails, fall back to the hash provider, ensuring the RAG pipeline is always
-    available, which helps offline development and CI.
+    优先使用已配置的 DashScope；配置缺失或 SDK 初始化失败时回退到 hash provider，确保 RAG
+    流水线始终可用，方便离线开发和 CI。
     """
     settings = get_embedding_settings()
     indexing = get_indexing_settings()
 
     if not settings.is_configured:
         if indexing.debug_log:
-            logger.warning("OC_EMBEDDING_* is not configured; using the local hash embedding placeholder")
+            logger.warning("未配置 OC_EMBEDDING_*，使用本地 hash embedding 占位实现")
         return HashEmbeddingProvider(EMBEDDING_DIMENSION)
 
     try:
@@ -202,7 +195,7 @@ def _build_embedding_provider() -> Any:
             )
         return provider
     except Exception as error:  # noqa: BLE001
-        logger.warning("DashScope embedding initialization failed; falling back to the hash placeholder: %s", error)
+        logger.warning("DashScope embedding 初始化失败，回退到 hash 占位实现：%s", error)
         return HashEmbeddingProvider(EMBEDDING_DIMENSION)
 
 
@@ -211,24 +204,22 @@ embedding_provider = _build_embedding_provider()
 
 @lru_cache(maxsize=2048)
 def _cached_query_embedding(text: str) -> tuple[float, ...]:
-    """Process-level query embedding cache; a tuple is used so lru_cache can hash it, and callers convert back to a list.
+    """进程级查询 embedding 缓存；使用 tuple 便于 lru_cache 哈希，调用方再转回 list。
 
-    Used only for the "query path"; the write path (upsert document embedding)
-    cannot be cached because each document's content differs, so there are no hits.
+    仅用于“查询路径”；写入路径（upsert 文档 embedding）不能缓存，因为每个文档内容不同，不会命中。
     """
     return tuple(embedding_provider.embed(text))
 
 
 def embed_query(text: str) -> list[float]:
-    """LRU-cached query embedding entry point; tool_loop / RAG / parallel_retrieval all go through it."""
+    """带 LRU 缓存的查询 embedding 入口；tool_loop / RAG / parallel_retrieval 都走这里。"""
     return list(_cached_query_embedding(text))
 
 
 def get_embedding_signature() -> str:
-    """Return the signature of the current embedding configuration.
+    """返回当前 embedding 配置签名。
 
-    ChromaDB stores this signature to determine whether vectors need to be
-    rewritten after the model, base_url, or dimension changes.
+    ChromaDB 会存储该签名，用于判断模型、base_url 或维度变化后是否需要重写向量。
     """
     return (
         f"{embedding_provider.name}:"

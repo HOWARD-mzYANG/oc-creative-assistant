@@ -1,22 +1,17 @@
-"""Boundary check node.
+"""边界检查节点。
 
-Runs before chat_assembler, performing deterministic validation on the
-proposed_changes produced by this turn's agent. It filters out non-compliant
-items and records the reasons in ``boundary_warnings`` for downstream use, so
-chat_assembler can faithfully explain in the reply why items were skipped,
-preventing users from accepting empty staging.
+在 chat_assembler 之前运行，对本轮 agent 产出的 proposed_changes 做确定性校验。
+它会过滤不合规项目，并把原因记录到 ``boundary_warnings`` 供下游使用，使
+chat_assembler 能在回复中如实说明哪些项目被跳过以及原因，避免用户接受空暂存。
 
-Validation runs only hard rules, no LLM calls:
-- create_node: title / content length, node_type whitelist
-- create_edge: source / target must be a pending_id within the same batch or a
-  real node_id within the project; self-loops are forbidden
-- update_node: target_id must match an existing node, payload must contain at
-  least one updatable field
-- whole batch: pending_id must not repeat, changes per batch <= the limit
+校验只执行硬规则，不调用 LLM：
+- create_node：title / content 长度，node_type 白名单
+- create_edge：source / target 必须是同批次 pending_id 或项目内真实 node_id；禁止自环
+- update_node：target_id 必须匹配已有节点，payload 至少包含一个可更新字段
+- 整批：pending_id 不得重复，批次变更数量不得超过上限
 
-This works hand in hand with canvas_apply's "defensive skip": canvas_apply is
-the last fallback before persisting, while this is the earliest gate, letting
-users immediately see in the reply "which item failed and why".
+它与 canvas_apply 的“防御性跳过”配合：canvas_apply 是持久化前的最后兜底，而这里是最早
+闸口，让用户能立即在回复中看到“哪一项失败以及为什么”。
 """
 
 from __future__ import annotations
@@ -31,8 +26,7 @@ from app.db.database import SessionLocal
 from app.db.models import NodeORM
 
 
-# Only agents of these intents produce proposed_changes; simulation is
-# physically isolated and does not participate.
+# 只有这些意图的 agent 会产生 proposed_changes；simulation 物理隔离，不参与。
 _OUTPUT_KEY_BY_INTENT: dict[str, str] = {
     "inspiration": "inspiration_output",
     "research": "research_output",
@@ -51,11 +45,10 @@ _AGENTS_WITH_CHANGES = {"inspiration", "research", "structure"}
 
 
 def boundary_check_node(state: AgentState) -> dict[str, Any]:
-    """Run boundary validation on the proposed_changes of the agent matching the current intent.
+    """对与当前意图匹配的 agent 的 proposed_changes 执行边界校验。
 
-    Runs hard rules to filter out non-compliant items and records the reasons
-    in ``boundary_warnings`` for downstream chat_assembler to reference, letting
-    users immediately see in the reply "which item was skipped and why".
+    用硬规则过滤不合规项，并把原因记录到 ``boundary_warnings``，供下游 chat_assembler
+    引用，让用户立即在回复中看到“哪一项被跳过以及为什么”。
     """
     intent = state.get("intent")
     if intent is None or intent.primary not in _AGENTS_WITH_CHANGES:
@@ -84,21 +77,18 @@ def _filter_changes(
     changes: list[ProposedChange],
     project_id: str,
 ) -> tuple[list[ProposedChange], list[str]]:
-    """Run all rules and return (accepted changes, list of warning descriptions).
+    """运行所有规则并返回（接受的变更，warning 描述列表）。
 
-    Dedup dimensions: create_node by pending_id, create_edge by the (source,
-    target, relation_type) triple, update_node by the (target_id, key payload
-    fields) combination. The LLM occasionally copies "one well-thought-out
-    item" N times into the list; this dedup layer hard-removes them within the
-    batch.
+    去重维度：create_node 按 pending_id，create_edge 按 (source, target, relation_type)
+    三元组，update_node 按 (target_id, 关键 payload 字段) 组合。LLM 偶尔会把“一个想好的
+    项目”复制 N 次放进列表；这一层会在批次内硬性去重。
     """
     warnings: list[str] = []
 
     if len(changes) > _MAX_CHANGES_PER_BATCH:
         warnings.append(
-            f"The agent proposed {len(changes)} changes at once, exceeding the "
-            f"per-turn limit of {_MAX_CHANGES_PER_BATCH}; only the first "
-            f"{_MAX_CHANGES_PER_BATCH} are kept."
+            f"Agent 一次提出了 {len(changes)} 项变更，超过每轮上限 "
+            f"{_MAX_CHANGES_PER_BATCH}；仅保留前 {_MAX_CHANGES_PER_BATCH} 项。"
         )
         changes = changes[:_MAX_CHANGES_PER_BATCH]
 
@@ -112,8 +102,7 @@ def _filter_changes(
                 duplicate_indices.add(idx)
                 warnings.append(
                     f"create_node #{idx + 1} has pending_id="
-                    f"{change.pending_id!r} that duplicates an existing item in "
-                    f"the same batch; skipped."
+                    f"{change.pending_id!r} 与同批次已有项目重复；已跳过。"
                 )
             else:
                 pending_ids.add(change.pending_id)
@@ -124,8 +113,7 @@ def _filter_changes(
         if signature in seen_signatures:
             duplicate_indices.add(idx)
             warnings.append(
-                f"{change.change_type} #{idx + 1} is identical in content to an "
-                f"existing item in the same batch; skipped."
+                f"{change.change_type} #{idx + 1} 与同批次已有项目内容相同；已跳过。"
             )
         else:
             seen_signatures.add(signature)
@@ -145,7 +133,7 @@ def _filter_changes(
 
 
 def _signature_of(change: ProposedChange) -> tuple | None:
-    """Extract a change's "content fingerprint" for cross-item dedup; returns None to skip dedup when no fingerprint can be formed."""
+    """提取变更的“内容指纹”用于跨项去重；无法形成指纹时返回 None 并跳过去重。"""
     payload = change.payload or {}
 
     if change.change_type == "create_node":
@@ -192,22 +180,22 @@ def _check_one(
     project_id: str,
     pending_ids: set[str],
 ) -> str | None:
-    """Run all rules on a single change; returns None if it passes, otherwise the rejection reason."""
+    """对单条变更运行所有规则；通过则返回 None，否则返回拒绝原因。"""
     payload = change.payload or {}
 
     if change.change_type == "create_node":
         title = (str(payload.get("title") or "")).strip()
         if not title:
-            return "Missing title."
+            return "缺少标题。"
         if len(title) > _TITLE_MAX:
-            return f"title length {len(title)} exceeds the limit of {_TITLE_MAX}."
+            return f"标题长度 {len(title)} 超过上限 {_TITLE_MAX}。"
         content = str(payload.get("content") or "")
         if len(content) > _CONTENT_MAX:
-            return f"content length {len(content)} exceeds the limit of {_CONTENT_MAX}."
+            return f"内容长度 {len(content)} 超过上限 {_CONTENT_MAX}。"
         if payload.get("node_type") not in _VALID_NODE_TYPES:
             return (
-                f"node_type={payload.get('node_type')!r} is not in the whitelist "
-                f"{sorted(_VALID_NODE_TYPES)}."
+                f"node_type={payload.get('node_type')!r} 不在白名单 "
+                f"{sorted(_VALID_NODE_TYPES)} 中。"
             )
         return None
 
@@ -215,45 +203,44 @@ def _check_one(
         source = payload.get("source")
         target = payload.get("target")
         if not source or not target:
-            return "source or target is empty."
+            return "source 或 target 为空。"
         if source == target:
-            return "source equals target; self-loop edge rejected."
+            return "source 与 target 相同；拒绝自环边。"
         for label, raw in (("source", source), ("target", target)):
             if raw in pending_ids:
                 continue
             node = db.get(NodeORM, raw)
             if node is None or node.project_id != project_id:
                 return (
-                    f"{label}={raw!r} is neither a pending_id in the same batch "
-                    "nor a real node_id within the project."
+                    f"{label}={raw!r} 既不是同批次 pending_id，也不是项目内真实 node_id。"
                 )
         return None
 
     if change.change_type == "update_node":
         if not change.target_id:
-            return "Missing target_id."
+            return "缺少 target_id。"
         node = db.get(NodeORM, change.target_id)
         if node is None or node.project_id != project_id:
-            return f"target_id={change.target_id!r} has no matching node within the project."
+            return f"target_id={change.target_id!r} 在项目内没有匹配节点。"
         if not any(field in payload for field in _UPDATABLE_FIELDS):
-            return f"payload must contain at least one updatable field {sorted(_UPDATABLE_FIELDS)}."
+            return f"payload 必须至少包含一个可更新字段 {sorted(_UPDATABLE_FIELDS)}。"
         return None
 
     if change.change_type == "delete_node":
         if not change.target_id:
-            return "Missing target_id."
+            return "缺少 target_id。"
         node = db.get(NodeORM, change.target_id)
         if node is None or node.project_id != project_id:
-            return f"target_id={change.target_id!r} has no matching node within the project."
+            return f"target_id={change.target_id!r} 在项目内没有匹配节点。"
         return None
 
     if change.change_type == "delete_edge":
         if change.target_id:
-            return None  # A real edge_id is validated for project ownership later when canvas_apply persists it
+            return None  # 真实 edge_id 的项目归属会在 canvas_apply 持久化时再校验。
         payload_src = payload.get("source")
         payload_tgt = payload.get("target")
         if not payload_src or not payload_tgt:
-            return "Missing target_id, or missing the payload.source / payload.target triple."
+            return "缺少 target_id，或缺少 payload.source / payload.target 三元组。"
         return None
 
-    return f"Unsupported change_type={change.change_type!r}."
+    return f"不支持的 change_type={change.change_type!r}。"

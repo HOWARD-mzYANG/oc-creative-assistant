@@ -17,18 +17,24 @@ const emit = defineEmits<{
 }>()
 
 const CHANGE_TYPE_LABELS: Record<string, string> = {
-  create_node: 'New node',
-  create_edge: 'New relation',
-  update_node: 'Update node',
-  delete_node: 'Delete node',
-  delete_edge: 'Delete relation',
+  create_node: '新建节点',
+  create_edge: '新建关系',
+  update_node: '更新节点',
+  delete_node: '删除节点',
+  delete_edge: '删除关系',
+}
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待处理',
+  accepted: '已接受',
+  rejected: '已拒绝',
+  edited: '已编辑',
 }
 
 const titleHint = computed(() => {
   const type = props.item.change_type
   if (type === 'create_node') {
     const payload = props.item.payload as { title?: string; node_type?: string }
-    const title = payload.title ?? 'Untitled node'
+    const title = payload.title ?? '未命名节点'
     return payload.node_type ? `${title} · ${payload.node_type}` : title
   }
   return CHANGE_TYPE_LABELS[type] ?? type
@@ -46,7 +52,7 @@ const contentPreview = computed(() => {
     const source = (payload.source as string | undefined) ?? '?'
     const target = (payload.target as string | undefined) ?? '?'
     const relation = (payload.relation_type as string | undefined) ?? 'related'
-    return `${source}  →  ${target}\nRelation: ${relation}`
+    return `${source}  →  ${target}\n关系：${relation}`
   }
 
   if (item.change_type === 'update_node') {
@@ -57,12 +63,12 @@ const contentPreview = computed(() => {
   }
 
   if (item.change_type === 'delete_node') {
-    return item.target_id ? `Target node ID: ${item.target_id}` : ''
+    return item.target_id ? `目标节点 ID：${item.target_id}` : ''
   }
 
   if (item.change_type === 'delete_edge') {
     if (item.target_id) {
-      return `Target relation ID: ${item.target_id}`
+      return `目标关系 ID：${item.target_id}`
     }
     const source = (payload.source as string | undefined) ?? '?'
     const target = (payload.target as string | undefined) ?? '?'
@@ -79,7 +85,7 @@ const isPending = computed(() => props.item.status === 'pending')
   <article class="staging-item" :class="item.status">
     <header class="staging-item__head">
       <span class="staging-item__type">{{ item.change_type }}</span>
-      <span class="staging-item__status">{{ item.status }}</span>
+      <span class="staging-item__status">{{ STATUS_LABELS[item.status] ?? item.status }}</span>
     </header>
     <h4 class="staging-item__title">{{ titleHint }}</h4>
     <p v-if="contentPreview" class="staging-item__content">{{ contentPreview }}</p>
@@ -87,10 +93,10 @@ const isPending = computed(() => props.item.status === 'pending')
 
     <footer v-if="isPending" class="staging-item__actions">
       <button type="button" class="accept" @click="emit('resolve', item.id, 'accept')">
-        Accept
+        接受
       </button>
       <button type="button" class="reject" @click="emit('resolve', item.id, 'reject')">
-        Reject
+        拒绝
       </button>
     </footer>
   </article>

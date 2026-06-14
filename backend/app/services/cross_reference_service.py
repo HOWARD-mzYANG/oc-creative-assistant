@@ -1,11 +1,9 @@
-"""Cross sub-graph reference service (first_revision phase 6).
+"""跨子图引用服务（first_revision 第 6 阶段）。
 
-EdgeORM only carries project_id (not graph_id), so an edge can naturally connect
-two nodes in different sub-graphs (valid as long as they are in the same project,
-guaranteed by graph_validation's project-level check). This module aggregates the
-edges that "touch a given node and whose other end lands in a different
-sub-graph", to support the back-reference section of a character card (e.g.
-"Xiaoming appears in plot:Chapter 1 Encounter / belongs to world:Flame Kingdom").
+EdgeORM 只携带 project_id（不携带 graph_id），因此一条边可以自然连接两个不同子图中的节点
+（只要它们属于同一项目即可，由 graph_validation 的项目级检查保证）。本模块聚合“触碰某个
+节点，且另一端落在不同子图”的边，用来支持角色卡的反向引用区（例如“小明出现在剧情：
+第一章相遇 / 属于世界观：火焰王国”）。
 """
 
 from __future__ import annotations
@@ -20,7 +18,7 @@ from app.services.graph_repository import require_project
 
 
 def _section_by_graph_id(project: ProjectORM) -> dict[str, str]:
-    """The project's graph_id -> section reverse-lookup table."""
+    """项目的 graph_id -> section 反查表。"""
     mapping: dict[str, str] = {}
     if project.plot_graph_id:
         mapping[project.plot_graph_id] = "plot"
@@ -32,12 +30,12 @@ def _section_by_graph_id(project: ProjectORM) -> dict[str, str]:
 
 
 def get_node_cross_references(project_id: str, node_id: str) -> CrossReferenceResponse:
-    """Return all places where this node is referenced in other sub-graphs."""
+    """返回该节点在其他子图中被引用的所有位置。"""
     with SessionLocal() as db:
         project = require_project(db, project_id)
         node = db.get(NodeORM, node_id)
         if node is None or node.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail="未找到节点")
 
         section_of = _section_by_graph_id(project)
         own_section = section_of.get(node.graph_id or "")
@@ -57,7 +55,7 @@ def get_node_cross_references(project_id: str, node_id: str) -> CrossReferenceRe
             if other is None:
                 continue
             other_section = section_of.get(other.graph_id or "")
-            # Keep only cross sub-graph references (the other end is in a different section).
+            # 只保留跨子图引用（另一端位于不同 section）。
             if other_section is None or other_section == own_section:
                 continue
             references.append(

@@ -47,7 +47,7 @@ export async function exportProjectOc(projectId: string): Promise<Blob> {
   const data = await requestJson<unknown>(`/api/projects/${projectId}/export.oc`)
   return new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
 }
-/** Import a .oc file into a new project; returns the new project's detail. */
+/** 将 .oc 文件导入为新项目；返回新项目详情。 */
 export async function importProjectOc(file: File): Promise<{ id: string }> {
   const form = new FormData()
   form.append('file', file)
@@ -85,7 +85,7 @@ export async function updateProject(
   })
 }
 
-/** Read a node's free-form fields (Character card). */
+/** 读取节点的自由表单字段（角色卡）。 */
 export async function getNodeFields(
   projectId: string,
   nodeId: string,
@@ -93,7 +93,7 @@ export async function getNodeFields(
   return requestJson(`/api/projects/${projectId}/nodes/${nodeId}/fields`)
 }
 
-/** Wholly replace a node's free-form fields (Character card). */
+/** 整体替换节点的自由表单字段（角色卡）。 */
 export async function saveNodeFields(
   projectId: string,
   nodeId: string,
@@ -123,7 +123,7 @@ export interface CrossReferenceResponse {
   references: CrossReferenceItem[]
 }
 
-/** Update node fields (shared by the inline card "Edit" + the node detail page, reusing the graph's PATCH node endpoint). */
+/** 更新节点字段（行内卡片“编辑”和节点详情页共用，复用图的 PATCH 节点端点）。 */
 export async function updateNode(
   projectId: string,
   nodeId: string,

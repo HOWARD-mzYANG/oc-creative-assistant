@@ -150,7 +150,7 @@ async function persistAll() {
   }
 
   const node = props.node
-  const nextTitle = title.value.trim() || 'Untitled'
+  const nextTitle = title.value.trim() || '未命名'
   const fields = rowsToFields(fieldRows.value)
   const content = fieldsToContent(fieldRows.value)
   const titleChanged = nextTitle !== node.data.title
@@ -159,7 +159,7 @@ async function persistAll() {
   if (!titleChanged && !contentChanged) return
 
   isSaving = true
-  saveState.value = 'Saving…'
+  saveState.value = '保存中…'
   try {
     await saveNodeFields(props.projectId, node.id, fields)
     fieldsCache.set(props.projectId, node.id, fieldRows.value)
@@ -167,9 +167,9 @@ async function persistAll() {
     if (titleChanged) patch.title = nextTitle
     if (contentChanged) patch.content = content
     if (Object.keys(patch).length > 0) emit('update', patch)
-    saveState.value = 'Saved'
+    saveState.value = '已保存'
   } catch {
-    saveState.value = 'Save failed'
+    saveState.value = '保存失败'
   } finally {
     isSaving = false
     if (saveQueued) {
@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="world-doc">
     <div v-if="isEmpty" class="world-doc__empty">
-      <p>Select a note from the folder tree, or create a new root note.</p>
+      <p>从左侧文件夹树选择一条笔记，或新建根笔记。</p>
     </div>
 
     <div v-else class="world-doc__surface">
@@ -200,13 +200,13 @@ onBeforeUnmount(() => {
           v-model="title"
           class="world-doc__title"
           type="text"
-          placeholder="Untitled"
+          placeholder="未命名"
           spellcheck="false"
           @blur="flushSave"
           @keydown.enter="($event.target as HTMLInputElement).blur()"
         />
         <span v-if="saveState || isRefreshingFields" class="world-doc__save">
-          {{ saveState || 'Loading…' }}
+          {{ saveState || '加载中…' }}
         </span>
       </div>
 

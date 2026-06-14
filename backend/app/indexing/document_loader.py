@@ -1,8 +1,7 @@
-"""Vector index document extraction and lightweight DTO conversion.
+"""向量索引文档抽取与轻量 DTO 转换。
 
-The current index data source comes from canvas nodes. This module is responsible
-for organizing ORM nodes into searchable text and providing the node DTO
-conversion functions needed by RAG responses.
+当前索引数据源来自画布节点。本模块负责把 ORM 节点整理成可检索文本，
+并提供 RAG 响应所需的节点 DTO 转换函数。
 """
 
 from __future__ import annotations
@@ -15,14 +14,13 @@ from app.services.graph_mappers import db_fields_to_api
 
 
 def node_to_current_payload(node: NodeORM) -> RagCurrentNodePayload:
-    """Convert an ORM node into the current-node RAG DTO.
+    """将 ORM 节点转换为当前节点的 RAG DTO。
 
-    Args:
-        node: The current node already read from SQLite.
+    参数：
+        node: 已从 SQLite 读取出的当前节点。
 
-    Returns:
-        A current-node DTO containing only the fields needed by the prompt and the
-        frontend preview.
+    返回：
+        仅包含 prompt 与前端预览所需字段的当前节点 DTO。
     """
     return RagCurrentNodePayload(
         id=node.id,
@@ -35,15 +33,14 @@ def node_to_current_payload(node: NodeORM) -> RagCurrentNodePayload:
 
 
 def node_to_vector_item(node: NodeORM, score: float) -> RagVectorContextItem:
-    """Convert an ORM node into a vector retrieval result DTO.
+    """将 ORM 节点转换为向量检索结果 DTO。
 
-    Args:
-        node: The node hit by vector retrieval.
-        score: The similarity score, usually between 0 and 1.
+    参数：
+        node: 向量检索命中的节点。
+        score: 相似度分数，通常位于 0 到 1 之间。
 
-    Returns:
-        A vector context response item; the score is rounded for easier frontend
-        display.
+    返回：
+        向量上下文响应项；分数会被四舍五入，便于前端展示。
     """
     content = (node.content or "").strip()
     fields = db_fields_to_api(node.meta)
@@ -60,17 +57,15 @@ def node_to_vector_item(node: NodeORM, score: float) -> RagVectorContextItem:
 
 
 def node_to_document(node: NodeORM) -> str:
-    """Assemble a node into a retrieval document for embedding.
+    """将节点组装成用于 embedding 的检索文档。
 
-    The title, type, tags, and content all participate in vectorization; the
-    coordinates, sort order, and timestamps do not participate in retrieval
-    semantics.
+    标题、类型、标签和正文都会参与向量化；坐标、排序和时间戳不参与检索语义。
 
-    Args:
-        node: The ORM node to write or compare against during a query.
+    参数：
+        node: 写入索引或查询时用于比较的 ORM 节点。
 
-    Returns:
-        The text used for the ChromaDB document and the Alibaba embedding.
+    返回：
+        用于 ChromaDB document 和阿里 embedding 的文本。
     """
     tags = ", ".join(db_tags_to_api(node.meta))
     fields = db_fields_to_api(node.meta)
@@ -88,14 +83,13 @@ Content:
 
 
 def db_tags_to_api(meta: Any) -> list[str]:
-    """Read tags from a node's meta JSON.
+    """从节点 meta JSON 中读取标签。
 
-    Args:
-        meta: The meta field of the ORM node, which may come from an old database
-            or manually edited data.
+    参数：
+        meta: ORM 节点的 meta 字段，可能来自旧数据库或手动编辑的数据。
 
-    Returns:
-        A list of string tags; values of unexpected types are filtered out.
+    返回：
+        字符串标签列表；类型异常的值会被过滤。
     """
     if isinstance(meta, dict):
         tags = meta.get("tags", [])

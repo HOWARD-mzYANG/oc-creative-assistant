@@ -1,9 +1,7 @@
-"""Project application service (first_revision phase 1).
+"""Project 应用服务（first_revision 第 1 阶段）。
 
-Responsible for project CRUD and seed reading, and automatically creating three
-sub-graphs (plot / character / world) when a project is created. Index and graph
-node read/write are still handled by graph_store; this module only maintains the
-lifecycle boundary of projects and sub-graphs.
+负责项目 CRUD 和 seed 读取，并在创建项目时自动创建三个子图（plot / character / world）。
+索引与图节点读写仍由 graph_store 处理；本模块只维护项目与子图的生命周期边界。
 """
 
 import json
@@ -27,7 +25,7 @@ _SECTIONS = ("plot", "character", "world")
 
 
 def _latest_seed_orm(session, project_id: str) -> ProjectSeedORM | None:
-    """Read the latest version of a project's seed; returns None if it does not exist."""
+    """读取项目 seed 的最新版本；不存在时返回 None。"""
     return (
         session.query(ProjectSeedORM)
         .filter(ProjectSeedORM.project_id == project_id)
@@ -65,7 +63,7 @@ def _project_to_detail(session, project: ProjectORM) -> ProjectDetailPayload:
 
 
 def _create_subgraphs(session, project: ProjectORM) -> None:
-    """Create three sub-graphs for a project and backfill the FKs (structurally identical to the migration backfill)."""
+    """为项目创建三个子图并回填 FK（结构上与迁移回填一致）。"""
     graph_ids: dict[str, str] = {}
     for section in _SECTIONS:
         graph_id = uuid.uuid4().hex
@@ -78,7 +76,7 @@ def _create_subgraphs(session, project: ProjectORM) -> None:
 
 
 def list_projects() -> list[ProjectSummaryPayload]:
-    """List all projects, for display as cards in the project library."""
+    """列出所有项目，用于在项目库中显示为卡片。"""
     with SessionLocal() as session:
         projects = (
             session.query(ProjectORM).order_by(ProjectORM.updated_at.desc()).all()
@@ -97,14 +95,14 @@ def list_projects() -> list[ProjectSummaryPayload]:
 
 
 def get_project_detail(project_id: str) -> ProjectDetailPayload:
-    """Read project details (including the three graph_ids and the latest seed)."""
+    """读取项目详情（包含三个 graph_id 和最新 seed）。"""
     with SessionLocal() as session:
         project = require_project(session, project_id)
         return _project_to_detail(session, project)
 
 
 def create_project(payload: ProjectCreateRequest) -> ProjectDetailPayload:
-    """Create a project and automatically create three sub-graphs."""
+    """创建项目并自动创建三个子图。"""
     with SessionLocal.begin() as session:
         project = ProjectORM(
             id=uuid.uuid4().hex,
@@ -119,7 +117,7 @@ def create_project(payload: ProjectCreateRequest) -> ProjectDetailPayload:
 
 
 def update_project(project_id: str, payload: ProjectUpdateRequest) -> ProjectDetailPayload:
-    """Update a project's name / description / cover image (None means no change)."""
+    """更新项目名称 / 描述 / 封面图（None 表示不变）。"""
     with SessionLocal.begin() as session:
         project = require_project(session, project_id)
         if payload.name is not None:
@@ -133,27 +131,26 @@ def update_project(project_id: str, payload: ProjectUpdateRequest) -> ProjectDet
 
 
 def delete_project(project_id: str) -> None:
-    """Cascade-delete a project (graphs / nodes / edges / sessions / seeds cascade via foreign keys)."""
+    """级联删除项目（graphs / nodes / edges / sessions / seeds 通过外键级联）。"""
     with SessionLocal.begin() as session:
         project = require_project(session, project_id)
         session.delete(project)
 
 
 def get_latest_seed(project_id: str) -> ProjectSeedPayload | None:
-    """Read a project's current seed."""
+    """读取项目当前 seed。"""
     with SessionLocal() as session:
         require_project(session, project_id)
         return _seed_to_payload(_latest_seed_orm(session, project_id))
 
 
 def rebuild_seed(project_id: str) -> ProjectSeedPayload:
-    """Force-rebuild a project's seed, with the version auto-incrementing.
+    """强制重建项目 seed，并自动递增版本。
 
-    Phase 5: call seed_compressor to actually compress the project's current
-    state; when the project has no content yet or the LLM fails, fall back to an
-    empty-structure placeholder, ensuring the endpoint always returns a seed.
+    第 5 阶段：调用 seed_compressor 实际压缩项目当前状态；当项目尚无内容或 LLM 失败时，
+    回退到空结构占位，确保端点始终返回 seed。
     """
-    # Deferred import to avoid a potential circular dependency with the agents package.
+    # 延迟导入，避免与 agents 包产生潜在循环依赖。
     from app.agents.seed_compressor import build_seed_json
 
     seed_json = build_seed_json(project_id) or json.dumps(
@@ -181,5 +178,5 @@ def rebuild_seed(project_id: str) -> ProjectSeedPayload:
         payload = _seed_to_payload(seed)
 
     if payload is None:  # pragma: no cover - for type narrowing only
-        raise HTTPException(status_code=500, detail="Failed to rebuild seed")
+        raise HTTPException(status_code=500, detail="重建 seed 失败")
     return payload

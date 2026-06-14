@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 
 /**
- * Landing — two entries: chat-driven creation, or the project library.
+ * 首页：两个入口，分别进入对话驱动创作和项目库。
  */
 const router = useRouter()
 </script>
@@ -10,20 +10,20 @@ const router = useRouter()
 <template>
   <main class="home">
     <div class="home__inner">
-      <p class="eyebrow home__eyebrow">Original Character Studio</p>
-      <h1 class="home__title">OC&nbsp;Creative&nbsp;Suite</h1>
-      <p class="home__sub">A calm, paper-quiet workspace for building original characters.</p>
+      <p class="eyebrow home__eyebrow">原创角色工作室</p>
+      <h1 class="home__title">OC&nbsp;创意&nbsp;套件</h1>
+      <p class="home__sub">一个安静如纸页的原创角色创作工作区。</p>
 
       <div class="home__actions">
         <button type="button" class="home__card" @click="router.push('/chat')">
           <span class="home__card-icon">✦</span>
-          <span class="home__card-title">Chat</span>
-          <span class="home__card-desc">Think out loud — ideas become nodes.</span>
+          <span class="home__card-title">对话</span>
+          <span class="home__card-desc">把想法说出来，让灵感变成节点。</span>
         </button>
         <button type="button" class="home__card" @click="router.push('/library')">
           <span class="home__card-icon">❏</span>
-          <span class="home__card-title">Library</span>
-          <span class="home__card-desc">Open or start a project.</span>
+          <span class="home__card-title">项目库</span>
+          <span class="home__card-desc">打开或新建一个项目。</span>
         </button>
       </div>
     </div>

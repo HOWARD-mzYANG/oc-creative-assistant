@@ -1,14 +1,10 @@
-"""Structure agent node.
+"""结构 agent 节点。
 
-Receives "build structure" intents (adding nodes, creating relations in bulk,
-organizing character groups, etc.). In a ReAct loop it checks for duplicates
-first, then proposes, outputting StructureOutput.proposed_changes into staging
-for user confirmation.
+接收“构建结构”意图（新增节点、批量创建关系、整理角色组等）。它会在 ReAct 循环中先查重，
+再提出建议，并将 StructureOutput.proposed_changes 输出到暂存区供用户确认。
 
-When a create_edge within the batch references a new node that hasn't been
-persisted yet, it uses a pending_id; at persistence time canvas_apply translates
-the pending_id into a real node_id, resolving the "nodes before edges"
-dependency.
+当同批次的 create_edge 引用尚未持久化的新节点时，会使用 pending_id；持久化时由
+canvas_apply 将 pending_id 转换为真实 node_id，从而解决“先节点后边”的依赖。
 """
 
 from __future__ import annotations
@@ -34,7 +30,7 @@ logger = logging.getLogger(__name__)
 _SYSTEM_PROMPT = load_prompt("structure")
 
 def structure_agent_node(state: AgentState) -> dict[str, Any]:
-    """Check for duplicates and propose structure changes in a ReAct loop; degrade to empty proposed_changes when the LLM fails."""
+    """在 ReAct 循环中查重并提出结构变更；LLM 失败时降级为空 proposed_changes。"""
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "")
 
@@ -42,7 +38,7 @@ def structure_agent_node(state: AgentState) -> dict[str, Any]:
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
             f"{build_memory_block(state, 'structure')}\n\n"
-            f"[User request]\n{user_message}"
+            f"[用户请求]\n{user_message}"
         ),
     ]
 
@@ -65,16 +61,15 @@ def structure_agent_node(state: AgentState) -> dict[str, Any]:
         )
         if output is None:
             output = StructureOutput(
-                reasoning="Structured output was empty.",
+                reasoning="结构化输出为空。",
                 summary=(
-                    "I couldn't put together a suggested structure this time. "
-                    "You could rephrase your question or try again later."
+                    "这次我没能整理出结构建议。你可以换个说法，或稍后再试。"
                 ),
             )
     except Exception as error:  # noqa: BLE001
         logger.warning("structure_agent LLM call failed, degrading: %s", error)
         output = StructureOutput(
-            reasoning=f"Call failed ({type(error).__name__}).",
-            summary="I couldn't put together a suggested structure this time. You could rephrase your question or try again later.",
+            reasoning=f"调用失败（{type(error).__name__}）。",
+            summary="这次我没能整理出结构建议。你可以换个说法，或稍后再试。",
         )
     return {"structure_output": output}

@@ -45,7 +45,7 @@ const labelText = computed(() => (typeof props.label === 'string' ? props.label 
     <InlineEditableText
         :style="labelStyle"
         :model-value="labelText"
-        placeholder="label"
+        placeholder="关系标签"
         @save="(value: string) => updateEdgeLabel?.(id, value)"
       />
     </div>

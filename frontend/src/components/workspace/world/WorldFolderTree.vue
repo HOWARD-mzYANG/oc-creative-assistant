@@ -31,7 +31,7 @@ interface FlatRow {
 function flatten(tree: WorldTreeNode, depth: number, rows: FlatRow[]) {
   rows.push({
     id: tree.id,
-    title: tree.node.data.title || 'Untitled',
+    title: tree.node.data.title || '未命名',
     depth,
     hasChildren: tree.children.length > 0,
     isCollapsed: collapsed.value.has(tree.id),
@@ -159,11 +159,11 @@ function rowDropClass(id: string) {
 
 <template>
   <div class="world-folder-tree">
-    <h3 class="world-folder-tree__title">Module</h3>
+    <h3 class="world-folder-tree__title">模块</h3>
 
     <nav
       class="world-folder-tree__list"
-      aria-label="World notes"
+      aria-label="世界观笔记"
       @dragover.prevent
       @dragleave="onListDragLeave"
     >
@@ -189,8 +189,8 @@ function rowDropClass(id: string) {
           class="world-folder-tree__drag"
           role="button"
           tabindex="0"
-          aria-label="Drag to reorder or reparent"
-          title="Drag to change hierarchy"
+          aria-label="拖动以排序或调整层级"
+          title="拖动以调整层级"
           @mousedown.stop="onHandlePointerDown(row.id)"
           @touchstart.stop="onHandlePointerDown(row.id)"
         >
@@ -199,8 +199,8 @@ function rowDropClass(id: string) {
         <button
           type="button"
           class="world-folder-tree__remove"
-          aria-label="Delete note"
-          title="Delete note"
+          aria-label="删除笔记"
+          title="删除笔记"
           @click.stop="emit('delete', row.id)"
         >
           −
@@ -219,8 +219,8 @@ function rowDropClass(id: string) {
         <button
           type="button"
           class="world-folder-tree__add"
-          aria-label="Add child note"
-          title="Add child note"
+          aria-label="添加子笔记"
+          title="添加子笔记"
           @click.stop="emit('add-child', row.id)"
         >
           +
@@ -236,13 +236,13 @@ function rowDropClass(id: string) {
         <button type="button" class="world-folder-tree__main" @click="emit('add-root')">
           <span class="world-folder-tree__chevron world-folder-tree__chevron--spacer" />
           <span class="world-folder-tree__icon">📁</span>
-          <span class="world-folder-tree__label world-folder-tree__label--muted">New root</span>
+          <span class="world-folder-tree__label world-folder-tree__label--muted">新建根笔记</span>
         </button>
         <button
           type="button"
           class="world-folder-tree__add"
-          aria-label="Add root note"
-          title="Add root note"
+          aria-label="添加根笔记"
+          title="添加根笔记"
           @click.stop="emit('add-root')"
         >
           +
@@ -250,7 +250,7 @@ function rowDropClass(id: string) {
       </div>
     </nav>
 
-    <p class="world-folder-tree__hint">Drag ⠿ to nest under a folder, reorder, or drop on New root.</p>
+    <p class="world-folder-tree__hint">拖动 ⠿ 可放入文件夹、调整排序，或拖到“新建根笔记”。</p>
   </div>
 </template>
 

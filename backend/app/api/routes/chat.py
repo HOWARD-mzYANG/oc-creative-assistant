@@ -1,7 +1,7 @@
-"""Chat and staging HTTP routes.
+"""聊天与暂存 HTTP 路由。
 
-Exposes the CRUD endpoints for sessions / messages / staging; ``POST /api/chat``
-is the real agent entry point, triggering the full LangGraph reasoning pipeline.
+暴露 sessions / messages / staging 的 CRUD 端点；``POST /api/chat`` 是真正的
+Agent 入口，会触发完整 LangGraph 推理流水线。
 """
 
 from typing import Literal
@@ -46,19 +46,19 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 @router.post("/sessions", response_model=ChatSessionPayload)
 async def create_chat_session(payload: ChatSessionCreateRequest) -> ChatSessionPayload:
-    """Create a new chat session; also assigns a thread_id for use by the LangGraph Checkpointer."""
+    """创建新的聊天会话，并分配供 LangGraph Checkpointer 使用的 thread_id。"""
     return create_session(payload)
 
 
 @router.get("/projects/{project_id}/sessions", response_model=list[ChatSessionPayload])
 async def list_project_chat_sessions(project_id: str) -> list[ChatSessionPayload]:
-    """List the sessions under the given project, ordered by creation time descending."""
+    """列出指定项目下的会话，按创建时间倒序排列。"""
     return list_sessions(project_id)
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
 async def delete_chat_session_route(session_id: str) -> None:
-    """Delete a chat session and its messages / staging."""
+    """删除聊天会话及其消息 / 暂存项。"""
     delete_chat_session(session_id)
 
 
@@ -67,7 +67,7 @@ async def rename_chat_session_route(
     session_id: str,
     payload: SessionRenameRequest,
 ) -> ChatSessionPayload:
-    """Rename a chat session."""
+    """重命名聊天会话。"""
     return rename_chat_session(session_id, payload.title)
 
 
@@ -76,13 +76,13 @@ async def generate_chat_session_title(
     session_id: str,
     payload: SessionTitleRequest,
 ) -> ChatSessionPayload:
-    """Generate an LLM title from the first user message and persist it."""
+    """根据用户第一条消息生成 LLM 标题并持久化。"""
     return generate_session_title(session_id, payload.user_message)
 
     
 @router.get("/sessions/{session_id}/messages", response_model=list[ChatMessagePayload])
 async def list_chat_messages(session_id: str) -> list[ChatMessagePayload]:
-    """Read the full message history of a session."""
+    """读取会话的完整消息历史。"""
     return get_session_messages(session_id)
 
 
@@ -91,7 +91,7 @@ async def append_chat_message(
     session_id: str,
     payload: ChatMessageCreateRequest,
 ) -> ChatMessagePayload:
-    """Append a single message (does not trigger agent reasoning); used only for integration debugging and unit tests, real conversations go through POST /api/chat."""
+    """追加单条消息（不触发 Agent 推理）；仅用于集成调试和单元测试，真实对话走 POST /api/chat。"""
     return append_session_message(session_id, payload)
 
 
@@ -100,7 +100,7 @@ async def create_chat_staging_batch(
     session_id: str,
     payload: AgentStagingBatchCreateRequest,
 ) -> AgentStagingBatchPayload:
-    """Write a batch of staging items; shared entry point for persistence_hub and the manual endpoint."""
+    """写入一批暂存项；persistence_hub 与手动端点共用的入口。"""
     return create_staging_batch(session_id, payload)
 
 
@@ -112,7 +112,7 @@ async def list_chat_staging(
     session_id: str,
     status: Literal["pending", "accepted", "edited", "rejected"] | None = None,
 ) -> list[AgentStagingBatchPayload]:
-    """List staging by session, automatically grouped by batch; returns all statuses by default."""
+    """按会话列出暂存项，自动按批次分组；默认返回所有状态。"""
     return list_session_staging(session_id, status)
 
 
@@ -121,7 +121,7 @@ async def resolve_chat_staging_item(
     staging_id: str,
     payload: AgentStagingActionRequest,
 ) -> AgentStagingPayload:
-    """Accept / edit / reject a single staging item; operating again on an already-resolved item returns 409."""
+    """接受 / 编辑 / 拒绝单条暂存项；重复操作已处理项会返回 409。"""
     return resolve_staging_item(staging_id, payload)
 
 
@@ -133,23 +133,21 @@ async def resolve_chat_staging_batch(
     batch_id: str,
     payload: AgentStagingBatchActionRequest,
 ) -> list[AgentStagingPayload]:
-    """Batch accept / reject the staging from the same turn; already-resolved items are silently skipped."""
+    """批量接受 / 拒绝同一回合的暂存项；已处理项会静默跳过。"""
     return resolve_staging_batch(batch_id, payload)
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def post_chat(payload: ChatRequest) -> ChatResponse:
-    """Trigger the full agent_graph reasoning pipeline; returns the chat reply plus staging batch info synchronously."""
+    """触发完整 agent_graph 推理流水线；同步返回聊天回复和暂存批次信息。"""
     return run_chat_turn(payload)
 
 
 @router.post("/chat/stream")
 async def post_chat_stream(payload: ChatRequest) -> StreamingResponse:
-    """SSE streaming chat endpoint; the frontend parses the event stream with fetch + ReadableStream.
-    Cache-Control disables caching and X-Accel-Buffering disables nginx
-    intermediate buffering, so events can be pushed to the frontend immediately,
-    preventing the reverse proxy from piling them up into a "burst arrival" that
-    ruins the progressive experience.
+    """SSE 流式聊天端点；前端用 fetch + ReadableStream 解析事件流。
+    Cache-Control 禁用缓存，X-Accel-Buffering 禁用 nginx 中间缓冲，使事件能立即推送
+    到前端，避免反向代理把事件堆成一波“突发到达”，破坏渐进式体验。
     """
     return StreamingResponse(
         stream_chat_turn(payload),

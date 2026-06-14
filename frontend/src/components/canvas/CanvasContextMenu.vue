@@ -27,7 +27,7 @@ const emit = defineEmits<{
 }>()
 
 function labelOf(type: CreativeNodeType): string {
-  return ({character:'Character',worldbuilding:'Worldbuilding',plot:'Story node',idea:'Idea',research:'Research',structure:'Structure'} as Record<string,string>)[type] ?? type
+  return ({character:'角色',worldbuilding:'世界观',plot:'故事节点',idea:'想法',research:'资料',structure:'结构'} as Record<string,string>)[type] ?? type
 }
 </script>
 
@@ -42,22 +42,22 @@ function labelOf(type: CreativeNodeType): string {
           class="ctx-menu__item"
           @click="emit('create', type)"
         >
-          + New {{ labelOf(type) }}
+          + 新建{{ labelOf(type) }}
         </button>
       </template>
       <template v-else-if="menuType === 'edge'">
         <p v-if="edgeLabel" class="ctx-menu__caption">{{ edgeLabel }}</p>
-        <button type="button" class="ctx-menu__item" @click="emit('changeRelation')">Change relation</button>
+        <button type="button" class="ctx-menu__item" @click="emit('changeRelation')">更改关系</button>
         <button type="button" class="ctx-menu__item ctx-menu__item--danger" @click="emit('remove')">
-          Delete edge
+          删除边
         </button>
       </template>
       <template v-else>
-        <button type="button" class="ctx-menu__item" @click="emit('edit')">Edit</button>
-        <button type="button" class="ctx-menu__item" @click="emit('duplicate')">Duplicate</button>
-        <button type="button" class="ctx-menu__item" @click="emit('quote')">Copy to composer</button>
+        <button type="button" class="ctx-menu__item" @click="emit('edit')">编辑</button>
+        <button type="button" class="ctx-menu__item" @click="emit('duplicate')">复制</button>
+        <button type="button" class="ctx-menu__item" @click="emit('quote')">复制到输入框</button>
         <button type="button" class="ctx-menu__item ctx-menu__item--danger" @click="emit('remove')">
-          Delete
+          删除
         </button>
       </template>
     </div>

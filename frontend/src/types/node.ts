@@ -46,7 +46,7 @@ export interface CreativeNodeData {
   icon: string
     /** Display type label, so node components do not repeatedly write type mappings. */
   typeLabel: string
-  /** Worldbuilding folder parent; null means a root tree. Other node types ignore this field. */
+  /** 世界观 folder parent; null means a root tree. Other node types ignore this field. */
   parentId?: string | null
   /** Sibling order under the same parent in the world folder tree. */
   sortOrder?: number

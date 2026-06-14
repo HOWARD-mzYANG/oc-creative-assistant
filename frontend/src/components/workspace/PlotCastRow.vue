@@ -179,8 +179,8 @@ watch(
 <template>
   <section class="plot-cast">
     <div class="plot-cast__head">
-      <span class="eyebrow">Participants</span>
-      <span v-if="isLoading" class="plot-cast__hint">Loading…</span>
+      <span class="eyebrow">参与者</span>
+      <span v-if="isLoading" class="plot-cast__hint">加载中…</span>
     </div>
 
     <div class="plot-cast__row">
@@ -205,7 +205,7 @@ watch(
         <span
           class="plot-cast__remove"
           role="button"
-          aria-label="Remove participant"
+          aria-label="移除参与者"
           @click.stop="unlinkCharacter(member.edgeId)"
         >
           ×
@@ -216,17 +216,17 @@ watch(
         <button
           type="button"
           class="plot-cast__add"
-          aria-label="Add participant"
-          title="Add participant"
+          aria-label="添加参与者"
+          title="添加参与者"
           @click="togglePicker"
         >
           +
         </button>
 
         <div v-if="pickerOpen" class="plot-cast__picker">
-          <p v-if="isLoadingCharacters" class="plot-cast__picker-empty">Loading characters…</p>
+          <p v-if="isLoadingCharacters" class="plot-cast__picker-empty">正在加载角色…</p>
           <p v-else-if="allCharacters.length === 0" class="plot-cast__picker-empty">
-            No characters yet — create one in Characters first.
+            还没有角色，请先在“角色”中创建。
           </p>
           <p v-else-if="pickableCharacters.length === 0" class="plot-cast__picker-empty">
             All characters are already linked.

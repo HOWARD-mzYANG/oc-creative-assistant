@@ -63,7 +63,7 @@ function storySection(nodes: OcNode[], edges: OcEdge[]): string {
       return `<section class="node"><h3>${esc(n.title)}</h3>${fieldsHtml(n)}${contentHtml(n)}${relBlock}${tagsHtml(n)}</section>`
     })
     .join('')
-  return `<h2 class="board">Story</h2>${items}`
+  return `<h2 class="board">故事</h2>${items}`
 }
 
 function charactersSection(nodes: OcNode[]): string {
@@ -75,7 +75,7 @@ function charactersSection(nodes: OcNode[]): string {
         `<section class="node"><h3>${esc(n.title)}</h3>${fieldsHtml(n)}${contentHtml(n)}${tagsHtml(n)}</section>`,
     )
     .join('')
-  return `<h2 class="board">Characters</h2>${items}`
+  return `<h2 class="board">角色</h2>${items}`
 }
 
 function worldSection(nodes: OcNode[], edges: OcEdge[]): string {
@@ -107,7 +107,7 @@ function worldSection(nodes: OcNode[], edges: OcEdge[]): string {
       )
       .join('')
   }
-  return `<h2 class="board">Worldbuilding</h2>${walk(null, 0)}`
+  return `<h2 class="board">世界观</h2>${walk(null, 0)}`
 }
 
 const CSS = `
@@ -168,7 +168,7 @@ export function buildProjectHtml(data: OcExport, options: BuildProjectHtmlOption
   }</body></html>`
 }
 
-/** Export a project as PDF, using Electron's native PDF writer when available. */
+/** 导出 a project as PDF, using Electron's native PDF writer when available. */
 export async function openProjectPdf(data: OcExport): Promise<void> {
   if (window.ocDesktop?.exportProjectPdf) {
     await window.ocDesktop.exportProjectPdf({

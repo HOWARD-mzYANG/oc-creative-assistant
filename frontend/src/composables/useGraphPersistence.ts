@@ -29,14 +29,14 @@ export function useGraphPersistence(
   loaders?: GraphPersistenceLoaders,
 ) {
   const projectId = ref('')
-  const projectName = ref('Loading project…')
+  const projectName = ref('正在加载项目…')
   const graphSnapshot = ref<CreativeGraphSnapshot>({ nodes: [], edges: [] })
   const graphNodes = ref<CreativeFlowNode[]>([])
   const graphEdges = ref<CreativeFlowEdge[]>([])
   const graphVersion = ref(0)
   const isGraphReady = ref(false)
   const isSaving = ref(false)
-  const saveState = ref('Loading…')
+  const saveState = ref('加载中…')
 
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -94,7 +94,7 @@ export function useGraphPersistence(
     }
     try {
       isSaving.value = true
-      saveState.value = 'Saving…'
+      saveState.value = '保存中…'
       const saveDto = snapshotToSaveDto(graphSnapshot.value)
       const savedGraph = loaders
         ? await loaders.save(saveDto)
@@ -103,9 +103,9 @@ export function useGraphPersistence(
         setGraphSnapshot(graphDtoToSnapshot(savedGraph), true)
       }
       applyIndexingStatus(savedGraph.indexing)
-      saveState.value = `Saved · ${new Date().toLocaleTimeString()}`
+      saveState.value = `已保存 · ${new Date().toLocaleTimeString()}`
     } catch (error) {
-      saveState.value = error instanceof Error ? `Save failed: ${error.message}` : 'Save failed'
+      saveState.value = error instanceof Error ? `保存失败: ${error.message}` : '保存失败'
     } finally {
       isSaving.value = false
     }
@@ -133,7 +133,7 @@ export function useGraphPersistence(
 
   async function loadGraph(): Promise<{ initialNodeId: string }> {
     try {
-      saveState.value = 'Loading…'
+      saveState.value = '加载中…'
       const graph = loaders ? await loaders.load() : await loadDefaultGraph()
       const snapshot = graphDtoToSnapshot(graph)
       projectId.value = graph.project.id

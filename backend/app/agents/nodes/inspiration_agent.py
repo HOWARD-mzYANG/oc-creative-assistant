@@ -1,17 +1,12 @@
-"""Inspiration agent node.
+"""灵感 agent 节点。
 
-Calls LlmProvider to output InspirationOutput, forcing a reasoning field that
-explicitly emits CoT reasoning. The prompt is injected by build_memory_block
-with multi-layer memory + RAG context, letting the LLM brainstorm within the
-existing worldbuilding and recent conversation without straying from the user's
-context.
+调用 LlmProvider 输出 InspirationOutput，并强制包含 reasoning 字段以显式给出推理。
+prompt 由 build_memory_block 注入多层记忆 + RAG 上下文，让 LLM 在已有世界观和最近对话中
+发散创意，不偏离用户上下文。
 
-Tools are "optional": the LLM decides for itself "should I first verify with
-search_nodes whether the project has a similar node for this suggestion".
-research_agent's policy of forcing mandatory tool use does not suit a
-brainstorming scenario; here the ReAct early-exit mechanism lets the LLM wrap up
-directly when there is no problem, and not calling any tool in a turn is also
-valid.
+工具是“可选”的：LLM 自行决定是否要先用 search_nodes 检查项目里是否已有相似节点。
+research_agent 强制使用工具的策略不适合头脑风暴场景；这里用 ReAct 早退出机制，让 LLM 在
+没有问题时直接收束，本轮不调用任何工具也是有效路径。
 """
 
 from __future__ import annotations
@@ -38,19 +33,19 @@ _SYSTEM_PROMPT = load_prompt("inspiration")
 
 
 def inspiration_agent_node(state: AgentState) -> dict[str, Any]:
-    """Optionally verify via a ReAct loop and produce InspirationOutput; degrade gracefully when the LLM fails."""
+    """可选通过 ReAct 循环核验并生成 InspirationOutput；LLM 失败时优雅降级。"""
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "").strip()
 
     if not user_message:
-        empty = InspirationOutput(reasoning="User message is empty; skipping reasoning.", suggestions=[])
+        empty = InspirationOutput(reasoning="用户消息为空，跳过推理。", suggestions=[])
         return {"inspiration_output": empty}
 
     initial_messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
             f"{build_memory_block(state, 'inspiration')}\n\n"
-            f"[User question]\n{user_message}"
+            f"[用户问题]\n{user_message}"
         ),
     ]
 
@@ -73,13 +68,13 @@ def inspiration_agent_node(state: AgentState) -> dict[str, Any]:
         )
         if output is None:
             output = InspirationOutput(
-                reasoning="Structured output was empty.",
+                reasoning="结构化输出为空。",
                 suggestions=[],
             )
     except Exception as error:  # noqa: BLE001
         logger.warning("inspiration_agent LLM call failed, degrading: %s", error)
         output = InspirationOutput(
-            reasoning=f"Call failed ({type(error).__name__}); unable to brainstorm ideas for now.",
+            reasoning=f"调用失败（{type(error).__name__}）；暂时无法进行灵感发散。",
             suggestions=[],
         )
     return {"inspiration_output": output}

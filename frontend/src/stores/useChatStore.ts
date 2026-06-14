@@ -69,7 +69,7 @@ export const useChatStore = defineStore('chat', () => {
     const payload = item.payload_edited ?? item.payload
     return {
       node_id: item.target_id,
-      title: String(payload.title ?? 'Untitled'),
+      title: String(payload.title ?? '未命名'),
       node_type: String(payload.node_type ?? 'character'),
       content: String(payload.content ?? ''),
       change_type: item.change_type,
@@ -124,11 +124,11 @@ export const useChatStore = defineStore('chat', () => {
     error.value = ''
     try {
       sessions.value = await listProjectSessions(targetProjectId)
-      const session = sessions.value[0] ?? (await createChatSession(targetProjectId, 'New chat'))
+      const session = sessions.value[0] ?? (await createChatSession(targetProjectId, '新对话'))
       if (!sessions.value.length) sessions.value = [session]
       await switchSession(session.id)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to start chat'
+      error.value = e instanceof Error ? e.message : '对话启动失败'
     }
   }
 
@@ -149,7 +149,7 @@ export const useChatStore = defineStore('chat', () => {
   /** Create a fresh chat session and switch to it (explicit user action only). */
   async function newSession(): Promise<void> {
     if (!projectId.value) return
-    const session = await createChatSession(projectId.value, 'New chat')
+    const session = await createChatSession(projectId.value, '新对话')
     sessions.value = [session, ...sessions.value]
     sessionId.value = session.id
     messages.value = []
@@ -209,7 +209,7 @@ export const useChatStore = defineStore('chat', () => {
     streamingReply.value = ''
     streamingWebSources.value = []
     streamingApplied.value = []
-    progressLabel.value = 'Thinking…'
+    progressLabel.value = '思考中…'
     error.value = ''
     const appliedThisTurn: AppliedEntityDto[] = []
     let relatedThisTurn: RelatedNodeDto[] = []
@@ -285,7 +285,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Edit the title/body of the node behind a given inline card (revamp 1). */
+  /** 编辑 the title/body of the node behind a given inline card (revamp 1). */
   async function editAppliedNode(
     nodeId: string,
     patch: { title?: string; content?: string },

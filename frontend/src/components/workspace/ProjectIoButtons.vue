@@ -59,16 +59,16 @@ async function onImport(event: Event) {
 <template>
   <span class="project-io" :class="{ 'project-io--sidebar': variant === 'sidebar' }">
     <input ref="ocInput" type="file" accept=".oc,application/json" hidden @change="onImport" />
-    <button type="button" class="project-io__btn" @click="ocInput?.click()">Import</button>
+    <button type="button" class="project-io__btn" @click="ocInput?.click()">导入</button>
     <span class="project-io__export">
-      <button type="button" class="project-io__btn" @click="menuOpen = !menuOpen">Export</button>
+      <button type="button" class="project-io__btn" @click="menuOpen = !menuOpen">导出</button>
       <template v-if="menuOpen">
         <div class="project-io__backdrop" @click="menuOpen = false" />
         <ul
           class="project-io__menu"
           :class="{ 'project-io__menu--up': variant === 'sidebar' }"
         >
-          <li><button type="button" @click="choose('oc')">.oc file</button></li>
+          <li><button type="button" @click="choose('oc')">.oc 文件</button></li>
           <li><button type="button" @click="choose('pdf')">PDF</button></li>
         </ul>
       </template>

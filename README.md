@@ -1,58 +1,58 @@
 # oc-creative-assistant
-OC Creative Assistant System
+OC 创意助手系统
 
-## Installing Dependencies
+## 安装依赖
 
-### Frontend Dependencies
+### 前端依赖
 
-Frontend dependencies are maintained in `frontend/package.json`. Enter the `frontend` directory and install them:
+前端依赖由 `frontend/package.json` 维护。进入 `frontend` 目录并安装：
 
 ```powershell
 cd frontend
 npm install
 ```
 
-Once the installation completes, you can return to the project root:
+安装完成后，可以回到项目根目录：
 
 ```powershell
 cd ..
 ```
 
-### Electron Dependencies
+### Electron 依赖
 
-The Electron subproject is maintained in `electron/package.json`. Install its dependencies in the following order:
+Electron 子项目由 `electron/package.json` 维护。按以下顺序安装依赖：
 
 ```powershell
 cd electron
 npm install
 ```
 
-Afterwards, return to the project root:
+随后回到项目根目录：
 
 ```powershell
 cd ..
 ```
 
-### Backend Dependencies
+### 后端依赖
 
-We recommend first creating a Python virtual environment in the project root:
+建议先在项目根目录创建 Python 虚拟环境：
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Backend dependencies are maintained in `backend/requirements.txt`. Install them after activating the virtual environment:
+后端依赖由 `backend/requirements.txt` 维护。激活虚拟环境后安装：
 
 ```powershell
 pip install -r backend/requirements.txt
 ```
 
-## Common Scripts
+## 常用脚本
 
-All of the following commands are run from the project root, i.e. the directory that contains the root `package.json`.
+以下所有命令都在项目根目录运行，也就是包含根级 `package.json` 的目录。
 
-Any command that starts or builds the backend must run in a terminal where the backend Python environment is activated. If you open a new terminal, activate it again first:
+任何启动或构建后端的命令，都需要在已激活后端 Python 环境的终端中运行。如果打开了新终端，请先再次激活：
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -62,21 +62,21 @@ Any command that starts or builds the backend must run in a terminal where the b
 npm run frontend:dev
 ```
 
-Starts the frontend Vite dev server. This command enters the `frontend` subproject and runs `npm run dev`.
+启动前端 Vite 开发服务器。该命令会进入 `frontend` 子项目并运行 `npm run dev`。
 
 ```powershell
 npm run frontend:build
 ```
 
-Builds the frontend artifacts. This command enters the `frontend` subproject and runs type checking and the Vite build.
+构建前端产物。该命令会进入 `frontend` 子项目，执行类型检查和 Vite 构建。
 
 ```powershell
 npm run backend:dev
 ```
 
-Starts the backend FastAPI dev server, listening on `127.0.0.1:9000`. We recommend activating the Python virtual environment before running it.
+启动后端 FastAPI 开发服务器，监听 `127.0.0.1:9000`。建议运行前先激活 Python 虚拟环境。
 
-For example:
+例如：
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -87,41 +87,41 @@ npm run backend:dev
 npm run backend:build
 ```
 
-Runs the backend build script `scripts/build-backend.mjs`, which prepares the backend artifacts for the desktop packaging process.
+运行后端构建脚本 `scripts/build-backend.mjs`，为桌面端打包流程准备后端产物。
 
 ```powershell
 npm run electron:dev
 ```
 
-Starts the Electron subproject in development mode. You must first complete the installation in the "Electron Dependencies" section above.
+以开发模式启动 Electron 子项目。请先完成上方“Electron 依赖”部分的安装。
 
 ```powershell
 npm run electron:build
 ```
 
-Builds the Electron subproject. You must first complete the installation in the "Electron Dependencies" section above.
+构建 Electron 子项目。请先完成上方“Electron 依赖”部分的安装。
 
 ```powershell
 npm run dev:desktop
 ```
 
-Starts the desktop integrated development workflow, in which `scripts/dev-desktop.mjs` coordinates the frontend, backend, and Electron dev processes.
+启动桌面端一体化开发流程，由 `scripts/dev-desktop.mjs` 协调前端、后端和 Electron 开发进程。
 
-If this script needs to start the backend automatically, run it from a terminal where the backend Python environment is activated.
+如果该脚本需要自动启动后端，请在已激活后端 Python 环境的终端中运行。
 
-**Recommended**: First run `npm run frontend:dev` and `npm run backend:dev` in two separate terminals (the backend terminal needs the virtual environment activated). Once Vite and FastAPI are ready, run `npm run dev:desktop`. The script reuses the already-running frontend and backend to avoid starting them twice; if they were not started manually, it will also spin up the frontend and backend automatically before opening Electron.
+**推荐做法**：先在两个独立终端中分别运行 `npm run frontend:dev` 和 `npm run backend:dev`（后端终端需要激活虚拟环境）。等 Vite 和 FastAPI 就绪后，再运行 `npm run dev:desktop`。该脚本会复用已经运行的前端和后端，避免重复启动；如果没有手动启动，它也会在打开 Electron 前自动拉起前端和后端。
 
 ```powershell
 npm run build:desktop
 ```
 
-Runs the complete desktop build workflow, in which `scripts/build-desktop.mjs` coordinates the packaging steps for the frontend, backend, and Electron.
+运行完整的桌面端构建流程，由 `scripts/build-desktop.mjs` 协调前端、后端和 Electron 的打包步骤。
 
-After the build finishes, the desktop artifacts are written to `electron/dist`:
+构建完成后，桌面端产物会写入 `electron/dist`：
 
-- `electron/dist/OC Creative Assistant Setup 0.1.0.exe`: the Windows NSIS installer. This is the installer package you can distribute to users.
-- `electron/dist/OC Creative Assistant 0.1.0.exe`: the Windows portable executable. This can be run directly without installation.
-- `electron/dist/win-unpacked/OC Creative Assistant.exe`: the unpacked application executable, useful for quick local smoke testing after a build.
-- `electron/dist/OC Creative Assistant Setup 0.1.0.exe.blockmap`, `builder-debug.yml`, and `builder-effective-config.yaml`: build metadata generated by Electron Builder; these are not the main user-facing executables.
+- `electron/dist/OC Creative Assistant Setup 0.1.0.exe`：Windows NSIS 安装包，可分发给用户安装。
+- `electron/dist/OC Creative Assistant 0.1.0.exe`：Windows 便携版可执行文件，无需安装即可直接运行。
+- `electron/dist/win-unpacked/OC Creative Assistant.exe`：未打包压缩的应用可执行文件，适合构建后做本地快速冒烟测试。
+- `electron/dist/OC Creative Assistant Setup 0.1.0.exe.blockmap`、`builder-debug.yml` 和 `builder-effective-config.yaml`：Electron Builder 生成的构建元数据，不是主要面向用户的可执行文件。
 
-The `0.1.0` version segment comes from `electron/package.json`, so these file names change when the Electron package version changes.
+其中 `0.1.0` 版本号来自 `electron/package.json`，因此 Electron 包版本变化时，这些文件名也会随之变化。

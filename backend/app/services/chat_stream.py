@@ -1,14 +1,12 @@
-"""SSE streaming chat implementation.
+"""SSE 流式聊天实现。
 
-LangGraph's sync interface `graph.stream` is compatible with the `SqliteSaver`
-(synchronous checkpointer) the project currently uses; calling `graph.astream`
-directly would force `aget_tuple`, requiring `AsyncSqliteSaver` + `aiosqlite`,
-which does not match the existing architecture.
+LangGraph 的同步接口 `graph.stream` 与项目当前使用的 `SqliteSaver`
+（同步检查点存储）兼容；直接调用 `graph.astream` 会强制走 `aget_tuple`，
+需要 `AsyncSqliteSaver` + `aiosqlite`，与现有架构不匹配。
 
-Compromise: run the synchronous `graph.stream` inside `asyncio.to_thread` and
-bridge it into an async generator via `asyncio.Queue`, which neither pulls in
-the aiosqlite dependency nor requires rewriting chat_service.run_chat_turn as a
-whole into async.
+折中方案：在 `asyncio.to_thread` 中运行同步的 `graph.stream`，再通过
+`asyncio.Queue` 桥接成异步生成器。这样既不用引入 aiosqlite，也不用把
+chat_service.run_chat_turn 整体改成 async。
 """
 
 from __future__ import annotations
@@ -30,24 +28,24 @@ from app.services.chat_service import require_session
 
 logger = logging.getLogger(__name__)
 
-_PROD_ERROR_MESSAGE = "Something went wrong during reasoning, please try again"
+_PROD_ERROR_MESSAGE = "推理过程中出了点问题，请稍后再试"
 
 
 _NODE_LABELS: dict[str, str] = {
-    "load_context": "Loading context",
-    "intent_router": "Determining intent",
-    "parallel_retrieval": "Searching knowledge base",
-    "context_compress": "Compressing context",
-    "inspiration_agent": "Brainstorming ideas",
-    "research_agent": "Researching and verifying",
-    "structure_agent": "Organizing structure",
-    "simulation_agent": "Simulating branches",
-    "boundary_check": "Boundary check",
-    "chat_assembler": "Generating reply",
-    "persistence_hub": "Persisting results",
-    "structured_extractor": "Extracting entities",
-    "question_planner": "Planning follow-up",
-    "summary_compress": "Compressing conversation summary",
+    "load_context": "加载上下文",
+    "intent_router": "判断意图",
+    "parallel_retrieval": "检索知识库",
+    "context_compress": "压缩上下文",
+    "inspiration_agent": "发散创意",
+    "research_agent": "研究与核查",
+    "structure_agent": "整理结构",
+    "simulation_agent": "模拟分支",
+    "boundary_check": "边界检查",
+    "chat_assembler": "生成回复",
+    "persistence_hub": "持久化结果",
+    "structured_extractor": "提取实体",
+    "question_planner": "规划追问",
+    "summary_compress": "压缩对话摘要",
 }
 
 
@@ -55,7 +53,7 @@ _DONE = object()
 
 
 def _sse(data: dict[str, Any]) -> str:
-    """Dict -> SSE protocol data line (events separated by double \\n)."""
+    """将字典转为 SSE 协议数据行（事件之间用双换行分隔）。"""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
@@ -74,7 +72,7 @@ def _build_error_event(
     phase: str,
     last_node: str | None = None,
 ) -> dict[str, Any]:
-    """Build the SSE error payload; include diagnostics only in dev mode."""
+    """构建 SSE 错误载荷；仅在开发模式下包含诊断信息。"""
     if not get_app_settings().dev_mode:
         return {"type": "error", "message": _PROD_ERROR_MESSAGE}
 
@@ -85,7 +83,7 @@ def _build_error_event(
 
     return {
         "type": "error",
-        "message": f"Reasoning failed during {phase}{node_hint}: {summary}",
+        "message": f"推理在 {phase}{node_hint} 阶段失败：{summary}",
         "debug": {
             "phase": phase,
             "last_node": last_node,
@@ -97,7 +95,7 @@ def _build_error_event(
 
 
 def _resolve_related_nodes(node_ids: list[str]) -> list[dict[str, str]]:
-    """Resolve cited node ids to lightweight {id, title, node_type} for the chat UI."""
+    """将引用节点 ID 解析为聊天 UI 需要的轻量 {id, title, node_type}。"""
     ids = list(node_ids or [])
     if not ids:
         return []
@@ -112,7 +110,7 @@ def _resolve_related_nodes(node_ids: list[str]) -> list[dict[str, str]]:
 
 
 def _build_events(node_name: str, node_output: Any) -> list[dict[str, Any]]:
-    """Node output -> list of SSE events (a main event + metadata events attached to key nodes)."""
+    """将节点输出转成 SSE 事件列表（主事件 + 关键节点附带的元数据事件）。"""
     events: list[dict[str, Any]] = [
         {
             "type": "node_end",
@@ -165,11 +163,10 @@ def _build_events(node_name: str, node_output: Any) -> list[dict[str, Any]]:
 
 
 async def stream_chat_turn(payload: ChatRequest) -> AsyncIterator[str]:
-    """Run graph.stream (sync) and convert each node output into SSE events.
+    """运行同步的 graph.stream，并将每个节点输出转换成 SSE 事件。
 
-    Any internal graph exception is funneled into a single error event, so the
-    frontend can gracefully switch to fallback text without hitting a stream cut
-    off midway.
+    图内部的任何异常都会被收敛成单个错误事件，让前端能平滑切到兜底文案，
+    而不是遇到中途断流。
     """
     with SessionLocal() as db:
         session = require_session(db, payload.session_id)
@@ -192,12 +189,11 @@ async def stream_chat_turn(payload: ChatRequest) -> AsyncIterator[str]:
     queue: asyncio.Queue = asyncio.Queue()
 
     def producer() -> None:
-        """Synchronous thread runs graph.stream; call_soon_threadsafe delivers each chunk back to the loop.
+        """同步线程运行 graph.stream；call_soon_threadsafe 将每个 chunk 送回事件循环。
 
-        With multiple stream_modes, LangGraph wraps each chunk into a (mode,
-        payload) tuple; the main coroutine dispatches by mode: "updates" is a
-        node-level update, "custom" is a token event pushed from within a node via
-        get_stream_writer.
+        存在多个 stream_mode 时，LangGraph 会把每个 chunk 包装成 (mode, payload)
+        元组；主协程按 mode 分发："updates" 是节点级更新，"custom" 是节点内通过
+        get_stream_writer 推送的 token 事件。
         """
         try:
             stream = graph.stream(
@@ -229,12 +225,12 @@ async def stream_chat_turn(payload: ChatRequest) -> AsyncIterator[str]:
 
             mode, payload = item
             if mode == "custom":
-                # Token events pushed by chat_assembler via get_stream_writer, passed through to the frontend
+                # chat_assembler 通过 get_stream_writer 推送的 token 事件，原样传给前端。
                 if isinstance(payload, dict) and payload.get("type"):
                     yield _sse(payload)
                 continue
 
-            # mode == "updates": payload is a {node_name: node_output} dict
+            # mode == "updates"：payload 是 {node_name: node_output} 字典。
             for node_name, node_output in payload.items():
                 last_node = node_name
                 for event in _build_events(node_name, node_output):

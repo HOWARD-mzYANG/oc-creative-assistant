@@ -1,23 +1,18 @@
-"""Background structured extraction node (Agent B part one, first_revision decision 5 + rework 1).
+"""后台结构化提取节点（Agent B 第一部分，first_revision 决策 5 + rework 1）。
 
-Runs after persistence_hub: extracts entities / relations from the user's recent
-free-form conversation, converts them into staging (reusing AgentStagingORM),
-optionally [auto-persists] (accept_all) when ``auto_apply_staging`` is true
-(workspace flow), pushing "added/updated" card info to the frontend so the user
-can expand to edit or discard. When ``auto_apply_staging`` is false (Chat
-module), items stay pending for the right-hand staging panel.
+在 persistence_hub 之后运行：从用户最近的自由对话中提取实体 / 关系，转换成暂存项
+（复用 AgentStagingORM）；当 ``auto_apply_staging`` 为 true（工作区流程）时可选
+[自动持久化]（accept_all），并向前端推送“新增/更新”的卡片信息，让用户展开编辑或丢弃。
+当 ``auto_apply_staging`` 为 false（Chat 模块）时，项目保留为 pending，交给右侧暂存面板。
 
-Two key points of rework 1:
-1. Auto-persist (workspace only): when ``auto_apply_staging`` is set, immediately
-   accept_all after writing staging (still going through AgentStagingORM +
-   canvas_apply); the frontend renders inline cards via the extraction_applied event.
-2. Dedup by name: if a same-named entity already exists on the canvas **or is
-   already pending in staging** (e.g. structure_agent proposed it this turn),
-   skip create_node; merge attributes via update_node only when a real node exists.
-   Relations connect using real node_ids or same-batch pending_ids.
+rework 1 的两个关键点：
+1. 自动持久化（仅工作区）：设置 ``auto_apply_staging`` 后，写入 staging 立即 accept_all
+   （仍经过 AgentStagingORM + canvas_apply）；前端通过 extraction_applied 事件渲染行内卡片。
+2. 按名称去重：如果画布上已经有同名实体，或 staging 中已经有 pending 的同名实体
+   （例如 structure_agent 本轮已提出），则跳过 create_node；只有真实节点存在时才通过
+   update_node 合并属性。关系使用真实 node_id 或同批次 pending_id 连接。
 
-Works only when ``extraction_enabled`` is true; when off it is a no-op and the
-legacy chat flow is unaffected.
+仅在 ``extraction_enabled`` 为 true 时工作；关闭时为空操作，不影响旧聊天流程。
 """
 
 from __future__ import annotations
@@ -46,14 +41,14 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = load_prompt("structured_extractor")
 
-# Entity type -> canvas node_type (aligned with sub-graph partitioning).
+# 实体类型 -> 画布 node_type（与子图分区对齐）。
 _NODE_TYPE_BY_ENTITY: dict[str, str] = {
     "character": "character",
     "world": "worldbuilding",
     "plot": "plot",
 }
 
-# Relation label -> relation_type (drives the canvas edge visuals; used at persistence time).
+# 关系标签 -> relation_type（驱动画布边样式，并在持久化时使用）。
 _RELATION_BY_LABEL: dict[str, str] = {
     "belongs to": "belongs_to",
     "participates in": "belongs_to",
@@ -71,7 +66,7 @@ def _entity_key(node_type: str, title: str) -> tuple[str, str]:
 
 
 def _pending_create_refs(db: Session, project_id: str) -> dict[tuple[str, str], str]:
-    """Map (node_type, title) -> pending_id for pending create_node staging rows."""
+    """为 pending 的 create_node 暂存行建立 (node_type, title) -> pending_id 映射。"""
     refs: dict[tuple[str, str], str] = {}
     rows = db.scalars(
         select(AgentStagingORM).where(
@@ -91,7 +86,7 @@ def _pending_create_refs(db: Session, project_id: str) -> dict[tuple[str, str], 
 
 
 def _merge_content(existing: str, attributes: dict[str, str]) -> str:
-    """Merge newly extracted attributes into the existing node's content, without re-appending key-values already present."""
+    """将新提取的属性合并到已有节点内容中，不重复追加已存在的键值。"""
     lines = [line.strip() for line in (existing or "").splitlines() if line.strip()]
     seen = set(lines)
     for key, value in attributes.items():
@@ -103,7 +98,7 @@ def _merge_content(existing: str, attributes: dict[str, str]) -> str:
 
 
 def _emit_applied(items: list[dict[str, Any]]) -> None:
-    """Push the "persisted cards" to the frontend via the LangGraph custom stream (silent under non-streaming calls)."""
+    """通过 LangGraph custom stream 将“已持久化卡片”推给前端（非流式调用下静默）。"""
     if not items:
         return
     try:
@@ -127,12 +122,12 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
         return {}
 
     recent = state.get("recent_messages") or []
-    history = "\n".join(f"{m['role']}: {m['content']}" for m in recent[-6:]) or "(none)"
+    history = "\n".join(f"{m['role']}: {m['content']}" for m in recent[-6:]) or "（无）"
     messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
-            f"[Quoted nodes from canvas]\n{format_current_nodes(state.get('current_nodes') or [])}\n\n"
-            f"[Recent conversation]\n{history}\n\n[User's latest message]\n{state.get('user_message', '')}"
+            f"[画布引用节点]\n{format_current_nodes(state.get('current_nodes') or [])}\n\n"
+            f"[最近对话]\n{history}\n\n[用户最新消息]\n{state.get('user_message', '')}"
         ),
     ]
 
@@ -151,14 +146,14 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
         return {"deferred_fields": deferred, "extraction_count": 0}
 
     items: list[AgentStagingCreateItem] = []
-    # Entity name -> the id referenced at persistence time (existing = real node_id, new = pending_id).
+    # 实体名 -> 持久化时引用的 ID（已有 = 真实 node_id，新建 = pending_id）。
     ref_by_name: dict[str, str] = {}
-    # Entity name -> node_type, used to keep only plot↔plot relations.
+    # 实体名 -> node_type，用于只保留 plot->plot 关系。
     type_by_name: dict[str, str] = {}
 
-    # Dedup: canvas nodes always; pending staging only in Chat confirm mode (auto_apply off).
-    # In workspace auto-apply mode, structure_agent staging is accepted before this node runs;
-    # skipping pending rows here avoids duplicate cards in Chat, but must not block a failed auto_apply.
+    # 去重：画布节点始终参与；pending staging 只在聊天确认模式（auto_apply off）下参与。
+    # 工作区自动应用模式中，structure_agent staging 会在本节点运行前被接受；
+    # 这里跳过 pending 行可避免 Chat 中重复卡片，但不能阻塞失败的 auto_apply。
     chat_confirm_mode = not state.get("auto_apply_staging")
     with SessionLocal() as db:
         pending_create_refs = _pending_create_refs(db, project_id) if chat_confirm_mode else {}
@@ -177,7 +172,7 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
                 .first()
             )
             if existing is not None:
-                # A same-named card already exists -> update (merge new attributes into content), don't create a new one.
+                # 同名卡片已存在 -> 更新（把新属性合并进内容），不再新建。
                 ref_by_name[entity.name] = existing.id
                 if entity.attributes:
                     items.append(
@@ -189,11 +184,11 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
                                 "node_type": node_type,
                                 "content": _merge_content(existing.content, entity.attributes),
                             },
-                            reasoning="Supplemented an existing card from the conversation in the background",
+                            reasoning="后台从对话中补充已有卡片",
                         )
                     )
             elif key in pending_create_refs:
-                # structure_agent (or an earlier pending batch) already proposed this card.
+                # structure_agent（或更早的 pending 批次）已经提出过这张卡片。
                 ref_by_name[entity.name] = pending_create_refs[key]
             else:
                 pending_seq += 1
@@ -205,7 +200,7 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
                         change_type="create_node",
                         pending_id=pending_id,
                         payload={"title": entity.name, "content": content, "node_type": node_type},
-                        reasoning="Extracted from the conversation in the background",
+                        reasoning="后台从对话中提取",
                     )
                 )
 
@@ -227,7 +222,7 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
                     "relation_type": relation_type,
                     "label": relation.label or "related",
                 },
-                reasoning="Extracted from the conversation in the background",
+                reasoning="后台从对话中提取",
             )
         )
 
@@ -260,7 +255,7 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
 
 
 def _applied_cards_from_batch(batch_id: str) -> list[dict[str, Any]]:
-    """Build inline-card payloads from persisted staging rows (reads DB after accept_all)."""
+    """从已持久化的 staging 行构建行内卡片 payload（accept_all 后读取 DB）。"""
     with SessionLocal() as db:
         records = list_staging_by_batch(db, batch_id)
 
@@ -276,7 +271,7 @@ def _applied_cards_from_batch(batch_id: str) -> list[dict[str, Any]]:
         applied.append(
             {
                 "node_id": record.target_id,
-                "title": str(payload.get("title") or "Untitled"),
+                "title": str(payload.get("title") or "未命名"),
                 "node_type": str(payload.get("node_type") or "character"),
                 "content": str(payload.get("content") or ""),
                 "change_type": record.change_type,
@@ -286,10 +281,9 @@ def _applied_cards_from_batch(batch_id: str) -> list[dict[str, Any]]:
 
 
 def _auto_apply(batch_id: str) -> list[dict[str, Any]]:
-    """Auto-accept the whole staging batch and persist it, returning a summary of the "added/updated" cards.
+    """自动接受整个暂存批次并持久化，返回“新增/更新”卡片摘要。
 
-    Lazily imports chat_service to avoid a circular dependency with the agents
-    package (chat_service -> graph -> this node).
+    延迟导入 chat_service，避免与 agents 包形成循环依赖（chat_service -> graph -> 本节点）。
     """
     from app.schemas import AgentStagingBatchActionRequest
     from app.services.chat_service import resolve_staging_batch

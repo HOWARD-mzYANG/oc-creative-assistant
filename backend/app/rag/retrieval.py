@@ -29,12 +29,12 @@ def build_graph_context(
     Canvas edges are creative relations the user explicitly established, so they take
     priority over semantic similarity.
 
-    Args:
+    参数：
         node_id: The current node ID.
         nodes: The full node snapshot of the current project.
         edges: The full edge snapshot of the current project.
 
-    Returns:
+    返回：
         The graph relation context directly connected to the current node.
     """
     node_by_id = {node.id: node for node in nodes}
@@ -78,14 +78,14 @@ def build_project_vector_context(
 ) -> tuple[list[RagVectorContextItem], str, str | None]:
     """Build the project-level vector retrieval context.
 
-    Args:
+    参数：
         project_id: The current project ID.
         nodes: The full node snapshot of the current project.
         query: The retrieval question entered by the user.
         top_k: The maximum number of vector context items to return.
         node_type: Optional node type filter.
 
-    Returns:
+    返回：
         The list of similar nodes, the identifier of the vector store actually used,
         and an optional error message.
     """

@@ -1,19 +1,15 @@
-"""Chat assembler node.
+"""聊天回复组装节点。
 
-Reads the structured output of the agent matching the current intent and uses
-the LLM to translate it into a natural-language reply; small_talk goes through a
-separate lightweight prompt so that chit-chat is not contaminated by character
-names in the project context being mistaken for a "disguised username".
+读取与当前意图匹配的 agent 结构化输出，并让 LLM 将其翻译成自然语言回复；small_talk
+走单独的轻量 prompt，避免闲聊被项目上下文里的角色名污染，被误判为“伪装的用户名”。
 
-To support token-level streaming, the main path is split into two steps:
-  Step 1 [streaming]: chat_stream generates the plain-text reply_text, with each
-                      token pushed onto the LangGraph custom stream via
-                      get_stream_writer
-  Step 2 [non-streaming]: a structured call extracts cited_node_ids and
-                          staging_summary from the already-generated reply_text
+为支持 token 级流式输出，主路径拆成两步：
+  步骤 1 [流式]：chat_stream 生成纯文本 reply_text，并通过 get_stream_writer 将每个
+                 token 推到 LangGraph custom stream
+  步骤 2 [非流式]：结构化调用从已生成的 reply_text 中提取 cited_node_ids 和
+                  staging_summary
 
-The small_talk text is very short and not worth an extra round-trip, so it
-keeps a single structured call.
+small_talk 文本很短，不值得额外走一轮请求，因此保留单次结构化调用。
 """
 
 from __future__ import annotations
@@ -47,26 +43,24 @@ _METADATA_PROMPT = load_prompt("chat_assembler_metadata")
 
 
 def _hint_block(state: AgentState) -> str:
-    """Assemble the follow-up direction planned by question_planner into a hint block (empty when the gate is off).
+    """将 question_planner 规划的追问方向组装成提示块（开关关闭时为空）。
 
-    Provided only as a "suggested direction" for the assembler to weave in
-    naturally, not to be copied verbatim, to avoid the reply turning into
-    mechanical questioning.
+    这里只提供“建议方向”，供 assembler 自然织入回复，而不是逐字复制，避免回复变成机械追问。
     """
     hint = (state.get("next_question_hint") or "").strip()
     if not hint:
         return ""
     return (
-        f"\n\n[Suggested next follow-up direction (weave into the reply naturally, do not copy verbatim)]\n{hint}"
+        f"\n\n[建议的下一步追问方向（自然织入回复，不要逐字复制）]\n{hint}"
     )
 
 
 def _build_small_talk_brief(state: AgentState) -> str:
-    """Expose only the top-level info of the worldbuilding outline, hiding node-level and conversation-level specific names, to keep the LLM from mistaking a project character for the user's name during chit-chat."""
+    """只暴露世界观大纲的顶层信息，隐藏节点级和对话级具体名称，避免闲聊时 LLM 把项目角色误认为用户姓名。"""
     world_brief = (state.get("world_brief") or "").strip()
     if not world_brief:
-        return "(no project background yet)"
-    return f"[Project background at a glance]\n{world_brief[:120]}"
+        return "（暂无项目背景）"
+    return f"[项目背景概览]\n{world_brief[:120]}"
 
 
 def _assemble_small_talk(state: AgentState) -> ChatAssemblerOutput:
@@ -74,16 +68,16 @@ def _assemble_small_talk(state: AgentState) -> ChatAssemblerOutput:
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     llm_model = get_llm_settings().model
     runtime_block = (
-        f"[Runtime info]\n"
-        f"Current time: {now_str}\n"
-        f"Agent model: {llm_model}\n"
+        f"[运行时信息]\n"
+        f"当前时间：{now_str}\n"
+        f"Agent 模型：{llm_model}\n"
     )
     messages = [
         SystemMessage(_SMALL_TALK_PROMPT),
         HumanMessage(
             f"{runtime_block}\n{_build_small_talk_brief(state)}\n\n"
             f"{format_current_nodes(state.get('current_nodes') or [])}\n\n"
-            f"[User's latest message]\n{user_message}"
+            f"[用户最新消息]\n{user_message}"
             f"{_hint_block(state)}"
         ),
     ]
@@ -98,8 +92,7 @@ def _assemble_small_talk(state: AgentState) -> ChatAssemblerOutput:
             "你好！我可以帮你查项目里的设定与情节、头脑风暴，或在画布上整理故事结构。"
             if any("\u4e00" <= c <= "\u9fff" for c in user_message)
             else (
-                "Hi! I can help you look up project notes, brainstorm ideas, "
-                "or organize structure on the canvas."
+                "你好！我可以帮你查项目设定、一起头脑风暴，或在画布上整理故事结构。"
             )
         )
         return ChatAssemblerOutput(
@@ -114,7 +107,7 @@ def _build_reply_messages(
     user_message = state.get("user_message", "")
     warnings = state.get("boundary_warnings") or []
     warning_block = (
-        "\n\n[Items skipped by boundary check]\n" + "\n".join(f"- {item}" for item in warnings)
+        "\n\n[边界检查跳过的项目]\n" + "\n".join(f"- {item}" for item in warnings)
         if warnings
         else ""
     )
@@ -123,24 +116,22 @@ def _build_reply_messages(
         SystemMessage(_REPLY_PROMPT),
         HumanMessage(
             f"{build_memory_block(state, primary)}\n\n"
-            f"[User's latest message]\n{user_message}\n\n"
-            f"[Primary intent]\n{primary}\n\n"
-            f"[Agent structured output]\n{output.model_dump_json()}"
+            f"[用户最新消息]\n{user_message}\n\n"
+            f"[主要意图]\n{primary}\n\n"
+            f"[Agent 结构化输出]\n{output.model_dump_json()}"
             f"{warning_block}"
             f"{_hint_block(state)}\n\n"
-            "Output the final user-facing reply body directly; be careful not to "
-            "repeat what you already said in [Recent conversation], so the reply "
-            "feels continuous."
+            "请直接输出面向用户的最终回复正文；注意不要重复 [Recent conversation] 中已经说过的内容，"
+            "让回复保持连续。"
         ),
     ]
 
 
 def _stream_reply(messages: list[BaseMessage]) -> str:
-    """Stream tokens while pushing them onto the LangGraph custom stream, returning the assembled whole.
+    """流式产出 token，同时推送到 LangGraph custom stream，并返回组装后的完整文本。
 
-    get_stream_writer raises RuntimeError under non-streaming calls (e.g. a
-    direct graph.invoke), so it is wrapped in try/except to let unit tests and
-    the old interface still reuse this node.
+    get_stream_writer 在非流式调用（例如直接 graph.invoke）下会抛 RuntimeError，因此用
+    try/except 包住，让单元测试和旧接口仍可复用该节点。
     """
     try:
         writer = get_stream_writer()
@@ -162,8 +153,8 @@ def _build_meta_messages(output: Any, reply_text: str) -> list[BaseMessage]:
     return [
         SystemMessage(_METADATA_PROMPT),
         HumanMessage(
-            f"[Generated reply]\n{reply_text}\n\n"
-            f"[Original agent output]\n{output.model_dump_json()}"
+            f"[生成的回复]\n{reply_text}\n\n"
+            f"[原始 agent 输出]\n{output.model_dump_json()}"
         ),
     ]
 
@@ -180,7 +171,7 @@ def chat_assembler_node(state: AgentState) -> dict[str, Any]:
     if output is None:
         return {
             "assembler_output": ChatAssemblerOutput(
-                reply_text="I didn't get a suitable result this turn. How about telling me a bit more about the direction you want?"
+                reply_text="这轮我没有得到合适的结果。可以再多告诉我一点你想要的方向吗？"
             ),
         }
 

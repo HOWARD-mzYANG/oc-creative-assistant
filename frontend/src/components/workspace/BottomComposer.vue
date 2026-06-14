@@ -38,7 +38,7 @@ async function handleSend() {
   try {
     const text =
       message ||
-      `Please consider these ${quotedIds.length} quoted node(s) and help me develop them further.`
+      `请参考这 ${quotedIds.length} 个引用节点，帮我继续展开。`
     await chat.send(text, quotedIds, webSearchMode.value)
     composer.$patch({ input: '', references: [] })
   } finally {
@@ -52,8 +52,8 @@ async function handleSend() {
     <button
       type="button"
       class="composer-handle"
-      :aria-label="collapsed ? 'Expand composer' : 'Collapse composer'"
-      :title="collapsed ? 'Expand composer' : 'Collapse composer'"
+      :aria-label="collapsed ? '展开输入框' : '收起输入框'"
+      :title="collapsed ? '展开输入框' : '收起输入框'"
       @click="toggleCollapsed"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -126,14 +126,14 @@ async function handleSend() {
           v-model="input"
           class="chat-composer__field"
           type="text"
-          placeholder="Talk to the agent — quote nodes from the canvas with Ctrl+C…"
+          placeholder="和 Agent 对话，也可以在画布中按 Ctrl+C 引用节点…"
           :disabled="isStreaming"
         />
         <button
           type="submit"
           class="chat-composer__send"
           :class="{ 'is-ready': hasContent }"
-          aria-label="Send"
+          aria-label="发送"
           :disabled="isSending || isStreaming"
         >
           <span v-if="isSending || isStreaming" class="chat-composer__send-loading" aria-hidden="true">…</span>

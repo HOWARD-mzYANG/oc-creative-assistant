@@ -4,7 +4,7 @@ import type { CreativeNodeData } from '../../types/node'
 import NodeHandles from './NodeHandles.vue'
 
 /**
- * Research node card.
+ * 资料 node card.
  *
  * The research node is a frontend entry-point placeholder for RAG capabilities; for now it only stores a summary and source notes, without directly triggering retrieval.
  */

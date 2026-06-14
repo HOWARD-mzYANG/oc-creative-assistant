@@ -6,7 +6,7 @@ import NodeHandles from './NodeHandles.vue'
 import InlineEditableText from '../canvas/InlineEditableText.vue'
 
 /**
- * Character node card.
+ * 角色 node card.
  *
  * Title and summary support inline edit; on save, the value is written back via
  * the updateNodeData provided by CanvasWorkspace and triggers auto-save, without switching to the right panel.
@@ -24,14 +24,14 @@ const updateNodeData = inject<(id: string, patch: { title?: string; content?: st
     <h3>
       <InlineEditableText
         :model-value="data.title"
-        placeholder="Untitled character"
+        placeholder="未命名角色"
         @save="(v) => updateNodeData?.(props.id, { title: v })"
       />
     </h3>
     <p class="node-summary">
       <InlineEditableText
         :model-value="data.content"
-        placeholder="Add a short summary"
+        placeholder="添加简短摘要"
         multiline
         @save="(v) => updateNodeData?.(props.id, { content: v })"
       />

@@ -1,8 +1,7 @@
-"""Public service entry point for RAG.
+"""RAG 的公共服务入口。
 
-This module reads the graph snapshot of the project the current node belongs to,
-coordinates graph relation retrieval, vector retrieval, and prompt assembly, and
-returns the `RagContextResponse` needed by the API layer.
+本模块读取当前节点所属项目的图谱快照，协调图关系检索、向量检索和 prompt 组装，并返回
+API 层需要的 `RagContextResponse`。
 """
 
 from __future__ import annotations
@@ -28,34 +27,31 @@ from app.services.graph_mappers import db_status_to_api, db_tags_to_api
 
 
 def build_rag_context(request: RagContextRequest) -> RagContextResponse:
-    """Build the Hybrid RAG context preview.
+    """构建 Hybrid RAG 上下文预览。
 
-    This function only returns the current node context, retrieval results, and the
-    prompt; it does not call a real LLM. Vector index synchronization happens during
-    the graph-save stage, so the query stage does not perform a full write into ChromaDB.
+    本函数只返回当前节点上下文、检索结果和 prompt，不调用真实 LLM。向量索引同步发生在
+    图谱保存阶段，因此查询阶段不会向 ChromaDB 执行完整写入。
 
-    Args:
-        request: The RAG API request body.
+    参数：
+        request: RAG API 请求体。
 
-    Returns:
-        The current node, graph relation context, vector context, merged context,
-        prompt, and debug information.
+    返回：
+        当前节点、图关系上下文、向量上下文、合并上下文、prompt 和调试信息。
 
-    Raises:
-        HTTPException: Raised when the agent type is unsupported or the current node
-            does not exist.
+    抛出：
+        HTTPException: agent 类型不支持或当前节点不存在时抛出。
     """
     if request.agent_type != "inspiration":
-        raise HTTPException(status_code=400, detail="Only inspiration agent is supported in this PoC")
+        raise HTTPException(status_code=400, detail="此 PoC 仅支持 inspiration agent")
 
-    # Limit top_k to prevent a single request from injecting too many nodes into the prompt, which hurts debug readability and downstream LLM cost.
+    # 限制 top_k，避免单次请求向 prompt 注入过多节点，影响调试可读性并增加下游 LLM 成本。
     top_k = max(1, min(request.top_k, MAX_TOP_K))
 
     with SessionLocal() as session:
         current_node = session.get(NodeORM, request.node_id)
 
         if current_node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail="未找到节点")
 
         project_id = current_node.project_id
         nodes = session.scalars(
@@ -92,21 +88,19 @@ def build_rag_context(request: RagContextRequest) -> RagContextResponse:
 
 
 def search_project_memory(project_id: str, request: MemorySearchRequest) -> MemorySearchResponse:
-    """Search the Lore Memory of the current project.
+    """搜索当前项目的 Lore Memory。
 
-    This function only performs in-project vector retrieval and returns memory cards;
-    it does not build a prompt nor call the LLM.
+    本函数只执行项目内向量检索并返回记忆卡片；不构建 prompt，也不调用 LLM。
 
-    Args:
-        project_id: The current project ID.
-        request: The project-level search criteria.
+    参数：
+        project_id: 当前项目 ID。
+        request: 项目级搜索条件。
 
-    Returns:
-        The semantically related memory items within the current project and the
-        debug status.
+    返回：
+        当前项目内语义相关的记忆条目和调试状态。
 
-    Raises:
-        HTTPException: Raised when the project does not exist.
+    抛出：
+        HTTPException: 项目不存在时抛出。
     """
     top_k = max(1, min(request.top_k, MAX_TOP_K))
     query_used = request.query.strip()
@@ -115,7 +109,7 @@ def search_project_memory(project_id: str, request: MemorySearchRequest) -> Memo
         project = session.get(ProjectORM, project_id)
 
         if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise HTTPException(status_code=404, detail="未找到项目")
 
         nodes = session.scalars(
             select(NodeORM).where(NodeORM.project_id == project_id).order_by(NodeORM.sort_order, NodeORM.created_at)

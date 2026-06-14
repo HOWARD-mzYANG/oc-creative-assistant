@@ -17,7 +17,7 @@ from app.services.graph_repository import read_project_node, require_project
 
 
 def get_node_fields(project_id: str, node_id: str) -> NodeFieldsPayload:
-    """Read a node's custom fields."""
+    """读取 node's custom fields."""
     with SessionLocal() as session:
         require_project(session, project_id)
         node = session.get(NodeORM, node_id)

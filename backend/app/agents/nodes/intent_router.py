@@ -1,9 +1,7 @@
-"""Intent classification node.
+"""意图分类节点。
 
-Classifies the user's latest-turn message into an agent type and writes it to
-state.intent, so the downstream graph routes by intent to the matching agent.
-An empty message falls back directly to small_talk without calling the LLM,
-saving cost.
+将用户最新一轮消息分类为 agent 类型，并写入 state.intent，使下游图能按意图路由到匹配的
+agent。空消息会直接回退到 small_talk，不调用 LLM，以节省成本。
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ from app.agents.prompts import load_prompt
 
 _SYSTEM_PROMPT = load_prompt("intent_router")
 
-# Substantive project/story questions must not be swallowed by a leading greeting.
+# 实质性的项目/故事问题不能被开头寒暄吞掉。
 _PROJECT_QUERY_FRAGMENTS = (
     "看得到",
     "能看见",
@@ -50,7 +48,7 @@ _PROJECT_QUERY_FRAGMENTS = (
     "story nodes",
 )
 
-# Heuristic overrides when the LLM picks small_talk or returns nothing for clear creative tasks.
+# 当 LLM 对明确创作任务误判为 small_talk 或未返回结果时，用启发式覆盖。
 _STRUCTURE_FRAGMENTS = (
     "create a character",
     "create character",
@@ -102,7 +100,7 @@ def _looks_like_project_query(message: str) -> bool:
 
 
 def _guess_intent_from_message(message: str) -> IntentClassification | None:
-    """Keyword fallback when structured intent classification is missing or too generic."""
+    """当结构化意图分类缺失或过于笼统时，使用关键词兜底。"""
     text = message.strip().lower()
     raw = message.strip()
 
@@ -110,28 +108,28 @@ def _guess_intent_from_message(message: str) -> IntentClassification | None:
         return IntentClassification(
             primary="simulation",
             confidence=0.8,
-            reasoning="Hypothetical phrasing detected by heuristic.",
+            reasoning="启发式检测到假设性表达。",
         )
 
     if any(frag in text or frag in raw for frag in _STRUCTURE_FRAGMENTS):
         return IntentClassification(
             primary="structure",
             confidence=0.85,
-            reasoning="Entity or relation creation phrasing detected by heuristic.",
+            reasoning="启发式检测到实体或关系创建表达。",
         )
 
     if any(frag in text or frag in raw for frag in _INSPIRATION_FRAGMENTS):
         return IntentClassification(
             primary="inspiration",
             confidence=0.8,
-            reasoning="Open-ended story or brainstorm phrasing detected by heuristic.",
+            reasoning="启发式检测到开放式故事或头脑风暴表达。",
         )
 
     if _looks_like_project_query(message):
         return IntentClassification(
             primary="research",
             confidence=0.85,
-            reasoning="Project/story visibility or content question detected by heuristic.",
+            reasoning="启发式检测到项目/故事可见性或内容查询。",
         )
 
     return None
@@ -154,19 +152,19 @@ def _coerce_substantive_intent(
 
 
 def intent_router_node(state: AgentState) -> dict[str, Any]:
-    """Decide IntentClassification from the user message + recent conversation; empty message goes straight to small_talk."""
+    """根据用户消息 + 最近对话决定 IntentClassification；空消息直接进入 small_talk。"""
     user_message = state.get("user_message", "").strip()
     if not user_message:
         return {
-            "intent": IntentClassification(primary="small_talk", reasoning="User message is empty."),
+            "intent": IntentClassification(primary="small_talk", reasoning="用户消息为空。"),
         }
 
     recent = state.get("recent_messages") or []
     history = "\n".join(f"{m['role']}: {m['content']}" for m in recent[-4:])
-    history_block = f"[Recent conversation]\n{history}\n\n" if history else ""
+    history_block = f"[最近对话]\n{history}\n\n" if history else ""
     quoted_block = format_current_nodes(state.get("current_nodes") or [])
     quoted_section = (
-        f"[Quoted nodes from canvas]\n{quoted_block}\n\n"
+        f"[画布引用节点]\n{quoted_block}\n\n"
         if state.get("current_nodes")
         else ""
     )
@@ -174,7 +172,7 @@ def intent_router_node(state: AgentState) -> dict[str, Any]:
     messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
-            f"{history_block}{quoted_section}[Latest message]\n{user_message}"
+            f"{history_block}{quoted_section}[最新消息]\n{user_message}"
         ),
     ]
 

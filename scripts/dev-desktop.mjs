@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-// Normalize the port input, falling back to the default value when it is invalid.
+// 标准化端口输入；无效时回退到默认值。
 function resolvePort(rawPort, fallback) {
   const parsedPort = Number(rawPort)
 
@@ -30,25 +30,25 @@ const pythonCommand = process.env.PYTHON_BIN ?? 'python'
 const children = []
 let isShuttingDown = false
 
-// Use a consistent desktop launcher log prefix to make troubleshooting easier.
+// 使用统一的桌面启动器日志前缀，方便排查问题。
 function log(message) {
   console.log(`[desktop] ${message}`)
 }
 
-// Build the local HTTP base URL from the host and port.
+// 根据主机和端口构建本地 HTTP 基础 URL。
 function buildHttpUrl(host, port) {
   return `http://${host}:${port}`
 }
 
-// Build the backend health endpoint URL from the base URL.
+// 根据基础 URL 构建后端健康检查端点 URL。
 function buildHealthUrl(baseUrl) {
   return `${baseUrl.replace(/\/$/, '')}/health`
 }
 
-// Spawn a child process and register its lifecycle handling consistently.
+// 启动子进程，并统一注册生命周期处理。
 function spawnProcess(name, command, args, extraEnv = {}) {
-  log(`Starting ${name}...`)
-  // On Windows, npm.cmd needs a shell to be parsed correctly; other commands are spawned directly.
+  log(`正在启动 ${name}...`)
+  // 在 Windows 上，npm.cmd 需要 shell 才能正确解析；其他命令直接启动。
   const useShell = process.platform === 'win32' && command.toLowerCase().endsWith('.cmd')
 
   const child = spawn(command, args, {
@@ -68,7 +68,7 @@ function spawnProcess(name, command, args, extraEnv = {}) {
       return
     }
 
-    console.error(`[desktop] Failed to start ${name}:`, error)
+    console.error(`[desktop] 启动 ${name} 失败：`, error)
     void shutdown(1)
   })
 
@@ -77,22 +77,22 @@ function spawnProcess(name, command, args, extraEnv = {}) {
       return
     }
 
-    const reason = signal ? `signal ${signal}` : `code ${code ?? 0}`
+    const reason = signal ? `信号 ${signal}` : `退出码 ${code ?? 0}`
 
     if (name === 'electron') {
-      log(`Electron exited with ${reason}. Shutting down the rest of the stack.`)
+      log(`Electron 已退出（${reason}）。正在关闭其余进程。`)
       void shutdown(code ?? 0)
       return
     }
 
-    console.error(`[desktop] ${name} exited early with ${reason}.`)
+    console.error(`[desktop] ${name} 提前退出（${reason}）。`)
     void shutdown(code ?? 1)
   })
 
   return child
 }
 
-// Poll until a given HTTP URL becomes reachable.
+// 轮询直到指定 HTTP URL 可访问。
 async function waitForUrl(url, timeoutMs = 60_000, intervalMs = 500) {
   const startedAt = Date.now()
 
@@ -104,16 +104,16 @@ async function waitForUrl(url, timeoutMs = 60_000, intervalMs = 500) {
         return
       }
     } catch {
-      // Keep polling until the dev server is ready or the timeout expires.
+      // 持续轮询，直到开发服务器就绪或超时。
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
 
-  throw new Error(`Timed out waiting for ${url}`)
+  throw new Error(`等待 ${url} 超时`)
 }
 
-// Determine whether a reusable Vite dev server is already running.
+// 判断是否已有可复用的 Vite 开发服务器在运行。
 async function isFrontendReady(baseUrl) {
   try {
     const response = await fetch(new URL('/__vite_ping', `${baseUrl}/`))
@@ -123,7 +123,7 @@ async function isFrontendReady(baseUrl) {
   }
 }
 
-// Determine whether a reusable FastAPI backend service is already running.
+// 判断是否已有可复用的 FastAPI 后端服务在运行。
 async function isBackendReady(healthUrl) {
   try {
     const response = await fetch(healthUrl)
@@ -139,7 +139,7 @@ async function isBackendReady(healthUrl) {
   }
 }
 
-// Check whether a given local port is currently available.
+// 检查指定本地端口当前是否可用。
 async function isPortFree(host, port) {
   return new Promise((resolve) => {
     const server = net.createServer()
@@ -156,7 +156,7 @@ async function isPortFree(host, port) {
   })
 }
 
-// Search upward from the preferred port for an available one.
+// 从首选端口开始向上查找可用端口。
 async function findAvailablePort(host, preferredPort, maxAttempts = 20) {
   for (let offset = 0; offset < maxAttempts; offset += 1) {
     const candidatePort = preferredPort + offset
@@ -167,11 +167,11 @@ async function findAvailablePort(host, preferredPort, maxAttempts = 20) {
   }
 
   throw new Error(
-    `Could not find an available port for ${host} starting from ${preferredPort}.`,
+    `无法为 ${host} 找到从 ${preferredPort} 开始的可用端口。`,
   )
 }
 
-// Extract the port from the configured URL, falling back to the default port when absent.
+// 从配置的 URL 提取端口；缺失时回退到默认端口。
 function readPortFromUrl(url, fallbackPort) {
   try {
     const parsedUrl = new URL(url)
@@ -186,7 +186,7 @@ function readPortFromUrl(url, fallbackPort) {
   }
 }
 
-// Terminate a child process safely, accounting for platform differences.
+// 考虑平台差异，安全终止子进程。
 function terminateChild(child) {
   if (!child.pid) {
     return
@@ -200,7 +200,7 @@ function terminateChild(child) {
   child.kill('SIGTERM')
 }
 
-// Shut down the entire desktop dev process set in reverse startup order.
+// 按启动顺序的反序关闭整个桌面开发进程组。
 async function shutdown(exitCode = 0) {
   if (isShuttingDown) {
     return
@@ -217,7 +217,7 @@ async function shutdown(exitCode = 0) {
   }, 200)
 }
 
-// Orchestrate the startup flow of frontend, backend, and Electron in local development.
+// 编排本地开发中的前端、后端和 Electron 启动流程。
 async function main() {
   let selectedBackendPort = backendPort
   let selectedBackendUrl = backendUrlOverride ?? buildHttpUrl(backendHost, selectedBackendPort)
@@ -227,11 +227,11 @@ async function main() {
   const backendRunning = await isBackendReady(selectedBackendHealthUrl)
 
   if (backendRunning) {
-    // When a backend is already available, reuse it directly to avoid port conflicts or data file contention from starting another one.
-    log(`Reusing existing backend at ${selectedBackendHealthUrl}.`)
+    // 如果后端已可用，直接复用，避免再次启动造成端口冲突或数据文件竞争。
+    log(`正在复用已有后端：${selectedBackendHealthUrl}。`)
   } else if (backendUrlOverride) {
     throw new Error(
-      `Configured backend URL ${selectedBackendHealthUrl} is not reachable. Start it manually or remove VITE_BACKEND_URL.`,
+      `配置的后端 URL ${selectedBackendHealthUrl} 不可访问。请手动启动它，或移除 VITE_BACKEND_URL。`,
     )
   } else {
     selectedBackendPort = await findAvailablePort(backendHost, backendPort)
@@ -240,7 +240,7 @@ async function main() {
     shouldStartBackend = true
 
     if (selectedBackendPort !== backendPort) {
-      log(`Backend port ${backendPort} is unavailable. Falling back to ${selectedBackendPort}.`)
+      log(`后端端口 ${backendPort} 不可用，回退到 ${selectedBackendPort}。`)
     }
   }
 
@@ -251,11 +251,11 @@ async function main() {
   const frontendRunning = await isFrontendReady(selectedRendererUrl)
 
   if (frontendRunning) {
-    // Reusing the running Vite instance preserves the developer's current page state and HMR session.
-    log(`Reusing existing frontend at ${selectedRendererUrl}.`)
+    // 复用正在运行的 Vite 实例，可以保留开发者当前页面状态和 HMR 会话。
+    log(`正在复用已有前端：${selectedRendererUrl}。`)
   } else if (rendererUrlOverride) {
     throw new Error(
-      `Configured renderer URL ${selectedRendererUrl} is not reachable. Start it manually or remove ELECTRON_RENDERER_URL.`,
+      `配置的渲染器 URL ${selectedRendererUrl} 不可访问。请手动启动它，或移除 ELECTRON_RENDERER_URL。`,
     )
   } else {
     selectedFrontendPort = await findAvailablePort(frontendHost, frontendPort)
@@ -263,7 +263,7 @@ async function main() {
     shouldStartFrontend = true
 
     if (selectedFrontendPort !== frontendPort) {
-      log(`Frontend port ${frontendPort} is unavailable. Falling back to ${selectedFrontendPort}.`)
+      log(`前端端口 ${frontendPort} 不可用，回退到 ${selectedFrontendPort}。`)
     }
   }
 
@@ -301,16 +301,16 @@ async function main() {
   }
 
   if (shouldStartFrontend) {
-    log(`Waiting for frontend dev server at ${selectedRendererUrl}...`)
+    log(`正在等待前端开发服务器：${selectedRendererUrl}...`)
     await waitForUrl(selectedRendererUrl)
   }
 
   if (shouldStartBackend) {
-    log(`Waiting for backend health endpoint at ${selectedBackendHealthUrl}...`)
+    log(`正在等待后端健康检查端点：${selectedBackendHealthUrl}...`)
     await waitForUrl(selectedBackendHealthUrl)
   }
 
-  log('Desktop dependencies are ready. Launching Electron.')
+  log('桌面端依赖已就绪，正在启动 Electron。')
 
   spawnProcess('electron', npmCommand, ['--prefix', 'electron', 'run', 'dev'], {
     BACKEND_BASE_URL: selectedBackendUrl,
@@ -320,27 +320,27 @@ async function main() {
   })
 }
 
-// When a termination signal is received, shut down all child processes uniformly.
+// 收到终止信号时，统一关闭所有子进程。
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     void shutdown(0)
   })
 }
 
-// Route unhandled Promise rejections into the shutdown flow.
+// 将未处理的 Promise rejection 接入关闭流程。
 process.on('unhandledRejection', (error) => {
-  console.error('[desktop] Unhandled rejection:', error)
+  console.error('[desktop] 未处理的 rejection：', error)
   void shutdown(1)
 })
 
-// Route uncaught exceptions into the shutdown flow.
+// 将未捕获异常接入关闭流程。
 process.on('uncaughtException', (error) => {
-  console.error('[desktop] Uncaught exception:', error)
+  console.error('[desktop] 未捕获异常：', error)
   void shutdown(1)
 })
 
-// Start the desktop dev orchestrator and clearly report startup errors.
+// 启动桌面端开发编排器，并清晰报告启动错误。
 main().catch((error) => {
-  console.error('[desktop] Failed to boot the desktop dev flow:', error)
+  console.error('[desktop] 启动桌面端开发流程失败：', error)
   void shutdown(1)
 })

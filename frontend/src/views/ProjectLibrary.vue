@@ -6,11 +6,11 @@ import { useLibraryStore } from '../stores/useLibraryStore'
 import type { ProjectSummary } from '../types/project'
 
 /**
- * Library (stage 2).
+ * 项目库（第 2 阶段）。
  *
- * A vertical list of horizontal "strip" cards: white gradient with black text,
- * optional cover fading in on the right, delete in the top-right corner.
- * Clicking the card opens the workspace.
+ * 纵向排列的横向条带卡片：白色渐变配黑色文字，
+ * 右侧可显示渐隐封面，右上角提供删除入口。
+ * 点击卡片会打开工作区。
  */
 const router = useRouter()
 const library = useLibraryStore()
@@ -52,7 +52,7 @@ function formatTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
 }
 
-/** White gradient overlay; cover image fades in on the right when present. */
+/** 白色渐变遮罩；存在封面图时在右侧渐隐显示。 */
 function stripBackground(project: ProjectSummary): string {
   if (project.cover_image) {
     return (
@@ -71,14 +71,14 @@ function stripBackground(project: ProjectSummary): string {
 <template>
   <main class="library">
     <header class="library__header">
-      <button type="button" class="library__back" @click="router.push('/')">← Home</button>
-      <h1>Library</h1>
-      <button type="button" class="library__new" @click="isCreating = true">+ New project</button>
+      <button type="button" class="library__back" @click="router.push('/')">← 首页</button>
+      <h1>项目库</h1>
+      <button type="button" class="library__new" @click="isCreating = true">+ 新建项目</button>
     </header>
 
     <p v-if="error" class="library__error">{{ error }}</p>
-    <p v-else-if="isLoading" class="library__hint">Loading…</p>
-    <p v-else-if="projects.length === 0" class="library__hint">No projects yet — create one from the top-right.</p>
+    <p v-else-if="isLoading" class="library__hint">加载中…</p>
+    <p v-else-if="projects.length === 0" class="library__hint">还没有项目，请从右上角创建一个。</p>
 
     <section v-else class="library__list">
       <article
@@ -91,15 +91,15 @@ function stripBackground(project: ProjectSummary): string {
         <button
           type="button"
           class="strip__del"
-          aria-label="Delete project"
-          title="Delete project"
+          aria-label="删除项目"
+          title="删除项目"
           @click="handleDelete(project.id, $event)"
         >
-          Delete
+          删除
         </button>
         <div class="strip__panel">
           <h3 class="strip__name">{{ project.name }}</h3>
-          <p class="strip__desc">{{ project.description || 'No description' }}</p>
+          <p class="strip__desc">{{ project.description || '暂无描述' }}</p>
           <footer class="strip__footer">
             <span class="strip__time">{{ formatTime(project.updated_at) }}</span>
           </footer>
@@ -109,13 +109,13 @@ function stripBackground(project: ProjectSummary): string {
 
     <div v-if="isCreating" class="library__modal" @click.self="isCreating = false">
       <div class="library__dialog">
-        <h2>New project</h2>
-        <input v-model="newName" type="text" placeholder="Project name" />
-        <textarea v-model="newDescription" placeholder="Description (optional)" rows="3"></textarea>
+        <h2>新建项目</h2>
+        <input v-model="newName" type="text" placeholder="项目名称" />
+        <textarea v-model="newDescription" placeholder="描述（可选）" rows="3"></textarea>
         <div class="library__dialog-actions">
-          <button type="button" @click="isCreating = false">Cancel</button>
+          <button type="button" @click="isCreating = false">取消</button>
           <button type="button" class="primary" :disabled="!newName.trim()" @click="handleCreate">
-            Create
+            创建
           </button>
         </div>
       </div>

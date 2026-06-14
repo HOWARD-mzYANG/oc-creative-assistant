@@ -1,8 +1,7 @@
-"""SQLAlchemy database connection and initialization.
+"""SQLAlchemy 数据库连接与初始化。
 
-This module only handles the SQLite engine, the Session factory, ORM metadata
-initialization, and lightweight compatibility for legacy databases. Business
-validation lives in the service layer, and the vector index in `app.indexing`.
+本模块只处理 SQLite engine、Session 工厂、ORM 元数据初始化，以及旧数据库的轻量兼容。
+业务校验位于服务层，向量索引位于 `app.indexing`。
 """
 
 import json
@@ -19,21 +18,21 @@ DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 
 class Base(DeclarativeBase):
-    """The declarative base shared by all ORM models."""
+    """所有 ORM 模型共享的声明式基类。"""
 
 
-# The local SQLite file lives under backend/data; the path is centralized in app.core.paths to avoid being affected by package hierarchy levels.
+# 本地 SQLite 文件位于 backend/data；路径集中在 app.core.paths，避免受包层级影响。
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _deserialize_json(value: str | None) -> Any:
-    """Deserialize a SQLite JSON field, while staying compatible with plain-string meta in legacy databases.
+    """反序列化 SQLite JSON 字段，同时兼容旧数据库中的纯字符串 meta。
 
-    Args:
-        value: The raw text before SQLAlchemy JSON deserialization.
+    参数：
+        value: SQLAlchemy JSON 反序列化前的原始文本。
 
-    Returns:
-        The parsed Python object; legacy non-JSON strings are returned as-is.
+    返回：
+        解析后的 Python 对象；旧版非 JSON 字符串会原样返回。
     """
     if value is None:
         return {}
@@ -54,9 +53,9 @@ engine = create_engine(
 
 @event.listens_for(engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
-    """Enable foreign key constraints for each SQLite connection.
+    """为每个 SQLite 连接启用外键约束。
 
-    SQLite does not enforce foreign keys by default; this ensures `ondelete=\"CASCADE\"` actually takes effect in the local desktop database.
+    SQLite 默认不强制执行外键；这里确保 `ondelete=\"CASCADE\"` 在本地桌面数据库中真正生效。
     """
     if isinstance(dbapi_connection, SQLiteConnection):
         cursor = dbapi_connection.cursor()
@@ -68,8 +67,8 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_db() -> None:
-    """Initialize the ORM table schema and backfill lightweight compatibility fields for legacy PoC databases."""
-    # Import the models lazily, ensuring Base.metadata has registered all tables before create_all.
+    """初始化 ORM 表结构，并为旧 PoC 数据库回填轻量兼容字段。"""
+    # 延迟导入模型，确保 create_all 前 Base.metadata 已注册所有表。
     from app.db.models import (  # noqa: F401
         AgentStagingORM,
         ChatMessageORM,
@@ -87,10 +86,9 @@ def init_db() -> None:
 
 
 def _ensure_sqlite_schema_compatibility() -> None:
-    """Backfill newly added columns for legacy PoC databases.
+    """为旧 PoC 数据库回填新增列。
 
-    The project has not yet introduced a full migration system; this only handles
-    the minimum compatibility needed for already-shipped local databases.
+    项目尚未引入完整迁移系统；这里只处理已发出本地数据库所需的最低兼容。
     """
     with engine.begin() as connection:
         edge_columns = {
@@ -126,8 +124,8 @@ def _ensure_sqlite_schema_compatibility() -> None:
                 "ALTER TABLE chat_sessions ADD COLUMN summary_message_count INTEGER NOT NULL DEFAULT 0"
             )
 
-        # first_revision phase 1: new columns needed by the multi sub-graph architecture.
-        # create_all only creates the new tables (graphs / project_seeds) and does not add columns to old tables, so add them manually here.
+        # first_revision 第 1 阶段：多子图架构需要的新列。
+        # create_all 只创建新表（graphs / project_seeds），不会给旧表加列，因此这里手动补齐。
         if "description" not in project_columns:
             connection.exec_driver_sql(
                 "ALTER TABLE projects ADD COLUMN description TEXT NOT NULL DEFAULT ''"
@@ -150,8 +148,8 @@ def _ensure_sqlite_schema_compatibility() -> None:
             connection.exec_driver_sql("ALTER TABLE nodes ADD COLUMN graph_id VARCHAR")
 
 
-# Assignment rules for node_type → sub-graph section.
-# Decision: plot/character/world each belong to their own section; all other types such as idea/research/structure are temporarily assigned to plot.
+# node_type -> 子图 section 的分配规则。
+# 决策：plot/character/world 各归属自己的 section；idea/research/structure 等其他类型暂归 plot。
 _SECTION_BY_NODE_TYPE: dict[str, str] = {
     "character": "character",
     "worldbuilding": "world",
@@ -161,12 +159,10 @@ _DEFAULT_SECTION = "plot"
 
 
 def _ensure_subgraph_backfill() -> None:
-    """Backfill three sub-graphs for legacy projects that lack them, and place existing nodes accordingly.
+    """为缺少子图的旧项目回填三个子图，并相应放置已有节点。
 
-    Idempotent: only handles projects whose ``plot_graph_id`` is still empty;
-    already-migrated projects are skipped.
-    The migration does not break legacy data — node / edge records are kept as-is,
-    only the ``graph_id`` dimension is added.
+    幂等：只处理 ``plot_graph_id`` 仍为空的项目；已迁移项目会跳过。
+    迁移不会破坏旧数据，node / edge 记录保持原样，只新增 ``graph_id`` 维度。
     """
     import uuid
 
@@ -176,7 +172,7 @@ def _ensure_subgraph_backfill() -> None:
         projects = session.query(ProjectORM).all()
         for project in projects:
             if project.plot_graph_id:
-                continue  # already migrated
+                continue  # 已迁移。
 
             graph_ids: dict[str, str] = {}
             for section in ("plot", "character", "world"):

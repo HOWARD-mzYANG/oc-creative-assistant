@@ -1,4 +1,4 @@
-"""Project seed compressor (first_revision stage 5).
+"""项目 seed compressor (first_revision stage 5).
 
 A standalone entrypoint, 【not inside the main conversation StateGraph】: it
 compresses a project's current state (all nodes, partitioned by sub-graph) into
@@ -37,7 +37,7 @@ _SYSTEM_PROMPT = (
 
 
 def _collect_project_brief(project_id: str) -> tuple[str, str]:
-    """Read the project name + node list grouped by type, assembled into the compression input text."""
+    """读取 project name + node list grouped by type, assembled into the compression input text."""
     with SessionLocal() as db:
         project = db.get(ProjectORM, project_id)
         project_name = project.name if project is not None else project_id

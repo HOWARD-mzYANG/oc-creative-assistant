@@ -23,7 +23,7 @@ const emit = defineEmits<{
     />
 
     <p v-if="nodes.length === 0" class="world-tree-canvas__empty">
-      No notes yet — add a root note in Notes view.
+      还没有笔记，请在“笔记”视图添加根笔记。
     </p>
     <p v-else-if="active" class="world-tree-canvas__hint">
       Hierarchy only · click a node to edit in Notes view

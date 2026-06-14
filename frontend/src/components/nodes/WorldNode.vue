@@ -6,7 +6,7 @@ import NodeHandles from './NodeHandles.vue'
 import InlineEditableText from '../canvas/InlineEditableText.vue'
 
 /**
- * Worldbuilding node card. Title and summary support inline edit.
+ * 世界观 node card. Title and summary support inline edit.
  */
 const props = defineProps<NodeProps<CreativeNodeData>>()
 const updateNodeData = inject<(id: string, patch: { title?: string; content?: string }) => void>(
@@ -21,14 +21,14 @@ const updateNodeData = inject<(id: string, patch: { title?: string; content?: st
     <h3>
       <InlineEditableText
         :model-value="data.title"
-        placeholder="Untitled worldbuilding"
+        placeholder="未命名世界观"
         @save="(v) => updateNodeData?.(props.id, { title: v })"
       />
     </h3>
     <p class="node-summary">
       <InlineEditableText
         :model-value="data.content"
-        placeholder="Add a short summary"
+        placeholder="添加简短摘要"
         multiline
         @save="(v) => updateNodeData?.(props.id, { content: v })"
       />

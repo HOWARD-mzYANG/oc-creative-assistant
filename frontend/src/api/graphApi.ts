@@ -71,7 +71,7 @@ export interface GraphDto {
   indexing?: IndexingStatusDto
 }
 
-/** Save endpoint request body; projectId is provided as a URL parameter. */
+/** 保存端点请求体；projectId 由 URL 参数提供。 */
 export interface SaveGraphDto {
   nodes: GraphNodeDto[]
   edges: GraphEdgeDto[]
@@ -186,7 +186,7 @@ export async function loadDefaultGraph(): Promise<GraphDto> {
 }
 
 /**
- * Save a project graph snapshot.
+ * 保存项目图快照。
  *
  * The backend uses a whole-graph replace strategy and syncs the vector index after the SQLite commit.
  *
@@ -221,7 +221,7 @@ export async function loadSubgraph(graphId: string): Promise<GraphDto> {
 }
 
 /**
- * Save a single sub-graph snapshot by graph_id (wholly replaces that sub-graph's nodes and internal edges).
+ * 按 graph_id 保存单个子图快照（整体替换该子图的节点和内部边）。
  *
  * Args:
  *   graphId: sub-graph ID.

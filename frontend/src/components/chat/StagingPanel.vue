@@ -21,19 +21,19 @@ const emit = defineEmits<{
 <template>
   <section v-if="batches.length > 0" class="staging-panel">
     <header class="staging-panel__head">
-      <h3>Pending changes</h3>
-      <span class="staging-panel__count">{{ batches.length }} batches</span>
+      <h3>待处理变更</h3>
+      <span class="staging-panel__count">{{ batches.length }} 个批次</span>
     </header>
 
     <div v-for="batch in batches" :key="batch.batch_id" class="staging-batch">
       <header class="staging-batch__head">
-        <span>{{ batch.items.length }} items in this batch</span>
+        <span>本批次 {{ batch.items.length }} 项</span>
         <div class="staging-batch__actions">
           <button type="button" @click="emit('resolveBatch', batch.batch_id, 'accept_all')">
-            Accept all
+            全部接受
           </button>
           <button type="button" class="ghost" @click="emit('resolveBatch', batch.batch_id, 'reject_all')">
-            Reject all
+            全部拒绝
           </button>
         </div>
       </header>

@@ -78,7 +78,7 @@ const memoryGroups = computed(() =>
  */
 function summarizeContent(content: string) {
   if (!content.trim()) {
-    return 'No content yet'
+    return '暂无内容'
   }
 
   return content.length > 72 ? `${content.slice(0, 72)}...` : content
@@ -90,10 +90,10 @@ function getNodeTypeLabel(type: string) {
 
 function getMemorySourceLabel(source: string) {
   if (source === 'both') {
-    return 'Graph + semantic'
+    return '图关系 + 语义'
   }
 
-  return source === 'graph' ? 'Graph relation' : 'Semantic match'
+  return source === 'graph' ? '图关系' : '语义匹配'
 }
 
 /**
@@ -134,7 +134,7 @@ async function handleLoadRelatedMemory() {
     relatedMemoryItems.value = result.merged_context
   } catch (error) {
     relatedMemoryItems.value = []
-    relatedMemoryError.value = error instanceof Error ? error.message : 'Failed to load related memories'
+    relatedMemoryError.value = error instanceof Error ? error.message : '相关记忆加载失败'
   } finally {
     isRelatedMemoryLoading.value = false
   }
@@ -150,7 +150,7 @@ async function handleSearchMemory() {
   const query = memorySearchQuery.value.trim()
 
   if (!props.projectId || !query) {
-    memorySearchError.value = 'Enter a memory question to search'
+    memorySearchError.value = '请输入要搜索的记忆问题'
     return
   }
 
@@ -169,7 +169,7 @@ async function handleSearchMemory() {
     }
   } catch (error) {
     memorySearchItems.value = []
-    memorySearchError.value = error instanceof Error ? error.message : 'Memory search failed'
+    memorySearchError.value = error instanceof Error ? error.message : '记忆搜索失败'
   } finally {
     isMemorySearching.value = false
   }
@@ -188,7 +188,7 @@ watch(
   <!-- Left sidebar: node types, project-memory navigation, and a lightweight search entry point -->
   <aside class="project-sidebar">
     <section class="sidebar-section">
-      <h2>Node types</h2>
+      <h2>节点类型</h2>
       <div class="node-type-list">
         <button
           v-for="option in nodeTypeOptions"
@@ -221,8 +221,8 @@ watch(
     <!-- </section> -->
 
     <section class="sidebar-section">
-      <h2>Memory list</h2>
-      <p v-if="memoryGroups.length === 0" class="empty-copy">No nodes yet — create a creative memory from above first.</p>
+      <h2>记忆列表</h2>
+      <p v-if="memoryGroups.length === 0" class="empty-copy">还没有节点，请先从上方创建一条创意记忆。</p>
       <details v-for="group in memoryGroups" :key="group.type" class="memory-group" open>
         <summary>
           <span>{{ group.icon }} {{ group.label }}</span>
@@ -237,21 +237,21 @@ watch(
           @click="handleSelectNode(node.id)"
         >
           <strong>{{ node.data.title }}</strong>
-          <span>{{ node.data.status }} · {{ node.data.tags.join(' / ') || 'No tags' }}</span>
+          <span>{{ node.data.status }} · {{ node.data.tags.join(' / ') || '无标签' }}</span>
           <p>{{ summarizeContent(node.data.content) }}</p>
         </button>
       </details>
     </section>
 
     <section class="sidebar-section">
-      <h2>Related memories</h2>
+      <h2>相关记忆</h2>
       <template v-if="selectedNode">
-        <p class="context-copy">View graph relations and semantically similar memories around "{{ selectedNode.data.title }}".</p>
+        <p class="context-copy">查看图关系以及语义相近的记忆：“{{ selectedNode.data.title }}”。</p>
         <button type="button" class="secondary-button" :disabled="isRelatedMemoryLoading" @click="handleLoadRelatedMemory">
-          {{ isRelatedMemoryLoading ? 'Loading…' : 'View related memories' }}
+          {{ isRelatedMemoryLoading ? '加载中…' : '查看相关记忆' }}
         </button>
         <p v-if="relatedMemoryError" class="memory-error">{{ relatedMemoryError }}</p>
-        <p v-else-if="relatedMemoryItems.length === 0" class="empty-copy">Click the button to show memories related to the current node.</p>
+        <p v-else-if="relatedMemoryItems.length === 0" class="empty-copy">点击按钮显示与当前节点相关的记忆。</p>
         <button
           v-for="item in relatedMemoryItems"
           :key="item.id"
@@ -264,16 +264,16 @@ watch(
           <p>{{ summarizeContent(item.content) }}</p>
         </button>
       </template>
-      <p v-else class="empty-copy">Select a node to see its related memories here.</p>
+      <p v-else class="empty-copy">选择一个节点，在这里查看相关记忆。</p>
     </section>
 
     <section class="sidebar-section">
-      <h2>Project memory search</h2>
+      <h2>项目记忆搜索</h2>
       <div class="memory-search">
         <input
           v-model="memorySearchQuery"
           type="text"
-          placeholder="e.g. Who is connected to the Shibuya Station line?"
+          placeholder="例如：谁和涩谷站线有关？"
           @keydown.enter.prevent="handleSearchMemory"
         />
         <div class="custom-select-container">
@@ -282,7 +282,7 @@ watch(
             :class="{ 'is-open': isMemorySearchTypeSelectOpen }"
             @click="isMemorySearchTypeSelectOpen = !isMemorySearchTypeSelectOpen"
           >
-            <span>{{ memorySearchType === 'all' ? 'All types' : (nodeTypeOptions.find(opt => opt.type === memorySearchType)?.label || memorySearchType) }}</span>
+            <span>{{ memorySearchType === 'all' ? '全部类型' : (nodeTypeOptions.find(opt => opt.type === memorySearchType)?.label || memorySearchType) }}</span>
             <div class="custom-select-arrow"></div>
           </div>
           <ul class="custom-select-options" v-show="isMemorySearchTypeSelectOpen">
@@ -291,7 +291,7 @@ watch(
               :class="{ 'is-selected': memorySearchType === 'all' }"
               @click="memorySearchType = 'all'; isMemorySearchTypeSelectOpen = false"
             >
-              All types
+              全部类型
             </li>
             <li
               v-for="option in nodeTypeOptions"
@@ -305,11 +305,11 @@ watch(
           </ul>
         </div>
         <button type="button" :disabled="isMemorySearching" @click="handleSearchMemory">
-          {{ isMemorySearching ? 'Searching…' : 'Search memory' }}
+          {{ isMemorySearching ? '搜索中…' : '搜索记忆' }}
         </button>
       </div>
       <p v-if="memorySearchError" class="memory-error">{{ memorySearchError }}</p>
-      <p v-else-if="memorySearchItems.length === 0" class="empty-copy">Enter a question to search existing lore within this project.</p>
+      <p v-else-if="memorySearchItems.length === 0" class="empty-copy">输入问题，在当前项目的既有设定中搜索。</p>
       <button
         v-for="item in memorySearchItems"
         :key="item.id"
@@ -318,7 +318,7 @@ watch(
         @click="handleSelectNode(item.id)"
       >
         <strong>{{ item.title }}</strong>
-        <span>score {{ item.score.toFixed(2) }} · {{ getNodeTypeLabel(item.type) }}</span>
+        <span>分数 {{ item.score.toFixed(2) }} · {{ getNodeTypeLabel(item.type) }}</span>
         <p>{{ summarizeContent(item.content) }}</p>
       </button>
     </section>

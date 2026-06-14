@@ -10,9 +10,8 @@ import {
 /**
  * Edge detail panel.
  *
- * Provides direction reversal, relation-type switching, and label editing; node
- * lookup is only used to display the source/target titles. The actual edge
- * persistence is handled by the parent after emit('edgeUpdated').
+ * 提供方向反转、关系类型切换和标签编辑；节点查找只用于展示源/目标标题。
+ * 实际边数据持久化由父组件在收到 emit('edge-updated') 后处理。
  */
 const props = defineProps<{
   selectedEdge: CreativeFlowEdge
@@ -20,8 +19,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  edgeUpdated: [edge: CreativeFlowEdge]
-  edgeDeleted: [edgeId: string]
+  'edge-updated': [edge: CreativeFlowEdge]
+  'edge-deleted': [edgeId: string]
 }>()
 
 const isEdgeRelationSelectOpen = ref(false)
@@ -59,7 +58,7 @@ function updateEdge(partial: Partial<CreativeFlowEdge['data']>) {
     ...partial,
   }
 
-  emit('edgeUpdated', {
+  emit('edge-updated', {
     ...props.selectedEdge,
     label: data.label,
     data,
@@ -74,7 +73,7 @@ function updateEdgeRelation(relationType: CreativeRelationType) {
 }
 
 function reverseSelectedEdge() {
-  emit('edgeUpdated', {
+  emit('edge-updated', {
     ...props.selectedEdge,
     source: props.selectedEdge.target,
     target: props.selectedEdge.source,
@@ -87,23 +86,23 @@ function reverseSelectedEdge() {
 <template>
   <div class="edge-detail-panel">
     <section class="detail-header">
-      <p>Current edge</p>
+      <p>当前边</p>
       <h2>{{ selectedEdge.data.label }}</h2>
     </section>
 
     <section class="detail-panel">
       <dl class="edge-meta">
         <div>
-          <dt>Source node</dt>
+          <dt>源节点</dt>
           <dd>{{ sourceNodeTitle }}</dd>
         </div>
         <div>
-          <dt>Target node</dt>
+          <dt>目标节点</dt>
           <dd>{{ targetNodeTitle }}</dd>
         </div>
       </dl>
 
-      <label for="edge-relation">Relation type</label>
+      <label for="edge-relation">关系类型</label>
       <div class="custom-select-container">
         <div
           class="custom-select-trigger"
@@ -126,7 +125,7 @@ function reverseSelectedEdge() {
         </ul>
       </div>
 
-      <label for="edge-label">Edge label</label>
+      <label for="edge-label">边标签</label>
       <div class="input-wrapper">
         <input
           id="edge-label"
@@ -136,8 +135,8 @@ function reverseSelectedEdge() {
         />
       </div>
 
-      <button type="button" class="secondary-action" @click="reverseSelectedEdge">Reverse direction</button>
-      <button type="button" class="danger" @click="emit('edgeDeleted', selectedEdge.id)">Delete edge</button>
+      <button type="button" class="secondary-action" @click="reverseSelectedEdge">反转方向</button>
+      <button type="button" class="danger" @click="emit('edge-deleted', selectedEdge.id)">删除边</button>
     </section>
   </div>
 </template>

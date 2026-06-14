@@ -1,8 +1,7 @@
-"""Pydantic DTOs for the backend API.
+"""后端 API 使用的 Pydantic DTO。
 
-Field naming follows the existing frontend contract, to avoid structural migrations
-changing the HTTP request and response formats. Conversion between internal database
-fields and API fields is handled by the service layer.
+字段命名遵循现有前端契约，避免结构迁移改变 HTTP 请求和响应格式。
+内部数据库字段与 API 字段之间的转换由服务层处理。
 """
 
 from datetime import datetime
@@ -12,14 +11,14 @@ from pydantic import BaseModel, Field
 
 
 class ProjectPayload(BaseModel):
-    """Minimal display information for a project."""
+    """项目的最小展示信息。"""
 
     id: str
     name: str
 
 
 class ProjectSeedPayload(BaseModel):
-    """Project seed DTO (first_revision decision 3)."""
+    """项目 seed DTO（first_revision 决策 3）。"""
 
     id: str
     project_id: str
@@ -30,7 +29,7 @@ class ProjectSeedPayload(BaseModel):
 
 
 class GraphInfoPayload(BaseModel):
-    """Sub-graph metadata DTO."""
+    """子图元数据 DTO。"""
 
     id: str
     project_id: str
@@ -38,7 +37,7 @@ class GraphInfoPayload(BaseModel):
 
 
 class ProjectSummaryPayload(BaseModel):
-    """Overview information needed by the project library card."""
+    """项目库卡片所需的概览信息。"""
 
     id: str
     name: str
@@ -49,7 +48,7 @@ class ProjectSummaryPayload(BaseModel):
 
 
 class ProjectDetailPayload(BaseModel):
-    """Project details: includes the three sub-graph ids and the latest seed (first_revision phase 1)."""
+    """项目详情：包含三个子图 ID 和最新 seed（first_revision 第 1 阶段）。"""
 
     id: str
     name: str
@@ -64,14 +63,14 @@ class ProjectDetailPayload(BaseModel):
 
 
 class ProjectCreateRequest(BaseModel):
-    """Create-project request body; the backend automatically creates three sub-graphs."""
+    """创建项目请求体；后端会自动创建三个子图。"""
 
     name: str
     description: str = ""
 
 
 class ProjectUpdateRequest(BaseModel):
-    """Partial project update request body; None means the field is not modified."""
+    """项目局部更新请求体；None 表示不修改该字段。"""
 
     name: str | None = None
     description: str | None = None
@@ -79,21 +78,21 @@ class ProjectUpdateRequest(BaseModel):
 
 
 class NodeFieldsPayload(BaseModel):
-    """Node free-form fields DTO (first_revision decision 2)."""
+    """节点自由表单字段 DTO（first_revision 决策 2）。"""
 
     node_id: str
     fields: dict[str, str] = Field(default_factory=dict)
 
 
 class WorkspaceChatRequest(BaseModel):
-    """Request body for the workspace bottom chat box (second_revision change B / W5)."""
+    """工作区底部聊天框请求体（second_revision 变更 B / W5）。"""
 
     message: str = ""
     quoted_node_ids: list[str] = Field(default_factory=list)
 
 
 class CrossReferenceItem(BaseModel):
-    """A single cross-sub-graph reference (first_revision phase 6)."""
+    """单条跨子图引用（first_revision 第 6 阶段）。"""
 
     edge_id: str
     other_node_id: str
@@ -101,12 +100,12 @@ class CrossReferenceItem(BaseModel):
     other_section: Literal["plot", "character", "world"]
     relation_type: str
     relation_label: str
-    # 'outgoing': this node -> the other; 'incoming': the other -> this node
+    # 'outgoing'：当前节点 -> 对方；'incoming'：对方 -> 当前节点。
     direction: Literal["outgoing", "incoming"]
 
 
 class CrossReferenceResponse(BaseModel):
-    """All references to a node in other sub-graphs."""
+    """一个节点在其他子图中的全部引用。"""
 
     node_id: str
     section: Literal["plot", "character", "world"] | None = None
@@ -114,17 +113,17 @@ class CrossReferenceResponse(BaseModel):
 
 
 class PositionPayload(BaseModel):
-    """Two-dimensional node coordinates used by Vue Flow."""
+    """Vue Flow 使用的二维节点坐标。"""
 
     x: float
     y: float
 
 
 class NodePayload(BaseModel):
-    """Node DTO shared by frontend and backend.
+    """前后端共享的节点 DTO。
 
-    Field names follow frontend conventions, e.g. `type`, `nodeType`, and `typeLabel`,
-    to avoid introducing extra mapping cost at the API boundary.
+    字段名遵循前端约定，例如 `type`、`nodeType` 和 `typeLabel`，
+    以避免在 API 边界引入额外映射成本。
     """
 
     id: str
@@ -142,10 +141,10 @@ class NodePayload(BaseModel):
 
 
 class EdgeWaypointPayload(BaseModel):
-    """Perpendicular coordinates of the edge midpoint produced by user dragging.
+    """用户拖动生成的边中点垂直坐标。
 
-    Consistent with the frontend ``CreativeEdgeWaypoint``; fields keep camelCase to
-    avoid DTO conversion noise.
+    与前端 ``CreativeEdgeWaypoint`` 保持一致；字段保留 camelCase，
+    避免 DTO 转换噪声。
     """
 
     orientation: str  # "horizontal" | "vertical"
@@ -155,10 +154,9 @@ class EdgeWaypointPayload(BaseModel):
 
 
 class EdgePayload(BaseModel):
-    """Vue Flow edge DTO.
+    """Vue Flow 边 DTO。
 
-    Stores handle and edge styling information, so that after the backend reads it the
-    frontend can restore the connections exactly as they were.
+    存储 handle 和边样式信息，后端读出后前端可以精确恢复连接。
     """
 
     id: str
@@ -174,11 +172,10 @@ class EdgePayload(BaseModel):
 
 
 class IndexingStatusPayload(BaseModel):
-    """Vector index status DTO.
+    """向量索引状态 DTO。
 
-    The save endpoint first guarantees the write to SQLite, then carries the
-    embedding/ChromaDB synchronization result back to the frontend, so the user can
-    know whether semantic retrieval is actually available.
+    保存端点会先保证写入 SQLite，再把 embedding/ChromaDB 同步结果带回前端，
+    让用户知道语义检索是否真正可用。
     """
 
     status: str = "not_checked"
@@ -193,7 +190,7 @@ class IndexingStatusPayload(BaseModel):
 
 
 class GraphPayload(BaseModel):
-    """When reading the graph, returns project metadata and the full node and edge snapshots."""
+    """读取图时返回项目元数据以及完整节点、边快照。"""
 
     project: ProjectPayload
     nodes: list[NodePayload]
@@ -202,10 +199,9 @@ class GraphPayload(BaseModel):
 
 
 class SaveGraphRequest(BaseModel):
-    """Save endpoint request body.
+    """保存端点请求体。
 
-    The save strategy is a whole-graph snapshot replacement; empty lists mean clearing
-    the current project graph.
+    保存策略是整体替换图快照；空列表表示清空当前项目图。
     """
 
     nodes: list[NodePayload] = Field(default_factory=list)
@@ -213,9 +209,9 @@ class SaveGraphRequest(BaseModel):
 
 
 class UpdateNodeRequest(BaseModel):
-    """Partial node update request body.
+    """节点局部更新请求体。
 
-    All fields are optional; `None` means the field is not modified.
+    所有字段都是可选的；`None` 表示不修改该字段。
     """
 
     title: str | None = None
@@ -229,9 +225,9 @@ class UpdateNodeRequest(BaseModel):
 
 
 class RagContextRequest(BaseModel):
-    """RAG context preview request.
+    """RAG 上下文预览请求。
 
-    The current endpoint only builds the context and the prompt; it does not call any LLM.
+    当前端点只构建上下文和 prompt，不调用任何 LLM。
     """
 
     node_id: str
@@ -241,7 +237,7 @@ class RagContextRequest(BaseModel):
 
 
 class RagCurrentNodePayload(BaseModel):
-    """Snapshot of the current node in the RAG response."""
+    """RAG 响应中的当前节点快照。"""
 
     id: str
     type: str
@@ -252,7 +248,7 @@ class RagCurrentNodePayload(BaseModel):
 
 
 class RagGraphContextItem(BaseModel):
-    """One-hop graph relation context derived from canvas edges."""
+    """由画布边推导出的一跳图关系上下文。"""
 
     id: str
     type: str
@@ -264,7 +260,7 @@ class RagGraphContextItem(BaseModel):
 
 
 class RagVectorContextItem(BaseModel):
-    """A similar node hit by vector retrieval."""
+    """向量检索命中的相似节点。"""
 
     id: str
     type: str
@@ -274,7 +270,7 @@ class RagVectorContextItem(BaseModel):
 
 
 class RagMergedContextItem(BaseModel):
-    """A merged context item."""
+    """合并后的上下文条目。"""
 
     id: str
     source: str
@@ -284,7 +280,7 @@ class RagMergedContextItem(BaseModel):
 
 
 class RagDebugPayload(BaseModel):
-    """Debug information for RAG context construction."""
+    """RAG 上下文构建的调试信息。"""
 
     query_used: str
     top_k: int
@@ -294,7 +290,7 @@ class RagDebugPayload(BaseModel):
 
 
 class MemorySearchRequest(BaseModel):
-    """Project-level Lore Memory search request."""
+    """项目级 Lore Memory 搜索请求。"""
 
     query: str = ""
     node_type: str | None = None
@@ -302,7 +298,7 @@ class MemorySearchRequest(BaseModel):
 
 
 class MemorySearchItem(BaseModel):
-    """A hit item from a project-level Lore Memory search."""
+    """项目级 Lore Memory 搜索的命中条目。"""
 
     id: str
     type: str
@@ -314,14 +310,14 @@ class MemorySearchItem(BaseModel):
 
 
 class MemorySearchResponse(BaseModel):
-    """Project-level Lore Memory search response."""
+    """项目级 Lore Memory 搜索响应。"""
 
     items: list[MemorySearchItem]
     debug: RagDebugPayload
 
 
 class RagContextResponse(BaseModel):
-    """The full response of the RAG context endpoint."""
+    """RAG 上下文端点的完整响应。"""
 
     current_node: RagCurrentNodePayload
     graph_context: list[RagGraphContextItem]
@@ -332,14 +328,14 @@ class RagContextResponse(BaseModel):
 
 
 class ChatSessionCreateRequest(BaseModel):
-    """Request body for creating a chat session."""
+    """创建聊天会话的请求体。"""
 
     project_id: str
     title: str = ""
 
 
 class ChatSessionPayload(BaseModel):
-    """Chat session DTO."""
+    """聊天会话 DTO。"""
 
     id: str
     project_id: str
@@ -350,17 +346,17 @@ class ChatSessionPayload(BaseModel):
 
 
 class SessionRenameRequest(BaseModel):
-    """Request body for renaming a chat session."""
+    """重命名聊天会话的请求体。"""
     title: str
 
 
 class SessionTitleRequest(BaseModel):
-    """Request body for LLM-summarized session title generation."""
+    """由 LLM 总结会话标题的请求体。"""
     user_message: str
 
     
 class ChatMessageCreateRequest(BaseModel):
-    """Request body for appending a chat message; from Phase 4 on, the graph entry point replaces the direct POST."""
+    """追加聊天消息的请求体；从第 4 阶段开始，图入口取代直接 POST。"""
 
     role: Literal["user", "assistant", "system"]
     content: str
@@ -368,7 +364,7 @@ class ChatMessageCreateRequest(BaseModel):
 
 
 class ChatMessagePayload(BaseModel):
-    """Chat message DTO."""
+    """聊天消息 DTO。"""
 
     id: str
     session_id: str
@@ -379,7 +375,7 @@ class ChatMessagePayload(BaseModel):
 
 
 class AgentStagingCreateItem(BaseModel):
-    """Write payload for a single staging item; used by both persistence_hub and the manual endpoint."""
+    """单个暂存项的写入载荷；persistence_hub 和手动端点都会使用。"""
 
     change_type: Literal[
         "create_node",
@@ -395,7 +391,7 @@ class AgentStagingCreateItem(BaseModel):
 
 
 class AgentStagingBatchCreateRequest(BaseModel):
-    """Request body for writing a batch of staging items in the same Agent turn."""
+    """同一轮 Agent 中批量写入暂存项的请求体。"""
 
     message_id: str
     agent_type: str = ""
@@ -403,7 +399,7 @@ class AgentStagingBatchCreateRequest(BaseModel):
 
 
 class AgentStagingPayload(BaseModel):
-    """DTO for a single staging item."""
+    """单个暂存项 DTO。"""
 
     id: str
     session_id: str
@@ -424,16 +420,16 @@ class AgentStagingPayload(BaseModel):
 
 
 class AgentStagingBatchPayload(BaseModel):
-    """Staging batch DTO; aggregates multiple changes sharing the same batch_id for display."""
+    """暂存批次 DTO；聚合共享同一 batch_id 的多项变更用于展示。"""
 
     batch_id: str
     items: list[AgentStagingPayload]
 
 
 class AgentStagingActionRequest(BaseModel):
-    """Request for handling a single staging item.
+    """处理单个暂存项的请求。
 
-    ``payload_edited`` is required when ``action='edit'``; it is ignored for other actions.
+    当 ``action='edit'`` 时必须提供 ``payload_edited``；其他动作会忽略它。
     """
 
     action: Literal["accept", "edit", "reject"]
@@ -441,33 +437,32 @@ class AgentStagingActionRequest(BaseModel):
 
 
 class AgentStagingBatchActionRequest(BaseModel):
-    """Request for batch staging handling."""
+    """批量处理暂存项的请求。"""
 
     action: Literal["accept_all", "reject_all"]
 
 
 class ChatRequest(BaseModel):
-    """Request body for triggering agent_graph inference."""
+    """触发 agent_graph 推理的请求体。"""
 
     session_id: str
     user_message: str
     selected_node_ids: list[str] = Field(default_factory=list)
-    # first_revision phase 4: ChatWorkspace full-screen chat sets this to True to enable the background B-agent;
-    # FloatingChatDock does not pass it, keeping the old flow (no question_planner / structured_extractor side effects).
+    # first_revision 第 4 阶段：ChatWorkspace 全屏聊天将其设为 True 以启用后台 B-agent；
+    # FloatingChatDock 不传该值，保持旧流程（没有 question_planner / structured_extractor 副作用）。
     extraction_enabled: bool = False
-    # When True, staging is accept_all'd immediately (inline ✅ cards + discard in chat UI).
+    # 为 True 时，staging 会立即 accept_all（聊天 UI 中的行内确认卡 + 丢弃）。
     auto_apply_staging: bool = False
-    # auto: heuristic decides; on: force Tavily; off: never call web_search this turn.
+    # auto：由启发式判断；on：强制 Tavily；off：本轮绝不调用 web_search。
     web_search_mode: Literal["auto", "on", "off"] = "auto"
-    # User-selected agent mode; "auto" lets intent_router classify freely.
+    # 用户选择的 agent 模式；"auto" 表示让 intent_router 自由分类。
     preferred_intent: Literal["auto", "research", "inspiration", "structure"] = "auto"
 
 
 class ChatResponse(BaseModel):
-    """The chat reply after one round of agent inference, plus a side-effect summary.
+    """一轮 agent 推理后的聊天回复，以及副作用摘要。
 
-    ``batch_id`` has a value only when this round produces staging; the frontend uses
-    it to fetch the content of the staging panel.
+    只有本轮产生 staging 时 ``batch_id`` 才有值；前端用它拉取暂存面板内容。
     """
 
     message_id: str

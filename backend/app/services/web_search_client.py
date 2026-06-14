@@ -55,12 +55,12 @@ class WebSearchUnavailable(WebSearchError):
 def search_web(query: str, top_k: int = 5) -> WebSearchResponse:
     """Call Tavily once and return the normalized results.
 
-    Args:
+    参数：
         query: Search keywords or a natural-language question.
         top_k: Maximum number of results to return, automatically clamped to
             [1, 10].
 
-    Raises:
+    抛出：
         WebSearchUnavailable: api_key not configured / Tavily returns 401 or 429.
         WebSearchError: Other network or parsing errors.
     """

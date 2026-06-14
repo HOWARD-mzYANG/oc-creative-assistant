@@ -18,14 +18,14 @@ const emit = defineEmits<{
 }>()
 
 const toolbarActions = [
-  { id: 'refresh', label: 'Refresh' },
-  { id: 'save', label: 'Save' },
-  { id: 'import', label: 'Import' },
-  { id: 'export', label: 'Export' },
-  { id: 'settings', label: 'Settings' },
+  { id: 'refresh', label: '刷新' },
+  { id: 'save', label: '保存' },
+  { id: 'import', label: '导入' },
+  { id: 'export', label: '导出' },
+  { id: 'settings', label: '设置' },
 ]
 
-const savingLabel = 'Saving…'
+const savingLabel = '保存中…'
 
 function handleActionClick(actionId: string) {
   if (actionId === 'save') {
@@ -42,13 +42,13 @@ function handleActionClick(actionId: string) {
     <div class="title-block">
       <div class="brand">
         <img class="logo-icon" :src="logoUrl" alt="" aria-hidden="true" />
-        <strong>OC Creative Assistant</strong>
+        <strong>OC 创意助手</strong>
       </div>
       <span class="divider">/</span>
       <span class="project-name">{{ projectName }}</span>
     </div>
 
-    <nav class="toolbar-actions" aria-label="Workspace actions">
+    <nav class="toolbar-actions" aria-label="工作区操作">
       <button
         v-for="action in toolbarActions"
         :key="action.id"

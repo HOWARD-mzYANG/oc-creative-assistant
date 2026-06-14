@@ -7,7 +7,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const nodeCommand = process.execPath
 
-// Run a subcommand and abort the entire build pipeline on failure.
+// 运行子命令；一旦失败就中止整个构建流水线。
 function run(command, args, name) {
   return new Promise((resolve, reject) => {
     const useShell = process.platform === 'win32' && /\.cmd$/i.test(command)
@@ -20,7 +20,7 @@ function run(command, args, name) {
     })
 
     child.on('error', (error) => {
-      reject(new Error(`${name} failed to start: ${error.message}`))
+      reject(new Error(`${name} 启动失败：${error.message}`))
     })
 
     child.on('exit', (code) => {
@@ -29,13 +29,13 @@ function run(command, args, name) {
         return
       }
 
-      reject(new Error(`${name} exited with code ${code ?? 1}`))
+      reject(new Error(`${name} 退出码为 ${code ?? 1}`))
     })
   })
 }
 
-// Build the frontend, backend, resources directory, and final Electron installer in order.
-await run(npmCommand, ['--prefix', 'frontend', 'run', 'build'], 'frontend build')
-await run(nodeCommand, ['scripts/build-backend.mjs'], 'backend build')
-await run(nodeCommand, ['scripts/prepare-electron-package.mjs'], 'electron bundle prepare')
-await run(npmCommand, ['--prefix', 'electron', 'run', 'build'], 'electron build')
+// 依次构建前端、后端、资源目录和最终 Electron 安装包。
+await run(npmCommand, ['--prefix', 'frontend', 'run', 'build'], '前端构建')
+await run(nodeCommand, ['scripts/build-backend.mjs'], '后端构建')
+await run(nodeCommand, ['scripts/prepare-electron-package.mjs'], 'Electron 包资源准备')
+await run(npmCommand, ['--prefix', 'electron', 'run', 'build'], 'Electron 构建')

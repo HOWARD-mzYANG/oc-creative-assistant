@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import WorldNotesWorkspace from '../../components/workspace/world/WorldNotesWorkspace.vue'
 
 /**
- * Worldbuilding view: folder notes by default, optional tree canvas derived from hierarchy.
+ * 世界观 view: folder notes by default, optional tree canvas derived from hierarchy.
  */
 const { worldGraphId } = storeToRefs(useProjectStore())
 </script>
@@ -15,7 +15,7 @@ const { worldGraphId } = storeToRefs(useProjectStore())
     :key="worldGraphId"
     :graph-id="worldGraphId"
   />
-  <p v-else class="workspace-loading">Loading worldbuilding…</p>
+  <p v-else class="workspace-loading">正在加载世界观…</p>
 </template>
 
 <style scoped>

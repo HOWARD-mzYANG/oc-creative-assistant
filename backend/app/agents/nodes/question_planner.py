@@ -43,7 +43,7 @@ def question_planner_node(state: AgentState) -> dict[str, Any]:
     messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
-            f"[Project seed/background]\n{seed[:500] or '(none yet)'}\n\n"
+            f"[项目 seed/background]\n{seed[:500] or '(none yet)'}\n\n"
             f"[Quoted nodes from canvas]\n{quoted_block}\n\n"
             f"[Recent conversation]\n{history}\n\n"
             f"[Fields to fill]\n{deferred_block}\n\n"

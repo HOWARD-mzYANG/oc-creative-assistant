@@ -1,13 +1,10 @@
-"""LangGraph shared state definition.
+"""LangGraph 共享状态定义。
 
-The agent graph flows around this ``AgentState``: load_context writes the
-project and session snapshot, intent_router decides this turn's intent, RAG and
-the corresponding agent drop their results into their own fields, and the
-assembler and persistence hub take the matching agent's output by intent for
-post-processing.
+agent 图围绕 ``AgentState`` 流转：load_context 写入项目与会话快照，intent_router 决定本轮
+意图，RAG 与对应 agent 把结果写入各自字段，assembler 和 persistence hub 再按意图取匹配
+agent 的输出做后处理。
 
-All fields use ``total=False``, so local tests can construct only the subset
-they care about to start a single node.
+所有字段都使用 ``total=False``，因此本地测试可以只构造关心的字段子集来启动单个节点。
 """
 
 from __future__ import annotations
@@ -31,7 +28,7 @@ from app.schemas import (
 
 
 class AgentState(TypedDict, total=False):
-    """The state dict shared between LangGraph nodes."""
+    """LangGraph 节点之间共享的状态字典。"""
 
     session_id: str
     project_id: str
@@ -64,8 +61,8 @@ class AgentState(TypedDict, total=False):
     staging_batch_id: str | None
     staging_count: int
 
-    # first_revision stage 4: background B-agents (structured_extractor / question_planner).
-    # When extraction_enabled is off, both nodes are no-ops throughout, and the FloatingChatDock legacy flow is unaffected.
+    # first_revision 第 4 阶段：后台 B-agents（structured_extractor / question_planner）。
+    # extraction_enabled 关闭时，两个节点全程都是空操作，不影响 FloatingChatDock 旧流程。
     extraction_enabled: bool
     auto_apply_staging: bool
     web_search_mode: str

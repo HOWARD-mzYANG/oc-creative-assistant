@@ -4,11 +4,11 @@ const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
 
-// In packaged mode the Electron main process hosts the backend process; in dev mode it usually reuses an external uvicorn.
+// 打包模式下 Electron 主进程托管后端进程；开发模式通常复用外部 uvicorn。
 let backendProcess = null
 const PDF_EXPORT_CHANNEL = 'oc:export-project-pdf'
 
-// Normalize the port input, falling back to the default value when it is invalid.
+// 标准化端口输入；无效时回退到默认值。
 function resolvePort(rawPort, fallback) {
   const parsedPort = Number(rawPort)
 
@@ -19,7 +19,7 @@ function resolvePort(rawPort, fallback) {
   return fallback
 }
 
-// Resolve the frontend entry URL to load in development mode.
+// 解析开发模式下要加载的前端入口 URL。
 function resolveRendererUrl() {
   const host = process.env.FRONTEND_DEV_HOST ?? '127.0.0.1'
   const port = process.env.FRONTEND_DEV_PORT ?? '5174'
@@ -27,17 +27,17 @@ function resolveRendererUrl() {
   return process.env.ELECTRON_RENDERER_URL ?? `http://${host}:${port}`
 }
 
-// Build the local HTTP base URL from the host and port.
+// 根据主机和端口构建本地 HTTP 基础 URL。
 function buildHttpUrl(host, port) {
   return `http://${host}:${port}`
 }
 
-// Build the health endpoint URL from the backend base URL.
+// 根据后端基础 URL 构建健康检查端点 URL。
 function buildHealthUrl(baseUrl) {
   return `${baseUrl.replace(/\/$/, '')}/health`
 }
 
-// Check whether a given local port is currently available.
+// 检查指定本地端口当前是否可用。
 async function isPortFree(host, port) {
   return new Promise((resolve) => {
     const server = net.createServer()
@@ -54,7 +54,7 @@ async function isPortFree(host, port) {
   })
 }
 
-// Search upward from the preferred port for an available one.
+// 从首选端口开始向上查找可用端口。
 async function findAvailablePort(host, preferredPort, maxAttempts = 20) {
   for (let offset = 0; offset < maxAttempts; offset += 1) {
     const candidatePort = preferredPort + offset
@@ -65,11 +65,11 @@ async function findAvailablePort(host, preferredPort, maxAttempts = 20) {
   }
 
   throw new Error(
-    `Could not find an available port for ${host} starting from ${preferredPort}.`,
+    `无法为 ${host} 找到从 ${preferredPort} 开始的可用端口。`,
   )
 }
 
-// Poll until a given HTTP URL becomes reachable.
+// 轮询直到指定 HTTP URL 可访问。
 async function waitForUrl(url, timeoutMs = 30_000, intervalMs = 500) {
   const startedAt = Date.now()
 
@@ -81,21 +81,21 @@ async function waitForUrl(url, timeoutMs = 30_000, intervalMs = 500) {
         return
       }
     } catch {
-      // Keep polling until the endpoint is ready or the timeout expires.
+      // 持续轮询，直到端点就绪或超时。
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
 
-  throw new Error(`Timed out waiting for ${url}`)
+  throw new Error(`等待 ${url} 超时`)
 }
 
-// Resolve the location of the packaged frontend entry file within resources.
+// 解析 resources 中打包前端入口文件的位置。
 function getBundledFrontendEntry() {
   return path.join(process.resourcesPath, 'frontend', 'index.html')
 }
 
-// Resolve the location of the packaged backend executable within resources.
+// 解析 resources 中打包后端可执行文件的位置。
 function getBundledBackendExecutable() {
   const executableName = process.platform === 'win32'
     ? 'oc-creative-backend.exe'
@@ -104,7 +104,7 @@ function getBundledBackendExecutable() {
   return path.join(process.resourcesPath, 'backend', executableName)
 }
 
-// Resolve the desktop app icon in development and packaged builds.
+// 解析开发和打包构建中的桌面应用图标。
 function getAppIconPath() {
   const iconPath = path.join(__dirname, 'assets', 'icon.png')
 
@@ -115,7 +115,7 @@ function getAppIconPath() {
   return path.join(__dirname, 'assets', 'logo.png')
 }
 
-// Keep desktop PDF exports independent from renderer pop-up permissions.
+// 让桌面 PDF 导出不依赖渲染器弹窗权限。
 function sanitizePdfFileName(value) {
   const rawName = String(value || 'project').trim() || 'project'
   const safeName = rawName
@@ -129,12 +129,12 @@ function sanitizePdfFileName(value) {
 
 async function exportHtmlToPdf(parentWindow, payload) {
   if (!payload || typeof payload.html !== 'string') {
-    throw new Error('Invalid PDF export payload.')
+    throw new Error('PDF 导出载荷无效。')
   }
 
   const defaultPath = sanitizePdfFileName(payload.defaultFileName)
   const saveDialogOptions = {
-    title: 'Export PDF',
+    title: '导出 PDF',
     defaultPath,
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   }
@@ -180,7 +180,7 @@ async function exportHtmlToPdf(parentWindow, payload) {
   }
 }
 
-// Resolve the packaged backend data directory; portable follows the exe, the installed version follows the current user.
+// 解析打包后端的数据目录；便携版跟随 exe，安装版跟随当前用户。
 function resolveBundledBackendDataDir() {
   const portableExecutableDir = process.env.PORTABLE_EXECUTABLE_DIR
 
@@ -191,7 +191,7 @@ function resolveBundledBackendDataDir() {
   return app.getPath('userData')
 }
 
-// Stop the started backend process when the app exits.
+// 应用退出时停止已启动的后端进程。
 function stopBundledBackend() {
   if (!backendProcess || backendProcess.killed) {
     return
@@ -204,7 +204,7 @@ function stopBundledBackend() {
   }
 }
 
-// Start the packaged backend and wait for the health check to pass.
+// 启动打包后的后端，并等待健康检查通过。
 async function startBundledBackend() {
   const backendHost = process.env.BACKEND_HOST ?? '127.0.0.1'
   const preferredBackendPort = resolvePort(process.env.BACKEND_PORT, 9000)
@@ -215,11 +215,11 @@ async function startBundledBackend() {
   const backendDataDir = resolveBundledBackendDataDir()
 
   if (!fs.existsSync(executablePath)) {
-    throw new Error(`Bundled backend executable not found at ${executablePath}`)
+    throw new Error(`未在 ${executablePath} 找到打包后的后端可执行文件`)
   }
 
-  // The backend's actual port may shift if it is occupied; the final URL is injected into the frontend via preload.
-  // The data directory is passed explicitly by Electron to prevent the backend from writing into the portable build's temporary extraction directory.
+  // 如果端口被占用，后端实际端口可能会变化；最终 URL 会通过 preload 注入前端。
+  // Electron 显式传入数据目录，避免后端写入便携版构建的临时解压目录。
   backendProcess = spawn(
     executablePath,
     ['--host', backendHost, '--port', String(selectedBackendPort)],
@@ -240,8 +240,8 @@ async function startBundledBackend() {
       return
     }
 
-    const reason = signal ? `signal ${signal}` : `code ${code ?? 0}`
-    console.error(`[electron] Bundled backend exited unexpectedly with ${reason}`)
+    const reason = signal ? `信号 ${signal}` : `退出码 ${code ?? 0}`
+    console.error(`[electron] 打包后端意外退出（${reason}）`)
   })
 
   await waitForUrl(backendHealthUrl)
@@ -249,10 +249,10 @@ async function startBundledBackend() {
   return backendUrl
 }
 
-// Select the appropriate runtime config based on development or packaged mode.
+// 根据开发或打包模式选择合适的运行时配置。
 async function resolveRuntimeConfig() {
   if (!app.isPackaged) {
-    // In dev mode the backend is not auto-started; its URL is provided by scripts/dev-desktop.mjs or an external service.
+    // 开发模式不自动启动后端；其 URL 由 scripts/dev-desktop.mjs 或外部服务提供。
     return {
       backendUrl: process.env.BACKEND_BASE_URL ?? null,
       rendererUrl: resolveRendererUrl(),
@@ -267,20 +267,20 @@ async function resolveRuntimeConfig() {
   }
 }
 
-// Load the development frontend, falling back to an inline error page on failure.
+// 加载开发前端；失败时回退到内联错误页。
 async function loadRenderer(mainWindow, rendererUrl) {
   try {
-    console.log(`[electron] Loading renderer from ${rendererUrl}`)
+    console.log(`[electron] 正在从 ${rendererUrl} 加载渲染器`)
     await mainWindow.loadURL(rendererUrl)
-    console.log('[electron] Renderer loaded successfully')
+    console.log('[electron] 渲染器加载成功')
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown renderer error'
+    const message = error instanceof Error ? error.message : '未知渲染器错误'
     const fallbackHtml = `
       <!doctype html>
-      <html lang="en">
+      <html lang="zh-CN">
         <head>
           <meta charset="UTF-8" />
-          <title>Renderer not available</title>
+          <title>渲染器不可用</title>
           <style>
             body {
               margin: 0;
@@ -308,9 +308,9 @@ async function loadRenderer(mainWindow, rendererUrl) {
         </head>
         <body>
           <main>
-            <h1>Renderer not available</h1>
-            <p>Electron could not load the frontend entry at <code>${rendererUrl}</code>.</p>
-            <p>Details: ${message}</p>
+            <h1>渲染器不可用</h1>
+            <p>Electron 无法加载位于 <code>${rendererUrl}</code> 的前端入口。</p>
+            <p>详情：${message}</p>
           </main>
         </body>
       </html>
@@ -320,12 +320,12 @@ async function loadRenderer(mainWindow, rendererUrl) {
   }
 }
 
-// Determine whether a URL is an external HTTP(S) link.
+// 判断 URL 是否为外部 HTTP(S) 链接。
 function isHttpUrl(url) {
   return /^https?:/i.test(url)
 }
 
-// Determine whether a link still belongs to the current frontend origin.
+// 判断链接是否仍属于当前前端源。
 function hasSameOrigin(url, rendererOrigin) {
   try {
     return new URL(url).origin === rendererOrigin
@@ -334,7 +334,7 @@ function hasSameOrigin(url, rendererOrigin) {
   }
 }
 
-// Hand external links to the system browser and limit in-app navigation scope.
+// 将外部链接交给系统浏览器，并限制应用内导航范围。
 function wireExternalNavigation(mainWindow, rendererUrl) {
   const rendererOrigin = rendererUrl ? new URL(rendererUrl).origin : null
 
@@ -368,7 +368,7 @@ function wireExternalNavigation(mainWindow, rendererUrl) {
   })
 }
 
-// Create the main window and inject the backend URL into the renderer process.
+// 创建主窗口，并把后端 URL 注入渲染进程。
 async function createWindow(runtimeConfig) {
   const mainWindow = new BrowserWindow({
     width: 1440,
@@ -380,7 +380,7 @@ async function createWindow(runtimeConfig) {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
-      // The renderer process keeps the browser isolation model, exposing only the necessary config via preload.
+      // 渲染进程保留浏览器隔离模型，仅通过 preload 暴露必要配置。
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -398,11 +398,11 @@ async function createWindow(runtimeConfig) {
   }
 
   const bundledFrontendEntry = getBundledFrontendEntry()
-  console.log(`[electron] Loading packaged renderer from ${bundledFrontendEntry}`)
+  console.log(`[electron] 正在从 ${bundledFrontendEntry} 加载打包渲染器`)
   await mainWindow.loadFile(bundledFrontendEntry)
 }
 
-// Clean up the backend child process before the process exits.
+// 进程退出前清理后端子进程。
 app.on('before-quit', () => {
   app.isQuitting = true
   stopBundledBackend()
@@ -413,7 +413,7 @@ ipcMain.handle(PDF_EXPORT_CHANNEL, async (event, payload) => {
   return exportHtmlToPdf(parentWindow, payload)
 })
 
-// Once the app is ready, initialize the runtime config and open the first window.
+// 应用就绪后初始化运行时配置并打开第一个窗口。
 app.whenReady().then(async () => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.occreativeassistant.app')
@@ -429,7 +429,7 @@ app.whenReady().then(async () => {
   })
 })
 
-// On non-macOS platforms, quit the app once all windows are closed.
+// 在非 macOS 平台上，所有窗口关闭后退出应用。
 app.on('window-all-closed', () => {
   stopBundledBackend()
 

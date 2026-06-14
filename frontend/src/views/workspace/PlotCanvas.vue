@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import SubgraphCanvas from '../../components/workspace/SubgraphCanvas.vue'
 
 /**
- * Story view (first_revision stage 3): a Vue Flow canvas bound to the plot sub-graph.
+ * 故事 view (first_revision stage 3): a Vue Flow canvas bound to the plot sub-graph.
  */
 const { plotGraphId } = storeToRefs(useProjectStore())
 </script>
@@ -16,7 +16,7 @@ const { plotGraphId } = storeToRefs(useProjectStore())
     :graph-id="plotGraphId"
     :create-types="['plot']"
   />
-  <p v-else class="workspace-loading">Loading story…</p>
+  <p v-else class="workspace-loading">正在加载故事…</p>
 </template>
 
 <style scoped>

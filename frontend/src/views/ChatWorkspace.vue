@@ -17,8 +17,8 @@ function renderMarkdown(text: string): string {
 }
 
 /**
- * Dedicated chat module: project-scoped sessions + main LangGraph agent.
- * Background extraction/staging uses the same APIs as the workspace shell.
+ * 独立对话模块：项目范围会话 + 主 LangGraph Agent。
+ * 后台抽取/暂存与工作区外壳使用相同 API。
  */
 const props = defineProps<{ projectId: string }>()
 const router = useRouter()
@@ -40,15 +40,15 @@ const { detail } = storeToRefs(projectStore)
 const draft = ref('')
 const streamRef = ref<HTMLElement | null>(null)
 
-const projectName = computed(() => detail.value?.name ?? 'Chat')
+const projectName = computed(() => detail.value?.name ?? '对话')
 const hasContent = computed(() => Boolean(draft.value.trim()))
 
 const AGENT_LABELS: Record<string, string> = {
-  inspiration: 'Inspiration',
-  research: 'Research',
-  structure: 'Structure',
-  simulation: 'Simulation',
-  small_talk: 'Chat',
+  inspiration: '灵感',
+  research: '资料',
+  structure: '结构',
+  simulation: '模拟',
+  small_talk: '对话',
 }
 
 onMounted(() => {
@@ -82,7 +82,7 @@ async function handleExit() {
   try {
     await rebuildProjectSeed(props.projectId)
   } catch {
-    /* A failed seed rebuild should not block exiting */
+    /* Seed 重建失败不应阻塞退出 */
   }
   router.push('/')
 }
@@ -91,17 +91,17 @@ async function handleExit() {
 <template>
   <div class="chat-workspace">
     <header class="chat-workspace__top">
-      <button type="button" class="chat-workspace__exit" @click="handleExit">← Home</button>
+      <button type="button" class="chat-workspace__exit" @click="handleExit">← 首页</button>
       <div class="chat-workspace__title-block">
         <span class="chat-workspace__title">{{ projectName }}</span>
-        <span class="chat-workspace__subtitle">Main agent · background sync</span>
+        <span class="chat-workspace__subtitle">主 Agent · 后台同步</span>
       </div>
       <button
         type="button"
         class="chat-workspace__go-workspace"
         @click="router.push(`/workspace/${projectId}`)"
       >
-        Open workspace
+        打开工作区
       </button>
     </header>
 
@@ -111,7 +111,7 @@ async function handleExit() {
       <section class="chat-workspace__chat">
         <div ref="streamRef" class="chat-workspace__stream">
           <p v-if="messages.length === 0 && !streamingReply && !isStreaming" class="chat-workspace__empty">
-            Start a conversation — the main agent can guide, extract entities, and suggest structure in the background.
+            开始一场对话：主 Agent 会在后台引导创作、抽取实体并建议结构。
           </p>
 
           <div
@@ -174,7 +174,7 @@ async function handleExit() {
             <span v-if="lastAgent" class="chat-workspace__thinking-agent">
               {{ AGENT_LABELS[lastAgent] ?? lastAgent }}
             </span>
-            <span>{{ progressLabel || 'Thinking' }}</span>
+            <span>{{ progressLabel || '思考中' }}</span>
             <span class="chat-workspace__dots" aria-hidden="true"><i></i><i></i><i></i></span>
           </div>
           <p v-if="error" class="chat-workspace__error">{{ error }}</p>
@@ -186,14 +186,14 @@ async function handleExit() {
               v-model="draft"
               class="chat-composer__field"
               type="text"
-              placeholder="Say what you're thinking — ideas get organised in the background…"
+              placeholder="说说你正在想什么，灵感会在后台整理成结构…"
               :disabled="isStreaming"
             />
             <button
               type="submit"
               class="chat-composer__send"
               :class="{ 'is-ready': hasContent }"
-              aria-label="Send"
+              aria-label="发送"
               :disabled="isStreaming"
             >
               <span v-if="isStreaming" class="chat-composer__send-loading" aria-hidden="true">…</span>

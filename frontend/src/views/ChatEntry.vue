@@ -5,11 +5,10 @@ import { storeToRefs } from 'pinia'
 import { useLibraryStore } from '../stores/useLibraryStore'
 
 /**
- * Chat entry (stage 2).
+ * 对话入口（第 2 阶段）。
  *
- * A dropdown to pick an existing project plus "New project"; on confirm it
- * navigates to /chat/:projectId. Reuses useLibraryStore, sharing the project
- * list and creation logic with the library.
+ * 通过下拉框选择已有项目，也可新建项目；确认后跳转到 /chat/:projectId。
+ * 复用 useLibraryStore，与项目库共享项目列表和创建逻辑。
  */
 const router = useRouter()
 const library = useLibraryStore()
@@ -43,18 +42,18 @@ async function handleCreate(): Promise<void> {
 
 <template>
   <main class="chat-entry">
-    <button type="button" class="chat-entry__back" @click="router.push('/')">← Home</button>
+    <button type="button" class="chat-entry__back" @click="router.push('/')">← 首页</button>
     <div class="chat-entry__panel">
-      <h1>Start a conversation</h1>
+      <h1>开始一场对话</h1>
 
       <p v-if="error" class="chat-entry__error">{{ error }}</p>
-      <p v-else-if="isLoading" class="chat-entry__hint">Loading projects…</p>
+      <p v-else-if="isLoading" class="chat-entry__hint">正在加载项目…</p>
 
       <template v-else>
         <label class="chat-entry__field">
-          <span>Choose a project</span>
+          <span>选择项目</span>
           <select v-model="selectedId" :disabled="projects.length === 0">
-            <option v-if="projects.length === 0" value="">(No projects — create one)</option>
+            <option v-if="projects.length === 0" value="">（还没有项目，请先创建）</option>
             <option v-for="project in projects" :key="project.id" :value="project.id">
               {{ project.name }}
             </option>
@@ -63,18 +62,18 @@ async function handleCreate(): Promise<void> {
 
         <div class="chat-entry__actions">
           <button type="button" class="primary" :disabled="!selectedId" @click="enterChat">
-            Enter chat
+            进入对话
           </button>
-          <button type="button" @click="isCreating = true">+ New project</button>
+          <button type="button" @click="isCreating = true">+ 新建项目</button>
         </div>
       </template>
 
       <div v-if="isCreating" class="chat-entry__create">
-        <input v-model="newName" type="text" placeholder="New project name" />
+        <input v-model="newName" type="text" placeholder="新项目名称" />
         <button type="button" class="primary" :disabled="!newName.trim()" @click="handleCreate">
-          Create & enter
+          创建并进入
         </button>
-        <button type="button" @click="isCreating = false">Cancel</button>
+        <button type="button" @click="isCreating = false">取消</button>
       </div>
     </div>
   </main>

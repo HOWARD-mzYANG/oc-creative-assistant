@@ -1,6 +1,6 @@
-"""RAG service-layer entry point.
+"""RAG 服务层 entry point.
 
-The current RAG core logic lives in `app.rag.service`. This service-layer module
+The current RAG core logic lives in `app.rag.service`. This 服务层 module
 is kept so the API layer only depends on `app.services`, and so more agents can be
 orchestrated here uniformly as they are integrated later.
 """

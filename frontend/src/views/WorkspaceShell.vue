@@ -11,7 +11,7 @@ import BottomComposer from '../components/workspace/BottomComposer.vue'
 import PanelToggleButton from '../components/workspace/PanelToggleButton.vue'
 
 /**
- * Workspace shell: resizable + collapsible left/right panels, no top toolbar.
+ * 工作区外壳：左右面板可调整大小、可折叠，无顶部工具栏。
  */
 const props = defineProps<{ projectId: string }>()
 
@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="workspace-shell">
     <main class="workspace-shell__body" :class="{ 'is-resizing': isResizing }">
-      <!-- Left panel -->
+      <!-- 左侧面板 -->
       <aside
         class="side-panel side-panel--left"
         :class="{ 'is-collapsed': !leftOpen }"
@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
           <div
             class="resize-handle resize-handle--right"
             :class="{ 'is-dragging': leftResize.isDragging.value }"
-            title="Drag to resize"
+            title="拖动调整大小"
             @mousedown="leftResize.startDrag"
           />
         </template>
@@ -112,13 +112,13 @@ onBeforeUnmount(() => {
           <PanelToggleButton
             direction="left"
             :expanded="false"
-            label="Expand navigation"
+            label="展开导航"
             @click="leftOpen = true"
           />
         </div>
       </aside>
 
-      <!-- Center -->
+      <!-- 中央区域 -->
       <div class="workspace-shell__center">
         <section class="workspace-shell__view">
           <router-view />
@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
         <BottomComposer />
       </div>
 
-      <!-- Right panel -->
+      <!-- 右侧面板 -->
       <aside
         class="side-panel side-panel--right"
         :class="{ 'is-collapsed': !rightOpen }"
@@ -136,7 +136,7 @@ onBeforeUnmount(() => {
           <div
             class="resize-handle resize-handle--left"
             :class="{ 'is-dragging': rightResize.isDragging.value }"
-            title="Drag to resize"
+            title="拖动调整大小"
             @mousedown="rightResize.startDrag"
           />
           <div class="side-panel__content">
@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
           <PanelToggleButton
             direction="right"
             :expanded="false"
-            label="Expand AI output"
+            label="展开 AI 输出"
             @click="rightOpen = true"
           />
         </div>

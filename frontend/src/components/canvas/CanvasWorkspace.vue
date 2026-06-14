@@ -357,7 +357,7 @@ function handleMenuQuote() {
       selected.map((node) => ({
         id: node.id,
         type: (node.data?.nodeType ?? node.type ?? 'idea') as string,
-        title: node.data?.title || 'Untitled',
+        title: node.data?.title || '未命名',
       })),
     )
   } else {
@@ -379,7 +379,7 @@ function handleCopyKey(event: KeyboardEvent) {
     selected.map((node) => ({
       id: node.id,
       type: (node.data?.nodeType ?? node.type ?? 'idea') as string,
-      title: node.data?.title || 'Untitled',
+      title: node.data?.title || '未命名',
     })),
   )
 }
@@ -560,11 +560,11 @@ watch(
 
         <div class="toolbar-sep" aria-hidden="true" />
 
-        <div class="toolbar-group toolbar-group--view canvas-actions" aria-label="canvas view">
-          <button type="button" class="toolbar-btn toolbar-btn--icon" title="Zoom in" @click="handleZoomIn">+</button>
-          <button type="button" class="toolbar-btn toolbar-btn--icon" title="Zoom out" @click="handleZoomOut">−</button>
-          <button type="button" class="toolbar-btn" @click="handleFitView">Fit</button>
-          <button type="button" class="toolbar-btn toolbar-btn--danger" @click="handleClearCanvas">Clear</button>
+        <div class="toolbar-group toolbar-group--view canvas-actions" aria-label="画布视图">
+          <button type="button" class="toolbar-btn toolbar-btn--icon" title="放大" @click="handleZoomIn">+</button>
+          <button type="button" class="toolbar-btn toolbar-btn--icon" title="缩小" @click="handleZoomOut">−</button>
+          <button type="button" class="toolbar-btn" @click="handleFitView">适应</button>
+          <button type="button" class="toolbar-btn toolbar-btn--danger" @click="handleClearCanvas">清空</button>
         </div>
       </div>
     </header>
@@ -634,10 +634,10 @@ watch(
 
       <!-- Interaction hint, lightly penciled into the bottom-left corner of the canvas -->
       <ul class="canvas-hint" aria-hidden="true">
-        <li><span class="canvas-hint__key">Select</span><span>Left-click</span></li>
-        <li><span class="canvas-hint__key">Edge</span><span>Click · Right-click</span></li>
-        <li><span class="canvas-hint__key">Menu</span><span>Right-click</span></li>
-        <li><span class="canvas-hint__key">Pan</span><span>Middle-drag</span></li>
+        <li><span class="canvas-hint__key">选择</span><span>左键点击</span></li>
+        <li><span class="canvas-hint__key">连线</span><span>点击 / 右键</span></li>
+        <li><span class="canvas-hint__key">菜单</span><span>右键</span></li>
+        <li><span class="canvas-hint__key">平移</span><span>中键拖动</span></li>
       </ul>
     </div>
 

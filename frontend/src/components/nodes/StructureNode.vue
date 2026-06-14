@@ -4,9 +4,9 @@ import type { CreativeNodeData } from '../../types/node'
 import NodeHandles from './NodeHandles.vue'
 
 /**
- * Structure node card.
+ * 结构 node card.
  *
- * Structure nodes organize multiple materials into character sheets, relationship summaries, or plot frameworks; for now they only handle canvas display.
+ * 结构 nodes organize multiple materials into character sheets, relationship summaries, or plot frameworks; for now they only handle canvas display.
  */
 defineProps<NodeProps<CreativeNodeData>>()
 </script>

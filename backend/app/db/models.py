@@ -1,8 +1,7 @@
-"""SQLAlchemy ORM models for the graph domain.
+"""图谱领域的 SQLAlchemy ORM 模型。
 
-A project is the lifecycle boundary of a graph; nodes and edges both belong to a
-project. This module only describes the database schema and ORM relationships; it
-does not handle API DTO conversion or business validation.
+项目是图谱的生命周期边界；节点和边都归属于项目。本模块只描述数据库结构与 ORM 关系，
+不处理 API DTO 转换或业务校验。
 """
 
 from datetime import datetime
@@ -15,10 +14,9 @@ from app.db.database import Base
 
 
 class ProjectORM(Base):
-    """Projects table.
+    """Projects 表。
 
-    The current PoC only creates a default project, but the schema retains
-    multi-project capability.
+    当前 PoC 只创建默认项目，但结构保留多项目能力。
     """
 
     __tablename__ = "projects"
@@ -39,19 +37,17 @@ class ProjectORM(Base):
     world_brief: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
     )
-    # first_revision decision 1: project brief, used by project library cards / workspace overview editing and seed assembly.
+    # first_revision 决策 1：项目简介，用于项目库卡片 / 工作区概览编辑 / seed 组装。
     description: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
     )
-    # Optional cover image, stored as a base64 data URL; shown on the overview page and as the library card background.
+    # 可选封面图，以 base64 data URL 存储；显示在概览页并作为项目库卡片背景。
     cover_image: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
     )
-    # Three independent sub-graphs under one Project. DB-level ForeignKeys are
-    # deliberately omitted here: projects<->graphs referencing each other would
-    # form a table-creation cycle, and SQLite does not support ALTER ADD CONSTRAINT;
-    # following this table's handling of EdgeORM endpoints, consistency is validated
-    # by the service layer (see graph_validation).
+    # 一个 Project 下的三个独立子图。这里刻意省略 DB 级 ForeignKey：projects<->graphs
+    # 互相引用会形成建表循环，且 SQLite 不支持 ALTER ADD CONSTRAINT；与 EdgeORM 端点处理
+    # 一致，改由服务层校验一致性（见 graph_validation）。
     plot_graph_id: Mapped[str | None] = mapped_column(String, nullable=True)
     character_graph_id: Mapped[str | None] = mapped_column(String, nullable=True)
     world_graph_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -74,10 +70,9 @@ class ProjectORM(Base):
 
 
 class NodeORM(Base):
-    """Canvas nodes table.
+    """画布节点表。
 
-    Nodes store creative content such as characters, worldbuilding, and plot, and
-    serve as the primary data source for the vector index.
+    节点存储角色、世界观、剧情等创作内容，也是向量索引的主要数据源。
     """
 
     __tablename__ = "nodes"
@@ -92,9 +87,8 @@ class NodeORM(Base):
         nullable=False,
         index=True,
     )
-    # first_revision decision 1: nodes belong to a specific sub-graph. Nullable for
-    # legacy databases during migration, backfilled by node_type via backfill;
-    # newly created nodes must carry a graph_id.
+    # first_revision 决策 1：节点归属于特定子图。迁移旧数据库时允许为空，并通过 node_type
+    # 回填；新创建节点必须携带 graph_id。
     graph_id: Mapped[str | None] = mapped_column(
         String,
         ForeignKey("graphs.id", ondelete="CASCADE"),
@@ -130,12 +124,10 @@ class NodeORM(Base):
 
 
 class EdgeORM(Base):
-    """Canvas edges table.
+    """画布边表。
 
-    Edges store Vue Flow endpoints, handles, and the creative relation type.
-    Same-project consistency of the endpoints is validated by the service layer,
-    avoiding the introduction of complex composite foreign keys during the PoC
-    stage.
+    边存储 Vue Flow 端点、handle 和创作关系类型。端点同项目一致性由服务层校验，避免在
+    PoC 阶段引入复杂复合外键。
     """
 
     __tablename__ = "edges"
@@ -207,13 +199,11 @@ class EdgeORM(Base):
 
 
 class ChatSessionORM(Base):
-    """Chat sessions table.
+    """聊天会话表。
 
-    One session corresponds to one chat panel context on the frontend;
-    ``thread_id`` is used by LangGraph's Checkpointer, so the same session can
-    retrieve its intermediate state from sqlite after a page refresh.
-    ``conversation_summary`` is periodically updated by the summary compression
-    node, used to keep long conversations from blowing the token budget.
+    一个 session 对应前端一个聊天面板上下文；``thread_id`` 供 LangGraph Checkpointer
+    使用，使同一会话在页面刷新后仍能从 sqlite 取回中间状态。``conversation_summary``
+    由摘要压缩节点定期更新，用于避免长对话撑爆 token 预算。
     """
 
     __tablename__ = "chat_sessions"
@@ -233,13 +223,12 @@ class ChatSessionORM(Base):
     conversation_summary: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
     )
-    # Core facts layer: key settings / decisions extracted by summary_compress each
-    # turn, accumulated across turns, not overwritten by the heavy recompression of
-    # conversation_summary, solving the core pain point of "early facts being forgotten after long conversations"
+    # 核心事实层：summary_compress 每轮抽取的关键设定 / 决策，跨轮累积，不被
+    # conversation_summary 的重压缩覆盖，解决“长对话后早期事实被遗忘”的核心痛点。
     key_facts: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
-    # high-water mark of how many leading messages the summary already covers; used for incremental throttling of summary compression, to avoid recompressing every turn
+    # 高水位：摘要已覆盖多少条开头消息；用于摘要压缩的增量节流，避免每轮都重压缩。
     summary_message_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
@@ -266,11 +255,10 @@ class ChatSessionORM(Base):
 
 
 class ChatMessageORM(Base):
-    """Chat messages table.
+    """聊天消息表。
 
-    Messages are append-only, never modified in place; ``meta`` is used to attach
-    extension fields such as cited_node_ids / agent_type, avoiding a schema change
-    every time a context field is added.
+    消息只追加，不原地修改；``meta`` 用于附加 cited_node_ids / agent_type 等扩展字段，
+    避免每新增一个上下文字段就改表结构。
     """
 
     __tablename__ = "chat_messages"
@@ -305,15 +293,12 @@ class ChatMessageORM(Base):
 
 
 class AgentStagingORM(Base):
-    """Agent pending-changes table.
+    """Agent 待处理变更表。
 
-    The canvas operations the Agent wants to perform are first staged here, and
-    only after the user accepts / edits / rejects them in the frontend staging
-    panel is it decided whether to actually apply them to the canvas. Multiple
-    changes produced in the same turn share a ``batch_id``, supporting batch
-    "accept all" / "reject all" operations; ``pending_id`` assigns a placeholder id
-    to new nodes within the same batch, so edges can reference new nodes not yet
-    persisted, with the real node_id backfilled at commit time.
+    Agent 想执行的画布操作会先暂存在这里，只有用户在前端暂存面板中接受 / 编辑 / 拒绝后，
+    才决定是否真正应用到画布。同一回合产生的多项变更共享 ``batch_id``，支持批量
+    “全部接受” / “全部拒绝”；``pending_id`` 为同批次新节点分配占位 ID，使边可以引用
+    尚未持久化的新节点，并在提交时回填真实 node_id。
     """
 
     __tablename__ = "agent_staging"
@@ -371,13 +356,11 @@ class AgentStagingORM(Base):
 
 
 class GraphORM(Base):
-    """Sub-graphs table (first_revision decision 1).
+    """子图表（first_revision 决策 1）。
 
-    A Project contains three independent sub-graphs: storyline (plot) /
-    character cards (character) / worldbuilding (world). Nodes belong to a specific
-    sub-graph via ``NodeORM.graph_id``; ``section`` uses a string rather than a DB
-    Enum, consistent with the handling of ``NodeORM.node_type``, making migration
-    simpler.
+    一个 Project 包含三个独立子图：剧情线（plot）/ 角色卡（character）/ 世界观（world）。
+    节点通过 ``NodeORM.graph_id`` 归属到特定子图；``section`` 使用字符串而非数据库 Enum，
+    与 ``NodeORM.node_type`` 的处理一致，简化迁移。
     """
 
     __tablename__ = "graphs"
@@ -392,7 +375,7 @@ class GraphORM(Base):
         nullable=False,
         index=True,
     )
-    # section ∈ {'plot', 'character', 'world'}
+    # section 属于 {'plot', 'character', 'world'}
     section: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -402,13 +385,11 @@ class GraphORM(Base):
 
 
 class ProjectSeedORM(Base):
-    """Project seeds table (first_revision decision 3).
+    """项目 seeds 表（first_revision 决策 3）。
 
-    A seed is a compressed snapshot of the project's current state (worldview /
-    characters / plot / style), injected at Chat Agent startup. The version
-    increments on each rebuild, and ``source`` records the trigger origin.
-    Written by seed_compressor (phase 5); the table is created here first to pave
-    the way for the phase 1 data model upgrade.
+    seed 是项目当前状态（世界观 / 角色 / 剧情 / 风格）的压缩快照，会在 Chat Agent 启动时
+    注入。每次重建都会递增版本，``source`` 记录触发来源。由 seed_compressor（第 5 阶段）
+    写入；这里先创建表，为第 1 阶段数据模型升级铺路。
     """
 
     __tablename__ = "project_seeds"
@@ -425,7 +406,7 @@ class ProjectSeedORM(Base):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     seed_json: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
-    # source ∈ {'chat_end', 'user_edit'}
+    # source 属于 {'chat_end', 'user_edit'}
     source: Mapped[str] = mapped_column(String, nullable=False, default="user_edit", server_default="user_edit")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

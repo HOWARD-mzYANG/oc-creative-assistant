@@ -125,7 +125,7 @@ function deleteNote(nodeId: string) {
   const node = nodes.value.find((item) => item.id === nodeId)
   if (!node) return
   const confirmed = window.confirm(
-    `Delete "${node.data.title}" and its nested notes?`,
+    `删除“${node.data.title}”及其嵌套笔记吗？`,
   )
   if (!confirmed) return
 

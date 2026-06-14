@@ -20,12 +20,10 @@ import { useCharacterAvatarCache } from '../../composables/useCharacterAvatarCac
 const SAVE_DEBOUNCE_MS = 500
 
 /**
- * Character card detail (first_revision decision 2, an approved deviation from the proposal).
+ * 角色卡详情（first_revision 决策 2，对原提案的已批准偏离）。
  *
- * Top: name + summary; middle: add/edit/remove "free-form fields" (persisted to
- * the fields key of node.meta JSON); bottom: the "relations" area shows this
- * character's outgoing edges in the character sub-graph as tags, without
- * drawing connecting lines.
+ * 顶部：名称 + 摘要；中部：添加/编辑/删除“自由字段”（持久化到 node.meta JSON 的 fields 键）；
+ * 底部：“关系”区域以标签展示该角色在角色子图中的出边，不绘制连接线。
  */
 const props = defineProps<{ charId: string }>()
 
@@ -63,7 +61,7 @@ let saveQueued = false
 let hydrateGeneration = 0
 let pendingFlush: Promise<void> | null = null
 
-// Cross sub-graph back-references (stage 6): where this character appears in the story / which worldbuilding it belongs to, etc.
+// 跨子图反向引用（第 6 阶段）：该角色出现在哪段故事、属于哪个世界观设定等。
 const crossRefs = ref<CrossReferenceItem[]>([])
 const plotRefs = computed(() => crossRefs.value.filter((r) => r.other_section === 'plot'))
 const worldRefs = computed(() => crossRefs.value.filter((r) => r.other_section === 'world'))
@@ -81,11 +79,11 @@ function openPlotNode() {
   router.push(`/workspace/${projectId.value}/plot`)
 }
 
-// Relations: this character's outgoing edges → tags (relation name + target character name).
+// 关系：该角色的出边 -> 标签（关系名 + 目标角色名）。
 const relations = computed(() =>
   graphStore.outgoingEdges(props.charId).map((edge) => ({
     id: edge.id,
-    label: edge.label || edge.relationType || 'relates to',
+    label: edge.label || edge.relationType || '关联',
     target: graphStore.getNode(edge.target)?.title ?? edge.target,
   })),
 )
@@ -128,7 +126,7 @@ async function flushSaveForCharacter(charId: string) {
   }
   if (isSaving) return
 
-  const snapshotTitle = title.value.trim() || 'Untitled Character'
+  const snapshotTitle = title.value.trim() || '未命名角色'
   const snapshotContent = content.value
   const snapshotAvatar = avatar.value
   const snapshotRows = fieldRows.value.map((row) => ({ ...row }))
@@ -204,7 +202,7 @@ async function handleAvatarChange(event: Event) {
   input.value = ''
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    saveState.value = 'Please choose an image file'
+    saveState.value = '请选择图片文件'
     return
   }
   try {
@@ -223,7 +221,7 @@ async function handleAvatarChange(event: Event) {
 
     await persistAvatarFor(charId, dataUrl)
   } catch (error) {
-    saveState.value = error instanceof Error ? error.message : 'Failed to load image'
+    saveState.value = error instanceof Error ? error.message : '图片加载失败'
   }
 }
 
@@ -245,7 +243,7 @@ async function persistAvatarFor(charId: string, dataUrl: string) {
 
   isSaving = true
   if (charId === props.charId) {
-    saveState.value = 'Saving…'
+    saveState.value = '保存中…'
   }
   try {
     let fields: Record<string, string> = {}
@@ -258,11 +256,11 @@ async function persistAvatarFor(charId: string, dataUrl: string) {
     fields.avatar = dataUrl
     await saveFieldsForCharacter(charId, fields)
     if (charId === props.charId) {
-      saveState.value = 'Saved'
+      saveState.value = '已保存'
     }
   } catch (error) {
     if (charId === props.charId) {
-      saveState.value = error instanceof Error ? `Save failed: ${error.message}` : 'Save failed'
+      saveState.value = error instanceof Error ? `保存失败: ${error.message}` : '保存失败'
     }
   } finally {
     isSaving = false
@@ -283,13 +281,13 @@ async function persistAll() {
     return
   }
 
-  const nextTitle = title.value.trim() || 'Untitled Character'
+  const nextTitle = title.value.trim() || '未命名角色'
   const nextContent = content.value
   const titleChanged = nextTitle !== (node.value?.title ?? '')
   const contentChanged = nextContent !== (node.value?.content ?? '')
 
   isSaving = true
-  saveState.value = 'Saving…'
+  saveState.value = '保存中…'
   try {
     if (titleChanged || contentChanged) {
       await updateNode(projectId.value, charId, {
@@ -303,9 +301,9 @@ async function persistAll() {
         await graphStore.load(characterGraphId.value, true)
       }
     }
-    saveState.value = 'Saved'
+    saveState.value = '已保存'
   } catch (error) {
-    saveState.value = error instanceof Error ? `Save failed: ${error.message}` : 'Save failed'
+    saveState.value = error instanceof Error ? `保存失败: ${error.message}` : '保存失败'
   } finally {
     isSaving = false
     if (saveQueued) {
@@ -330,8 +328,8 @@ async function hydrate() {
 }
 
 async function handleDelete() {
-  const charTitle = title.value.trim() || node.value?.title || 'this character'
-  const confirmed = window.confirm(`Delete "${charTitle}"? Related edges will be removed too.`)
+  const charTitle = title.value.trim() || node.value?.title || '这个角色'
+  const confirmed = window.confirm(`删除“${charTitle}”？相关关系边也会一并移除。`)
   if (!confirmed || isDeleting.value) return
 
   if (saveTimer) {
@@ -347,7 +345,7 @@ async function handleDelete() {
     }
     router.push(`/workspace/${projectId.value}/characters`)
   } catch (error) {
-    saveState.value = error instanceof Error ? `Delete failed: ${error.message}` : 'Delete failed'
+    saveState.value = error instanceof Error ? `删除失败: ${error.message}` : '删除失败'
   } finally {
     isDeleting.value = false
   }
@@ -406,7 +404,7 @@ onBeforeUnmount(async () => {
   <section class="char-detail">
     <header class="char-detail__topbar">
       <button type="button" class="char-detail__back" @click="router.push(`/workspace/${projectId}/characters`)">
-        ← Characters
+        ← 角色
       </button>
       <span v-if="saveState" class="char-detail__state">{{ saveState }}</span>
     </header>
@@ -424,12 +422,12 @@ onBeforeUnmount(async () => {
         class="char-detail__avatar"
         role="button"
         tabindex="0"
-        :aria-label="avatar ? 'Click to change avatar' : 'Click to upload avatar'"
-        title="Click to change avatar"
+        :aria-label="avatar ? '点击更换头像' : '点击上传头像'"
+        title="点击更换头像"
         @click.stop="openAvatarPicker"
         @keydown.enter="openAvatarPicker"
       >
-        <img v-if="avatar" :src="avatar" :alt="title || 'Character avatar'" />
+        <img v-if="avatar" :src="avatar" :alt="title || '角色头像'" />
         <span v-else class="char-detail__avatar-placeholder">+</span>
       </div>
       <div class="char-detail__intro">
@@ -437,7 +435,7 @@ onBeforeUnmount(async () => {
           v-model="title"
           class="char-detail__title"
           type="text"
-          placeholder="Character name"
+          placeholder="角色名称"
           spellcheck="false"
         />
         <textarea
@@ -445,7 +443,7 @@ onBeforeUnmount(async () => {
           v-model="content"
           class="char-detail__summary"
           rows="1"
-          placeholder="Add a summary…"
+          placeholder="添加摘要…"
           spellcheck="true"
           @input="onSummaryInput"
         />
@@ -455,8 +453,8 @@ onBeforeUnmount(async () => {
     <DocFieldsEditor v-model="fieldRows" />
 
     <div class="char-detail__section">
-      <h3>Relations</h3>
-      <p v-if="relations.length === 0" class="char-detail__hint">No character relations yet.</p>
+      <h3>角色关系</h3>
+      <p v-if="relations.length === 0" class="char-detail__hint">暂无角色关系。</p>
       <div v-else class="char-detail__relations">
         <span v-for="rel in relations" :key="rel.id" class="char-detail__rel">
           {{ rel.label }} → {{ rel.target }}
@@ -465,17 +463,17 @@ onBeforeUnmount(async () => {
     </div>
 
     <div class="char-detail__section">
-      <h3>Cross-references</h3>
-      <p v-if="crossRefs.length === 0" class="char-detail__hint">No cross-references yet.</p>
+      <h3>跨子图引用</h3>
+      <p v-if="crossRefs.length === 0" class="char-detail__hint">暂无跨引用。</p>
       <template v-else>
         <div v-if="worldRefs.length" class="char-detail__xref-group">
-          <span class="char-detail__xref-label">In worldbuilding:</span>
+          <span class="char-detail__xref-label">所属世界观：</span>
           <span v-for="ref in worldRefs" :key="ref.edge_id" class="char-detail__rel">
             {{ ref.other_title }}
           </span>
         </div>
         <div v-if="plotRefs.length" class="char-detail__xref-group">
-          <span class="char-detail__xref-label">Appears in story:</span>
+          <span class="char-detail__xref-label">出现于剧情：</span>
           <button
             v-for="ref in plotRefs"
             :key="ref.edge_id"
@@ -496,7 +494,7 @@ onBeforeUnmount(async () => {
         :disabled="isDeleting"
         @click="handleDelete"
       >
-        {{ isDeleting ? 'Deleting…' : 'Delete character' }}
+        {{ isDeleting ? '删除中…' : '删除角色' }}
       </button>
     </footer>
   </section>

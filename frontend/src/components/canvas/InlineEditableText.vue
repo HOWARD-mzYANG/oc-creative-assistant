@@ -51,7 +51,7 @@ function cancel() {
     class="inline-text nodrag nopan"
     :class="{ 'inline-text--empty': !modelValue }"
     @click.stop="enterEdit"
-  >{{ modelValue || placeholder || 'Click to edit' }}</span>
+  >{{ modelValue || placeholder || '点击编辑' }}</span>
 
   <textarea
     v-else-if="multiline"

@@ -2,7 +2,7 @@
 import { nextTick, onMounted, watch } from 'vue'
 import { autoResizeInput, autoResizeTextarea } from '../../composables/autoResizeField'
 
-/** Borderless key/value field blocks (shared by world notes and character attributes). */
+/** 无边框键值字段块（世界笔记和角色属性共用）。 */
 export interface DocFieldRow {
   key: string
   value: string
@@ -69,7 +69,7 @@ watch(rows, () => {
         v-model="row.key"
         class="doc-fields__name"
         type="text"
-        placeholder="Field name"
+        placeholder="字段名称"
         spellcheck="false"
         @input="onNameInput"
         @blur="onBlur"
@@ -79,7 +79,7 @@ watch(rows, () => {
         v-model="row.value"
         class="doc-fields__value"
         rows="1"
-        placeholder="Write content…"
+        placeholder="填写内容…"
         spellcheck="true"
         @input="onValueInput"
         @blur="onBlur"
@@ -87,7 +87,7 @@ watch(rows, () => {
     </section>
 
     <button type="button" class="doc-fields__add" @click="addField">
-      + Add field
+      + 添加字段
     </button>
   </div>
 </template>

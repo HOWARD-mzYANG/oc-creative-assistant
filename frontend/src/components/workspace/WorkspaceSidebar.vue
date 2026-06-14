@@ -8,10 +8,10 @@ import PanelToggleButton from './PanelToggleButton.vue'
 import ProjectIoButtons from './ProjectIoButtons.vue'
 
 /**
- * Workspace left-hand navigation (first_revision phase 3).
+ * 工作区左侧导航（first_revision 第 3 阶段）。
  *
  * Top to bottom: back to the project library, project name + summary, three-view
- * navigation (Story / Characters / Worldbuilding), and the seed version. Navigation
+ * navigation (故事 / 角色 / 世界观), and the seed version. Navigation
  * uses router-link, and each sub-view loads by its own graph_id.
  */
 const props = defineProps<{ projectId: string }>()
@@ -34,23 +34,23 @@ interface NavItem {
 
 const seedLabel = computed(() => {
   const seed = detail.value?.latest_seed
-  if (!seed) return 'Seed — not generated'
+  if (!seed) return 'Seed 尚未生成'
   const time = seed.created_at ? new Date(seed.created_at) : null
   const timeLabel = time && !Number.isNaN(time.getTime()) ? ` · ${time.toLocaleString()}` : ''
   return `Seed v${seed.version}${timeLabel}`
 })
 
 const navItems = computed<NavItem[]>(() => [
-  { id: 'overview', to: `/workspace/${props.projectId}/overview`, icon: '◷', label: 'Overview' },
+  { id: 'overview', to: `/workspace/${props.projectId}/overview`, icon: '◷', label: '概览' },
   {
     id: 'world',
     to: `/workspace/${props.projectId}/world`,
     icon: '◍',
     canvasIcon: '⊞',
-    label: 'Worldbuilding',
+    label: '世界观',
   },
-  { id: 'plot', to: `/workspace/${props.projectId}/plot`, icon: '❧', label: 'Story' },
-  { id: 'characters', to: `/workspace/${props.projectId}/characters`, icon: '✦', label: 'Characters' },
+  { id: 'plot', to: `/workspace/${props.projectId}/plot`, icon: '❧', label: '故事' },
+  { id: 'characters', to: `/workspace/${props.projectId}/characters`, icon: '✦', label: '角色' },
 ])
 
 function isNavActive(item: NavItem) {
@@ -66,7 +66,7 @@ function navIcon(item: NavItem) {
 
 function worldModeLabel(item: NavItem) {
   if (item.id !== 'world' || !isNavActive(item)) return ''
-  return worldMode.value === 'notes' ? 'Notes' : 'Tree'
+  return worldMode.value === 'notes' ? '笔记' : '树'
 }
 
 function handleNavClick(item: NavItem, event: MouseEvent) {
@@ -79,18 +79,18 @@ function handleNavClick(item: NavItem, event: MouseEvent) {
 <template>
   <aside class="workspace-sidebar">
     <div class="workspace-sidebar__header">
-      <router-link class="workspace-sidebar__back" to="/library">← Library</router-link>
+      <router-link class="workspace-sidebar__back" to="/library">← 项目库</router-link>
       <PanelToggleButton
         direction="left"
         expanded
-        label="Collapse navigation"
+        label="收起导航"
         @click="$emit('collapse')"
       />
     </div>
 
     <div class="workspace-sidebar__meta">
-      <h2 class="workspace-sidebar__name">{{ detail?.name ?? 'Loading…' }}</h2>
-      <p class="workspace-sidebar__desc">{{ detail?.description || 'No description yet.' }}</p>
+      <h2 class="workspace-sidebar__name">{{ detail?.name ?? '加载中…' }}</h2>
+      <p class="workspace-sidebar__desc">{{ detail?.description || '暂无描述。' }}</p>
     </div>
 
     <nav class="workspace-sidebar__nav">
@@ -103,7 +103,7 @@ function handleNavClick(item: NavItem, event: MouseEvent) {
           'is-active': isNavActive(item),
           'is-world-canvas': item.id === 'world' && isNavActive(item) && worldMode === 'canvas',
         }"
-        :title="item.id === 'world' && isNavActive(item) ? 'Click again to switch view' : undefined"
+        :title="item.id === 'world' && isNavActive(item) ? '再次点击切换视图' : undefined"
         @click="handleNavClick(item, $event)"
       >
         <span class="workspace-sidebar__icon">{{ navIcon(item) }}</span>

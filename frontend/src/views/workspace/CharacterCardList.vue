@@ -11,7 +11,7 @@ import { createCreativeNode } from '../../utils/nodeFactory'
 import { useCharacterAvatarCache } from '../../composables/useCharacterAvatarCache'
 
 /**
- * Characters list (first_revision decision 2, a user-approved deviation from the proposal).
+ * 角色 list (first_revision decision 2, a user-approved deviation from the proposal).
  *
  * A Notion-style card grid sourced from the nodes of the character sub-graph;
  * character relations are not drawn as Vue Flow connecting lines but shown as
@@ -146,7 +146,7 @@ async function handleCreate() {
     createOpen.value = false
     router.push(`/workspace/${projectId.value}/characters/${newNode.id}`)
   } catch (e) {
-    createError.value = e instanceof Error ? e.message : 'Failed to create character'
+    createError.value = e instanceof Error ? e.message : '创建角色失败'
   } finally {
     isCreating.value = false
   }
@@ -157,16 +157,16 @@ async function handleCreate() {
   <section class="card-list">
     <header class="card-list__header">
       <div class="card-list__intro">
-        <h2>Characters</h2>
+        <h2>角色</h2>
         <p class="card-list__hint">
-          Build your cast — open a card to edit fields and upload a portrait.
+          建立你的角色阵容：打开卡片即可编辑字段并上传头像。
         </p>
       </div>
       <span v-if="!isLoading && !error" class="card-list__count">{{ characterCount }}</span>
     </header>
 
     <p v-if="error" class="card-list__error">{{ error }}</p>
-    <p v-else-if="isLoading" class="card-list__hint card-list__hint--block">Loading…</p>
+    <p v-else-if="isLoading" class="card-list__hint card-list__hint--block">加载中…</p>
 
     <div v-else class="card-list__grid">
       <article
@@ -185,17 +185,17 @@ async function handleCreate() {
             <img
               v-if="avatarFor(node.id)"
               :src="avatarFor(node.id)"
-              :alt="`${node.title} portrait`"
+              :alt="`${node.title} 头像`"
             />
             <span v-else class="id-card__initials">{{ characterInitials(node.title) }}</span>
           </div>
           <div class="id-card__id">
-            <span class="id-card__label">Name</span>
+            <span class="id-card__label">姓名</span>
             <h3 class="id-card__name">{{ node.title }}</h3>
             <p
               class="id-card__summary"
               :class="{ 'id-card__summary--empty': !node.content }"
-            >{{ node.content || 'No summary yet' }}</p>
+            >{{ node.content || '暂无摘要' }}</p>
             <div v-if="extraTags(node.tags).length" class="id-card__tags">
               <span v-for="tag in extraTags(node.tags)" :key="tag" class="id-card__tag">{{ tag }}</span>
             </div>
@@ -203,33 +203,33 @@ async function handleCreate() {
         </div>
 
         <footer class="id-card__footer">
-          <span class="id-card__role">Character</span>
+          <span class="id-card__role">角色</span>
         </footer>
       </article>
 
       <button type="button" class="id-card id-card--create" @click="openCreate">
         <span class="id-card__create-photo" aria-hidden="true">+</span>
-        <span class="id-card__create-label">New character</span>
-        <span class="id-card__create-sub">Add to cast</span>
+        <span class="id-card__create-label">新建角色</span>
+        <span class="id-card__create-sub">加入角色阵容</span>
       </button>
     </div>
 
     <div v-if="createOpen" class="card-list__modal" @click.self="closeCreate">
       <form class="create-card" @submit.prevent="handleCreate">
-        <h3 class="create-card__title">New character</h3>
+        <h3 class="create-card__title">新建角色</h3>
         <label class="create-card__field">
-          <span>Name</span>
-          <input v-model="createName" type="text" placeholder="Character name" autofocus />
+          <span>名称</span>
+          <input v-model="createName" type="text" placeholder="角色名称" autofocus />
         </label>
         <label class="create-card__field">
-          <span>Summary</span>
-          <textarea v-model="createSummary" rows="3" placeholder="A short description (optional)" />
+          <span>摘要</span>
+          <textarea v-model="createSummary" rows="3" placeholder="简短描述（可选）" />
         </label>
         <p v-if="createError" class="create-card__error">{{ createError }}</p>
         <div class="create-card__actions">
-          <button type="button" class="create-card__cancel" @click="closeCreate">Cancel</button>
+          <button type="button" class="create-card__cancel" @click="closeCreate">取消</button>
           <button type="submit" class="create-card__save" :disabled="!createName.trim() || isCreating">
-            {{ isCreating ? 'Saving…' : 'Save' }}
+            {{ isCreating ? '保存中…' : '保存' }}
           </button>
         </div>
       </form>

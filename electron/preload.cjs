@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 const PDF_EXPORT_CHANNEL = 'oc:export-project-pdf'
 
-// Read a single argument passed in by the main process via additionalArguments.
+// 读取主进程通过 additionalArguments 传入的单个参数。
 function readAdditionalArgument(name) {
   const prefix = `--${name}=`
   const entry = process.argv.find((argument) => argument.startsWith(prefix))
@@ -14,8 +14,8 @@ function readAdditionalArgument(name) {
   return entry.slice(prefix.length)
 }
 
-// Expose only the minimal necessary runtime information to the renderer process.
-// Note: do not expose arbitrary Node/Electron APIs here, to avoid widening the frontend attack surface.
+// 只向渲染进程暴露必要的最小运行时信息。
+// 注意：不要在这里暴露任意 Node/Electron API，以免扩大前端攻击面。
 contextBridge.exposeInMainWorld('ocDesktop', {
   config: {
     backendUrl: readAdditionalArgument('backend-url') ?? process.env.BACKEND_BASE_URL ?? null,

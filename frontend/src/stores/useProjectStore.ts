@@ -26,7 +26,7 @@ export const useProjectStore = defineStore('project', () => {
     try {
       detail.value = await getProjectDetail(projectId)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load project'
+      error.value = e instanceof Error ? e.message : '项目加载失败'
       detail.value = null
     } finally {
       isLoading.value = false

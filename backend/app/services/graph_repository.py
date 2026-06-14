@@ -1,10 +1,7 @@
-"""Graph database operation helpers.
+"""图谱数据库操作辅助函数。
 
-This module is the persistence boundary between the service layer and the ORM,
-responsible for reading and writing projects, nodes, and edges in the database.
-It does not handle HTTP requests, nor does it trigger ChromaDB synchronization;
-external side effects are executed by the service orchestration layer after the
-transaction commits.
+本模块是服务层与 ORM 之间的持久化边界，负责读写数据库中的项目、节点和边。
+它不处理 HTTP 请求，也不触发 ChromaDB 同步；外部副作用由服务编排层在事务提交后执行。
 """
 
 from fastapi import HTTPException
@@ -19,35 +16,35 @@ from app.services.graph_validation import validate_edges_against_payload_nodes
 
 
 def require_project(session: Session, project_id: str) -> ProjectORM:
-    """Read a project and ensure it exists.
+    """读取项目并确认存在。
 
     Args:
-        session: The current database session.
-        project_id: The project ID.
+        session: 当前数据库 session。
+        project_id: 项目 ID。
 
     Returns:
-        The matching project ORM object.
+        匹配的项目 ORM 对象。
 
     Raises:
-        HTTPException: Raised when the project does not exist.
+        HTTPException: 项目不存在时抛出。
     """
     project = session.get(ProjectORM, project_id)
 
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="未找到项目")
 
     return project
 
 
 def read_ordered_nodes(session: Session, project_id: str) -> list[NodeORM]:
-    """Read project nodes ordered by the canvas save order.
+    """按画布保存顺序读取项目节点。
 
     Args:
-        session: The current database session.
-        project_id: The project ID.
+        session: 当前数据库 session。
+        project_id: 项目 ID。
 
     Returns:
-        The list of node ORM objects for the current project.
+        当前项目的节点 ORM 对象列表。
     """
     return session.scalars(
         select(NodeORM)
@@ -57,14 +54,14 @@ def read_ordered_nodes(session: Session, project_id: str) -> list[NodeORM]:
 
 
 def read_ordered_edges(session: Session, project_id: str) -> list[EdgeORM]:
-    """Read project edges ordered by the canvas save order.
+    """按画布保存顺序读取项目边。
 
     Args:
-        session: The current database session.
-        project_id: The project ID.
+        session: 当前数据库 session。
+        project_id: 项目 ID。
 
     Returns:
-        The list of edge ORM objects for the current project.
+        当前项目的边 ORM 对象列表。
     """
     return session.scalars(
         select(EdgeORM)
@@ -74,34 +71,31 @@ def read_ordered_edges(session: Session, project_id: str) -> list[EdgeORM]:
 
 
 def read_project_nodes(project_id: str) -> list[NodeORM]:
-    """Read a snapshot of the project nodes.
+    """读取项目节点快照。
 
-    This function opens an independent session so the service layer can compare
-    vector index fingerprints outside the SQLite transaction.
+    该函数会打开独立 session，让服务层能在 SQLite 事务之外比较向量索引指纹。
 
     Args:
-        project_id: The project ID.
+        project_id: 项目 ID。
 
     Returns:
-        The list of node ORM objects for the current project.
+        当前项目的节点 ORM 对象列表。
     """
     with SessionLocal() as session:
         return read_ordered_nodes(session, project_id)
 
 
 def read_project_node(project_id: str, node_id: str) -> NodeORM | None:
-    """Read a snapshot of a single node.
+    """读取单个节点快照。
 
-    This function re-reads the node after the transaction commits, ensuring that
-    index synchronization uses the state already persisted in SQLite.
+    该函数会在事务提交后重新读取节点，确保索引同步使用的是已持久化到 SQLite 的状态。
 
     Args:
-        project_id: The project ID.
-        node_id: The node ID.
+        project_id: 项目 ID。
+        node_id: 节点 ID。
 
     Returns:
-        The matching node ORM; returns None when the node does not exist or does
-        not belong to the project.
+        匹配的节点 ORM；节点不存在或不属于该项目时返回 None。
     """
     with SessionLocal() as session:
         node = session.get(NodeORM, node_id)
@@ -118,25 +112,22 @@ def replace_graph(
     nodes: list[NodePayload],
     edges: list[EdgePayload],
 ) -> None:
-    """Replace the entire project graph within the current transaction.
+    """在当前事务内整体替换项目图谱。
 
-    The save strategy is based on a complete snapshot: first validate that edge
-    endpoints only reference nodes from this submission, then delete the old edges
-    and old nodes, and finally write the new nodes and new edges in submission
-    order.
+    保存策略基于完整快照：先校验边端点只引用本次提交中的节点，再删除旧边和旧节点，最后按
+    提交顺序写入新节点和新边。
 
     Args:
-        session: The current database transaction session.
-        project_id: The project ID.
-        nodes: The complete list of nodes to save this time.
-        edges: The complete list of edges to save this time.
+        session: 当前数据库事务 session。
+        project_id: 项目 ID。
+        nodes: 本次要保存的完整节点列表。
+        edges: 本次要保存的完整边列表。
 
     Raises:
-        HTTPException: Raised when an edge references a node outside the current
-            graph.
+        HTTPException: 边引用当前图谱之外节点时抛出。
     """
     validate_edges_against_payload_nodes(nodes, edges)
-    # The SQLite foreign key constraint prevents deleting nodes still referenced by edges, so edges must be deleted first during replacement.
+    # SQLite 外键约束会阻止删除仍被边引用的节点，因此整体替换时必须先删边。
     session.query(EdgeORM).filter(EdgeORM.project_id == project_id).delete(synchronize_session=False)
     session.query(NodeORM).filter(NodeORM.project_id == project_id).delete(synchronize_session=False)
 
@@ -147,25 +138,25 @@ def replace_graph(
         session.add(edge_to_orm(project_id, edge, index))
 
 
-# --- sub-graph level operations (first_revision decision 1) ---
+# --- 子图级操作（first_revision 决策 1） ---
 
 
 def require_graph(session: Session, graph_id: str) -> GraphORM:
-    """Read a sub-graph and ensure it exists.
+    """读取子图并确认存在。
 
     Raises:
-        HTTPException: Raises 404 when the sub-graph does not exist.
+        HTTPException: 子图不存在时抛 404。
     """
     graph = session.get(GraphORM, graph_id)
 
     if graph is None:
-        raise HTTPException(status_code=404, detail="Graph not found")
+        raise HTTPException(status_code=404, detail="未找到图谱")
 
     return graph
 
 
 def read_ordered_nodes_by_graph(session: Session, graph_id: str) -> list[NodeORM]:
-    """Read the nodes of a sub-graph, ordered by the canvas save order."""
+    """按画布保存顺序读取子图节点。"""
     return session.scalars(
         select(NodeORM)
         .where(NodeORM.graph_id == graph_id)
@@ -174,10 +165,9 @@ def read_ordered_nodes_by_graph(session: Session, graph_id: str) -> list[NodeORM
 
 
 def read_intra_graph_edges(session: Session, graph_id: str) -> list[EdgeORM]:
-    """Read edges whose both endpoints fall within this sub-graph.
+    """读取两个端点都落在该子图内的边。
 
-    Phase 1 only handles intra-sub-graph edges; cross-sub-graph edges are
-    introduced in phase 6.
+    第 1 阶段只处理子图内部边；跨子图边在第 6 阶段引入。
     """
     node_ids = {
         node_id
@@ -196,7 +186,7 @@ def read_intra_graph_edges(session: Session, graph_id: str) -> list[EdgeORM]:
 
 
 def read_graph_nodes(graph_id: str) -> list[NodeORM]:
-    """Read a sub-graph node snapshot in an independent session, for comparing index fingerprints outside the transaction."""
+    """在独立 session 中读取子图节点快照，用于在事务外比较索引指纹。"""
     with SessionLocal() as session:
         return read_ordered_nodes_by_graph(session, graph_id)
 
@@ -207,12 +197,10 @@ def replace_subgraph(
     nodes: list[NodePayload],
     edges: list[EdgePayload],
 ) -> None:
-    """Replace the nodes and intra-graph edges of a sub-graph as a whole.
+    """整体替换子图的节点和内部边。
 
-    Structurally identical to ``replace_graph``, but the scope is narrowed to a
-    single sub-graph: it only deletes/writes nodes belonging to this sub-graph and
-    edges whose both endpoints fall within this sub-graph, without affecting other
-    sub-graphs under the project.
+    结构上与 ``replace_graph`` 相同，但范围缩小到单个子图：只删除/写入属于该子图的节点，以及
+    两个端点都位于该子图内的边，不影响项目下其他子图。
     """
     validate_edges_against_payload_nodes(nodes, edges)
 
@@ -222,7 +210,7 @@ def replace_subgraph(
             select(NodeORM.id).where(NodeORM.graph_id == graph.id)
         ).all()
     }
-    # Delete intra-graph edges first (the foreign key constraint prevents deleting nodes still referenced by edges), then delete nodes.
+    # 先删除子图内部边（外键约束会阻止删除仍被边引用的节点），再删除节点。
     if old_node_ids:
         session.query(EdgeORM).filter(
             EdgeORM.source.in_(old_node_ids), EdgeORM.target.in_(old_node_ids)

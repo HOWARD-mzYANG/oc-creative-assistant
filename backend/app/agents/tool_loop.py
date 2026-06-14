@@ -1,24 +1,17 @@
-"""Tool calling execution loop.
+"""工具调用执行循环。
 
-Encapsulates the ReAct loop of "call LLM → look at tool_calls → execute → feed
-results back to LLM", so agent nodes only care about the starting prompt and the
-final structured output. MAX_TOOL_LOOPS=3 lets the LLM truly make multi-turn
-decisions: round 1 calls the initial tools, rounds 2-3 see the results and
-decide whether to keep querying or wrap up; scenarios needing more than 3 rounds
-are rare in practice, and this also intercepts LLM infinite loops.
+封装“调用 LLM -> 查看 tool_calls -> 执行 -> 把结果喂回 LLM”的 ReAct 循环，让 agent 节点
+只关心起始 prompt 和最终结构化输出。MAX_TOOL_LOOPS=3 让 LLM 能真正做多轮决策：第 1 轮
+调用初始工具，第 2-3 轮查看结果并决定继续查询还是收束；实践中需要超过 3 轮的场景很少，
+这也能拦住 LLM 无限循环。
 
-Dual upper bounds on the tool-call budget: per-round batch ≤ MAX_CALLS_PER_BATCH
-prevents the LLM from firing a bunch of similar queries in parallel at once;
-cross-round total ≤ MAX_TOTAL_TOOL_CALLS prevents the LLM from repeatedly firing
-the same query across rounds.
+工具调用预算有双重上限：单轮批次 <= MAX_CALLS_PER_BATCH，防止 LLM 一次并行发出大量相似查询；
+跨轮总数 <= MAX_TOTAL_TOOL_CALLS，防止 LLM 跨轮重复发出同一查询。
 
-``compact_history_for_structured`` flattens the post-loop history into a pure
-SystemMessage + HumanMessage sequence, preventing the later
-``with_structured_output`` function_calling parser from treating old tool_calls
-as an "unknown tool" and throwing KeyError. Tool results are truncated by token
-(not by character), so tools like list_nodes that return dozens of JSON entries
-at once do not have key content cut off; the CoT of intermediate thinking is
-still truncated by character, as it is less sensitive to length.
+``compact_history_for_structured`` 会把循环后的历史压平为纯 SystemMessage + HumanMessage
+序列，避免后续 ``with_structured_output`` 的 function_calling parser 把旧 tool_calls 当作
+“unknown tool”并抛 KeyError。工具结果按 token（不是字符）截断，因此 list_nodes 这类一次返回
+几十条 JSON 的工具不会被切掉关键内容；中间思考 CoT 对长度不那么敏感，仍按字符截断。
 """
 
 from __future__ import annotations
@@ -42,7 +35,7 @@ MAX_TOTAL_TOOL_CALLS = 5
 _TOOL_RESULT_TOKEN_CAP = 600
 _MIDDLE_THOUGHT_CHAR_CAP = 400
 
-# Reuse the same encoding as context_compress; works offline and is consistent with mainstream OpenAI-compatible models
+# 复用与 context_compress 相同的 encoding；可离线工作，并与主流 OpenAI 兼容模型一致。
 _encoder = tiktoken.get_encoding("cl100k_base")
 
 
@@ -51,14 +44,12 @@ def run_tool_loop(
     initial_messages: list[BaseMessage],
     tools: list[BaseTool],
 ) -> list[BaseMessage]:
-    """Run the tool calling loop to completion, returning the message history with all tool_calls / tool_results.
+    """运行工具调用循环直到结束，返回包含所有 tool_calls / tool_results 的消息历史。
 
-    Protocol key point: "every" call in AIMessage.tool_calls must be paired with
-    a ToolMessage; missing even one will make the next chat_with_tools hit
-    OpenAI protocol 400 ("insufficient tool messages following tool_calls
-    message"); therefore the iteration always runs through all tool_calls, those
-    over budget are not actually invoked but use a placeholder ToolMessage to
-    notify the LLM "skipped, please wrap up directly".
+    协议关键点：AIMessage.tool_calls 中的“每个”调用都必须配对一个 ToolMessage；哪怕少一个，
+    下一次 chat_with_tools 都会触发 OpenAI 协议 400（tool_calls 后的 tool messages 不足）。
+    因此迭代总会跑完所有 tool_calls，超预算的不会实际调用，而是用占位 ToolMessage 通知 LLM
+    “已跳过，请直接收束”。
     """
     tool_by_name = {tool.name: tool for tool in tools}
     history: list[BaseMessage] = list(initial_messages)
@@ -77,20 +68,19 @@ def run_tool_loop(
             within_budget = total_calls < MAX_TOTAL_TOOL_CALLS
             if not within_batch or not within_budget:
                 content = (
-                    "[Skipped: this round's tool calls exceeded the budget "
-                    f"(at most {MAX_CALLS_PER_BATCH} per round, total budget "
-                    f"{MAX_TOTAL_TOOL_CALLS}). Please wrap up directly based on "
-                    "the existing evidence, and do not call any more tools.]"
+                    "[已跳过：本轮工具调用超出预算"
+                    f"（每轮最多 {MAX_CALLS_PER_BATCH} 次，总预算 {MAX_TOTAL_TOOL_CALLS} 次）。"
+                    "请直接基于已有证据收束，不要再调用工具。]"
                 )
             else:
                 tool_fn = tool_by_name.get(call["name"])
                 if tool_fn is None:
-                    content = f"Unknown tool: {call['name']}"
+                    content = f"未知工具：{call['name']}"
                 else:
                     try:
                         content = tool_fn.invoke(call["args"])
                     except Exception as exc:  # noqa: BLE001
-                        content = f"Tool execution failed: {exc}"
+                        content = f"工具执行失败：{exc}"
                 total_calls += 1
             history.append(ToolMessage(content=str(content), tool_call_id=call["id"]))
 
@@ -101,29 +91,28 @@ def run_tool_loop(
 
 
 def _truncate_chars(text: str, limit: int) -> str:
-    """Truncate by character count, suitable for length-insensitive CoT intermediate thinking."""
+    """按字符数截断，适合对长度不敏感的 CoT 中间思考。"""
     text = text.strip()
     if len(text) <= limit:
         return text
-    return text[:limit] + "…"
+    return text[:limit] + "..."
 
 
 def _truncate_tokens(text: str, cap: int) -> str:
-    """Truncate by token count, preserving more complete JSON / long-list tool return content."""
+    """按 token 数截断，尽量保留更完整的 JSON / 长列表工具返回内容。"""
     stripped = text.strip()
     tokens = _encoder.encode(stripped)
     if len(tokens) <= cap:
         return stripped
-    return _encoder.decode(tokens[:cap]) + "…"
+    return _encoder.decode(tokens[:cap]) + "..."
 
 
 def compact_history_for_structured(history: list[BaseMessage]) -> list[BaseMessage]:
-    """Fold the tool calling traces into an evidence digest, for later use by ``provider.structured()``.
+    """将工具调用轨迹折叠成证据摘要，供之后的 ``provider.structured()`` 使用。
 
-    Keep the original SystemMessage / HumanMessage, and turn the back-and-forth
-    of AIMessage.tool_calls + ToolMessage into one newly added HumanMessage text
-    block; this way with_structured_output does not run into off-target schema
-    tool_call names while parsing the history.
+    保留原始 SystemMessage / HumanMessage，并把 AIMessage.tool_calls + ToolMessage 的往返
+    变成新增的 HumanMessage 文本块；这样 with_structured_output 解析历史时不会撞到偏离目标
+    schema 的 tool_call 名称。
     """
     system_messages: list[BaseMessage] = []
     human_messages: list[BaseMessage] = []
@@ -144,13 +133,13 @@ def compact_history_for_structured(history: list[BaseMessage]) -> list[BaseMessa
             content = (message.content or "").strip() if isinstance(message.content, str) else ""
             if content and not calls:
                 trace_lines.append(
-                    f"- Intermediate thinking: {_truncate_chars(content, _MIDDLE_THOUGHT_CHAR_CAP)}"
+                    f"- 中间思考：{_truncate_chars(content, _MIDDLE_THOUGHT_CHAR_CAP)}"
                 )
         elif isinstance(message, ToolMessage):
-            label = pending_call_label.pop(message.tool_call_id, "unknown call")
+            label = pending_call_label.pop(message.tool_call_id, "未知调用")
             result = message.content if isinstance(message.content, str) else str(message.content)
             trace_lines.append(
-                f"- Called {label} → {_truncate_tokens(result, _TOOL_RESULT_TOKEN_CAP)}"
+                f"- 已调用 {label} -> {_truncate_tokens(result, _TOOL_RESULT_TOKEN_CAP)}"
             )
 
     if not trace_lines:
@@ -161,7 +150,7 @@ def compact_history_for_structured(history: list[BaseMessage]) -> list[BaseMessa
         *system_messages,
         *human_messages,
         HumanMessage(
-            f"【Evidence just collected via tools】\n{digest}\n\n"
-            "Please produce the structured output directly based on the above evidence, and do not call any more tools."
+            f"【刚通过工具收集到的证据】\n{digest}\n\n"
+            "请直接基于以上证据生成结构化输出，不要再调用工具。"
         ),
     ]

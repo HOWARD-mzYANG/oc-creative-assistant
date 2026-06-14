@@ -17,16 +17,16 @@ export function fileToScaledDataUrl(
         canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error('Canvas not supported'))
+          reject(new Error('当前环境不支持 Canvas'))
           return
         }
         ctx.drawImage(img, 0, 0, width, height)
         resolve(canvas.toDataURL('image/jpeg', quality))
       }
-      img.onerror = () => reject(new Error('Failed to load image'))
+      img.onerror = () => reject(new Error('图片加载失败'))
       img.src = String(reader.result)
     }
-    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.onerror = () => reject(new Error('文件读取失败'))
     reader.readAsDataURL(file)
   })
 }

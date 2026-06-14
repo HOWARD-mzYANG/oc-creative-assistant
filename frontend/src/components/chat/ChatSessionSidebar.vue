@@ -59,7 +59,7 @@ function onNewChat() {
 
 async function onDeleteSession(id: string) {
   closeMenu()
-  if (!window.confirm('Delete this chat and its history?')) return
+  if (!window.confirm('删除这段对话及其历史记录吗？')) return
   await chat.deleteSession(id)
 }
 </script>
@@ -67,8 +67,8 @@ async function onDeleteSession(id: string) {
 <template>
   <aside class="chat-sessions">
     <div class="chat-sessions__head">
-      <span>Chats</span>
-      <button type="button" class="chat-sessions__new" title="New chat" @click="onNewChat">+</button>
+      <span>对话</span>
+      <button type="button" class="chat-sessions__new" title="新对话" @click="onNewChat">+</button>
     </div>
 
     <div class="chat-sessions__list">
@@ -91,15 +91,15 @@ async function onDeleteSession(id: string) {
           v-else
           type="button"
           class="chat-sessions__title"
-          :title="s.id === sessionId ? 'Click to rename' : 'Open chat'"
+          :title="s.id === sessionId ? '点击重命名' : '打开对话'"
           @click="onTitleClick(s)"
         >
-          {{ s.title || 'Untitled chat' }}
+          {{ s.title || '未命名对话' }}
         </button>
         <button
           type="button"
           class="chat-sessions__more"
-          title="More"
+          title="更多"
           @click.stop="toggleMenu(s.id, $event)"
         >
           ⋯
@@ -118,7 +118,7 @@ async function onDeleteSession(id: string) {
           class="chat-sessions__menu-item chat-sessions__menu-item--danger"
           @click.stop="onDeleteSession(menuOpenId)"
         >
-          Delete
+          删除
         </button>
       </div>
     </template>

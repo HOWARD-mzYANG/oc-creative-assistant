@@ -1,9 +1,7 @@
-"""Graph DTO <-> ORM conversion.
+"""Graph DTO <-> ORM 转换。
 
-This module is the data-mapping boundary of the service layer, responsible for
-converting between API payloads and SQLAlchemy ORM, and for maintaining the
-compatibility rules of the node meta JSON. It does not access the database, nor
-does it trigger index sync.
+本模块是服务层的数据映射边界，负责在 API payload 与 SQLAlchemy ORM 之间转换，
+并维护节点 meta JSON 的兼容规则。它不访问数据库，也不触发索引同步。
 """
 
 from __future__ import annotations
@@ -24,16 +22,15 @@ from app.schemas import (
 META_TEXT_KEY = "text"
 META_TAGS_KEY = "tags"
 META_STATUS_KEY = "status"
-# first_revision decision 2: reserved key for storing a character card's "free
-# fields" into the node.meta JSON, without polluting the existing text / tags /
-# status.
+# first_revision 决策 2：保留键，用于把角色卡的“自由字段”存入 node.meta JSON，
+# 同时不污染既有 text / tags / status。
 META_FIELDS_KEY = "fields"
 META_PARENT_ID_KEY = "parentId"
 META_SORT_ORDER_KEY = "sortOrder"
 
 
 def db_fields_to_api(meta: Any) -> dict[str, str]:
-    """Read free fields from the database meta (key -> value, all strings)."""
+    """从数据库 meta 读取自由字段（key -> value，均为字符串）。"""
     if isinstance(meta, dict):
         fields = meta.get(META_FIELDS_KEY, {})
         if isinstance(fields, dict):
@@ -42,7 +39,7 @@ def db_fields_to_api(meta: Any) -> dict[str, str]:
 
 
 def merge_fields_into_meta(meta: Any, fields: dict[str, str]) -> dict[str, Any]:
-    """Write the free fields back into the meta JSON as a whole, preserving other reserved keys."""
+    """把自由字段整体写回 meta JSON，同时保留其他保留键。"""
     stored_meta: dict[str, Any] = meta if isinstance(meta, dict) else {}
     next_meta = dict(stored_meta)
     next_meta[META_FIELDS_KEY] = {str(k): str(v) for k, v in fields.items()}
@@ -50,29 +47,28 @@ def merge_fields_into_meta(meta: Any, fields: dict[str, str]) -> dict[str, Any]:
 
 
 def project_to_payload(project: ProjectORM) -> ProjectPayload:
-    """Convert a project ORM into an API payload.
+    """将 project ORM 转换为 API payload。
 
-    Args:
-        project: The project record in the database.
+    参数：
+        project: 数据库中的项目记录。
 
-    Returns:
-        The project DTO used by the frontend interface.
+    返回：
+        前端接口使用的项目 DTO。
     """
     return ProjectPayload(id=project.id, name=project.name)
 
 
 def node_to_payload(node: NodeORM) -> NodePayload:
-    """Convert a node ORM into an API payload.
+    """将 node ORM 转换为 API payload。
 
-    This function is compatible with both the legacy string meta and the current
-    JSON meta, ensuring the frontend still receives stable `meta`, `tags`, and
-    `status` fields.
+    兼容旧版字符串 meta 与当前 JSON meta，确保前端仍能收到稳定的
+    `meta`、`tags` 和 `status` 字段。
 
-    Args:
-        node: The node record in the database.
+    参数：
+        node: 数据库中的节点记录。
 
-    Returns:
-        The node DTO used by the frontend interface.
+    返回：
+        前端接口使用的节点 DTO。
     """
     return NodePayload(
         id=node.id,
@@ -91,7 +87,7 @@ def node_to_payload(node: NodeORM) -> NodePayload:
 
 
 def edge_to_payload(edge: EdgeORM) -> EdgePayload:
-    """Convert an edge ORM into an API payload."""
+    """将 edge ORM 转换为 API payload。"""
     waypoint = (
         EdgeWaypointPayload.model_validate(edge.waypoint) if edge.waypoint else None
     )
@@ -115,18 +111,17 @@ def node_to_orm(
     sort_order: int,
     graph_id: str | None = None,
 ) -> NodeORM:
-    """Convert a node payload into an ORM.
+    """将 node payload 转换为 ORM。
 
-    Args:
-        project_id: The ID of the project the node belongs to.
-        node: The node DTO submitted by the frontend.
-        sort_order: The node's order within the current graph snapshot.
-        graph_id: The sub-graph the node belongs to; None when saving at the
-            project level, passed in by the caller when saving at the sub-graph
-            level (first_revision decision 1).
+    参数：
+        project_id: 节点所属项目 ID。
+        node: 前端提交的节点 DTO。
+        sort_order: 节点在当前图快照中的顺序。
+        graph_id: 节点所属子图；项目级保存时为 None，子图级保存时由调用方传入
+            （first_revision 决策 1）。
 
-    Returns:
-        A node ORM object ready to be written to the database.
+    返回：
+        可直接写入数据库的节点 ORM 对象。
     """
     return NodeORM(
         id=node.id,
@@ -150,7 +145,7 @@ def node_to_orm(
 
 
 def edge_to_orm(project_id: str, edge: EdgePayload, sort_order: int) -> EdgeORM:
-    """Convert an edge payload into an ORM."""
+    """将 edge payload 转换为 ORM。"""
     return EdgeORM(
         id=edge.id,
         project_id=project_id,
@@ -175,22 +170,19 @@ def api_meta_to_db(
     parent_id: str | None = None,
     sort_order: int | None = None,
 ) -> dict[str, Any]:
-    """Merge API meta fields into the database JSON.
+    """将 API meta 字段合并到数据库 JSON。
 
-    The API still keeps the string `meta` field; the database uses JSON to store
-    the body, tags, and sync status together, avoiding extending the table schema
-    at the current PoC stage.
+    API 仍保留字符串 `meta` 字段；数据库使用 JSON 一起存储正文、标签和同步状态，
+    避免在当前 PoC 阶段扩展表结构。
 
-    Args:
-        meta: The string meta submitted by the frontend.
-        tags: Optional tag list; when None, keeps existing tags or writes a
-            default empty list.
-        status: Optional sync status; when None, keeps the existing status or
-            writes the default status.
-        existing_meta: The existing database meta when updating a node.
+    参数：
+        meta: 前端提交的字符串 meta。
+        tags: 可选标签列表；为 None 时保留现有标签，或写入默认空列表。
+        status: 可选同步状态；为 None 时保留现有状态，或写入默认状态。
+        existing_meta: 更新节点时数据库中已有的 meta。
 
-    Returns:
-        A JSON dict ready to be written to NodeORM.meta.
+    返回：
+        可写入 NodeORM.meta 的 JSON dict。
     """
     stored_meta: dict[str, Any] = existing_meta if isinstance(existing_meta, dict) else {}
     next_meta = dict(stored_meta)
@@ -222,7 +214,7 @@ def api_meta_to_db(
 
 
 def db_meta_to_api(meta: Any) -> str:
-    """Read the API string meta from the database meta."""
+    """从数据库 meta 中读取 API 字符串 meta。"""
     if isinstance(meta, dict):
         value = meta.get(META_TEXT_KEY, "")
         return value if isinstance(value, str) else ""
@@ -234,7 +226,7 @@ def db_meta_to_api(meta: Any) -> str:
 
 
 def db_tags_to_api(meta: Any) -> list[str]:
-    """Read the API tags from the database meta."""
+    """从数据库 meta 中读取 API tags。"""
     if isinstance(meta, dict):
         tags = meta.get(META_TAGS_KEY, [])
         return [tag for tag in tags if isinstance(tag, str)] if isinstance(tags, list) else []
@@ -243,7 +235,7 @@ def db_tags_to_api(meta: Any) -> list[str]:
 
 
 def db_status_to_api(meta: Any) -> str:
-    """Read the API status from the database meta."""
+    """从数据库 meta 中读取 API status。"""
     if isinstance(meta, dict):
         status = meta.get(META_STATUS_KEY, DEFAULT_NODE_STATUS)
         return status if isinstance(status, str) else DEFAULT_NODE_STATUS
@@ -252,7 +244,7 @@ def db_status_to_api(meta: Any) -> str:
 
 
 def db_parent_id_to_api(meta: Any) -> str | None:
-    """Read the world folder parent id from the database meta."""
+    """从数据库 meta 中读取世界观文件夹父级 ID。"""
     if isinstance(meta, dict):
         parent_id = meta.get(META_PARENT_ID_KEY)
         return parent_id if isinstance(parent_id, str) and parent_id else None
@@ -261,7 +253,7 @@ def db_parent_id_to_api(meta: Any) -> str | None:
 
 
 def db_sort_order_to_api(meta: Any) -> int:
-    """Read the world folder sibling order from the database meta."""
+    """从数据库 meta 中读取世界观文件夹同级排序。"""
     if isinstance(meta, dict):
         sort_order = meta.get(META_SORT_ORDER_KEY, 0)
         return sort_order if isinstance(sort_order, int) else 0

@@ -29,13 +29,13 @@ let saveQueued = false
 const isHydrating = ref(true)
 
 const TYPE_LABEL: Record<string, string> = {
-  character: 'Character',
-  worldbuilding: 'Worldbuilding',
-  world: 'Worldbuilding',
-  plot: 'Plot',
-  idea: 'Idea',
-  research: 'Research',
-  structure: 'Structure',
+  character: '角色',
+  worldbuilding: '世界观',
+  world: '世界观',
+  plot: '情节',
+  idea: '想法',
+  research: '资料',
+  structure: '结构',
 }
 
 const title = ref('')
@@ -50,7 +50,7 @@ interface FieldRow {
 }
 const fieldRows = ref<FieldRow[]>([])
 
-const typeLabel = computed(() => TYPE_LABEL[detailNode.value?.nodeType ?? ''] ?? 'Note')
+const typeLabel = computed(() => TYPE_LABEL[detailNode.value?.nodeType ?? ''] ?? '笔记')
 const isPlot = computed(() => detailNode.value?.nodeType === 'plot')
 
 function loadFromSnapshot() {
@@ -109,7 +109,7 @@ async function persist() {
   }
 
   isSaving = true
-  saveState.value = 'Saving…'
+  saveState.value = '保存中…'
   try {
     await updateNode(projectId, props.nodeId, {
       title: title.value,
@@ -118,9 +118,9 @@ async function persist() {
       status: status.value,
     })
     await saveNodeFields(projectId, props.nodeId, fields)
-    saveState.value = 'Saved'
+    saveState.value = '已保存'
   } catch (e) {
-    saveState.value = e instanceof Error ? `Save failed: ${e.message}` : 'Save failed'
+    saveState.value = e instanceof Error ? `保存失败: ${e.message}` : '保存失败'
   } finally {
     isSaving = false
     if (saveQueued) {
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="detail" :class="{ 'detail--plot': isPlot }">
     <div class="detail__bar">
-      <button type="button" class="detail__back" @click="emit('return')">← Back to canvas</button>
+      <button type="button" class="detail__back" @click="emit('return')">← 返回画布</button>
       <span class="detail__state">{{ saveState }}</span>
     </div>
 
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
               v-model="title"
               class="sheet__title"
               type="text"
-              placeholder="Untitled"
+              placeholder="未命名"
               spellcheck="false"
             />
 
@@ -174,34 +174,34 @@ onBeforeUnmount(() => {
               v-model="body"
               class="sheet__body"
               :rows="isPlot ? 6 : 10"
-              placeholder="Start writing — describe this character, place, or moment…"
+              placeholder="开始书写：描述这个角色、地点或瞬间…"
             ></textarea>
 
             <div v-if="!isPlot" class="sheet__meta">
               <label class="sheet__meta-row">
-                <span class="eyebrow">Tags</span>
-                <input v-model="tagsText" type="text" placeholder="protagonist, act one" />
+                <span class="eyebrow">标签</span>
+                <input v-model="tagsText" type="text" placeholder="主角，第一幕" />
               </label>
               <label class="sheet__meta-row sheet__meta-row--status">
-                <span class="eyebrow">Status</span>
+                <span class="eyebrow">状态</span>
                 <select v-model="status">
-                  <option value="draft">draft</option>
-                  <option value="synced">synced</option>
-                  <option value="outdated">outdated</option>
+                  <option value="draft">草稿</option>
+                  <option value="synced">已同步</option>
+                  <option value="outdated">需更新</option>
                 </select>
               </label>
             </div>
 
             <div class="sheet__fields">
               <div class="sheet__fields-head">
-                <span class="eyebrow">Attributes</span>
-                <button type="button" class="sheet__add" @click="addField">+ Add field</button>
+                <span class="eyebrow">属性</span>
+                <button type="button" class="sheet__add" @click="addField">+ 添加字段</button>
               </div>
-              <p v-if="fieldRows.length === 0" class="sheet__hint">No attributes yet.</p>
+              <p v-if="fieldRows.length === 0" class="sheet__hint">暂无属性。</p>
               <div v-for="(row, index) in fieldRows" :key="index" class="sheet__field">
-                <input v-model="row.key" class="sheet__field-key" placeholder="Faction" />
+                <input v-model="row.key" class="sheet__field-key" placeholder="阵营" />
                 <span class="sheet__field-sep">·</span>
-                <input v-model="row.value" class="sheet__field-val" placeholder="Flame Kingdom" />
+                <input v-model="row.value" class="sheet__field-val" placeholder="焰火王国" />
                 <button type="button" class="sheet__field-del" @click="removeField(index)">✕</button>
               </div>
             </div>

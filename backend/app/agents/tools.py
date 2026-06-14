@@ -1,22 +1,17 @@
-"""LangChain Tools factory.
+"""LangChain 工具工厂。
 
-The Research / Structure / Simulation agents call these tools on demand within
-the loop to collect evidence, handing the power of "deciding what to query"
-back to the LLM, and reducing the noise from naively stuffing the entire project
-knowledge base into the prompt.
+Research / Structure / Simulation agents 会在循环中按需调用这些工具收集证据，
+把“决定查询什么”的能力交还给 LLM，同时减少把整个项目知识库直接塞进 prompt
+带来的噪声。
 
-Tools fall into two categories by "query shape":
-- relevance: search_nodes hits the top-K by semantics, suitable for "things
-  related to X"
-- enumeration: list_nodes lists the full roster by node_type, suitable for
-  "what X are in the project"
-Mismatching the two will miss things: answering an enumeration question with
-search_nodes will surely miss low-relevance-score nodes.
+工具按“查询形态”分为两类：
+- relevance：search_nodes 按语义命中 top-K，适合“与 X 相关的内容”
+- enumeration：list_nodes 按 node_type 列出完整清单，适合“项目里有哪些 X”
+两者混用会漏信息：用 search_nodes 回答枚举问题，必然会漏掉相关性分数较低的节点。
 
-All tools bind project_id through a closure, so the schema visible to the LLM
-contains only business parameters; an agent node only needs to call
-``make_project_tools(state.project_id)`` to get all read-only tools scoped to
-the current project.
+所有工具都通过闭包绑定 project_id，因此 LLM 可见的 schema 只包含业务参数；
+agent 节点只需调用 ``make_project_tools(state.project_id)``，即可获得作用域限定在
+当前项目上的只读工具集合。
 """
 
 from __future__ import annotations
@@ -53,48 +48,40 @@ def _node_content_preview(node: NodeORM, limit: int = 120) -> str:
 
 
 def make_project_tools(project_id: str, *, include_web_search: bool = True) -> list[BaseTool]:
-    """Generate the read-only tool set bound to the given project.
+    """生成绑定到指定项目的只读工具集。
 
-    Internally maintains a turn-level search_cache, so when the LLM repeatedly
-    calls search_nodes with variant queries within the same ReAct loop it hits
-    existing results, avoiding repeated chroma calls.
+    内部维护回合级 search_cache，因此 LLM 在同一个 ReAct 循环中用相近查询反复调用
+    search_nodes 时会命中已有结果，避免重复调用 chroma。
 
-    The cache key normalizes by "word set" (split on whitespace → sort → join
-    back into a string), so the LLM hits the same cache whether it swaps word
-    order ("Elara mentor" / "mentor Elara") or tweaks top_k; without
-    normalization the LLM in ReAct can easily bypass the cache by rewriting
-    keywords and hammer chroma.
+    缓存键按“词集合”归一化（按空白切分 -> 排序 -> 重新拼接成字符串），因此无论
+    LLM 调换词序（"Elara mentor" / "mentor Elara"）还是调整 top_k，都会命中同一份
+    缓存；如果不归一化，ReAct 中的 LLM 很容易通过改写关键词绕过缓存并反复敲 chroma。
     """
     search_cache: dict[str, str] = {}
 
     def _cache_key(query: str) -> str:
-        # Word-order-independent + duplicate-word elimination + case-insensitive; top_k is not in the key, take max top_k to serve all callers
+        # 与词序无关 + 去重 + 忽略大小写；top_k 不进键，取最大 top_k 服务所有调用方。
         tokens = sorted(set(query.strip().lower().split()))
         return " ".join(tokens)
 
     @tool
     def search_nodes(query: str, top_k: int = 5) -> str:
-        """Semantically retrieve relevant nodes from the current project knowledge base (relevance query).
+        """从当前项目知识库中语义检索相关节点（相关性查询）。
 
-        Suitable for relevance-ranked questions like "things related to X /
-        similar to Y / content mentioning Z". If the user asks an enumeration
-        question like "what X are in the project", use list_nodes instead.
+        适合“与 X 相关 / 类似 Y / 提到 Z 的内容”等按相关性排序的问题。如果用户问的是
+        “项目里有哪些 X”这类枚举问题，应改用 list_nodes。
 
-        Within this turn, once a similar keyword combination (word-order
-        independent) has been called, sending the same set of words again hits
-        the cache directly and does not call chroma; also do not deliberately
-        bypass the cache and retry by swapping word order or changing top_k,
-        there is no new information.
+        在本回合内，相近关键词组合（与词序无关）一旦被调用过，再发送同一组词会直接
+        命中缓存，不再调用 chroma；也不要故意通过调换词序或改变 top_k 绕过缓存重试，
+        那不会带来新信息。
 
-        Args:
-            query: search keywords or a natural-language description.
-            top_k: maximum number of nodes to return; 3-8 recommended.
+        参数：
+            query: 搜索关键词或自然语言描述。
+            top_k: 最多返回的节点数量；建议 3-8。
 
-        Returns:
-            A JSON string list, each item with id / title / type /
-            content_preview / score. On retriever error it returns an
-            "[ERROR] ..." string, so the LLM wraps up immediately instead of
-            retrying with different keywords.
+        返回：
+            JSON 字符串列表，每项包含 id / title / type / content_preview / score。
+            检索器出错时返回 "[ERROR] ..." 字符串，使 LLM 立即收束而不是换关键词重试。
         """
         key = _cache_key(query)
         cached = search_cache.get(key)
@@ -109,9 +96,8 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
 
         if store == "chroma_unavailable":
             error_payload = (
-                f"[ERROR] The retriever is temporarily unavailable: {err}. This "
-                f"round, please answer directly based on the existing context, "
-                f"and do not retry by calling search_nodes / list_nodes."
+                f"[ERROR] 检索器暂时不可用：{err}。本轮请直接基于已有上下文回答，"
+                f"不要通过调用 search_nodes / list_nodes 重试。"
             )
             search_cache[key] = error_payload
             return error_payload
@@ -134,24 +120,19 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
 
     @tool
     def list_nodes(node_type: str = "", limit: int = 100) -> str:
-        """Enumerate all nodes in the current project, without semantic retrieval, with optional node_type filtering.
+        """枚举当前项目中的所有节点，不做语义检索，可选按 node_type 过滤。
 
-        Suitable for enumeration questions that require covering the full roster,
-        like "what characters are in the project / what settings have been
-        written / what plot nodes exist now"; do not answer such questions with
-        search_nodes, otherwise nodes with low relevance to the query terms will
-        be missed.
+        适合需要覆盖完整清单的枚举问题，例如“项目里有哪些角色 / 已写了哪些设定 /
+        现在有哪些剧情节点”；不要用 search_nodes 回答这类问题，否则与查询词相关性较低的
+        节点会被漏掉。
 
-        Args:
-            node_type: optional filter, one of six: character / worldbuilding /
-                plot / idea / research / structure; an empty string or a value
-                not in the whitelist means no filtering.
-            limit: maximum number of nodes to return, default 100; for larger
-                projects the LLM may reduce it to 30-50.
+        参数：
+            node_type: 可选过滤器，六选一：character / worldbuilding / plot / idea /
+                research / structure；空字符串或非白名单值表示不过滤。
+            limit: 最多返回的节点数，默认 100；大型项目中 LLM 可降到 30-50。
 
-        Returns:
-            A JSON string list, each item with id / title / type /
-            content_preview.
+        返回：
+            JSON 字符串列表，每项包含 id / title / type / content_preview。
         """
         nodes = read_project_nodes(project_id)
         if node_type in _NODE_TYPE_FILTER:
@@ -173,14 +154,13 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
 
     @tool
     def get_node(node_id: str) -> str:
-        """Read the full body and tags of the given node; return an empty object if not found.
+        """读取指定节点的完整正文与标签；未找到时返回空对象。
 
-        Args:
-            node_id: node ID (obtained from search_nodes / list_nodes /
-                list_neighbors).
+        参数：
+            node_id: 节点 ID（从 search_nodes / list_nodes / list_neighbors 获得）。
 
-        Returns:
-            A JSON string with id / title / type / content / tags.
+        返回：
+            包含 id / title / type / content / tags 的 JSON 字符串。
         """
         node = read_project_node(project_id, node_id)
         if node is None:
@@ -199,18 +179,16 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
 
     @tool
     def list_neighbors(node_id: str) -> str:
-        """List the directly connected one-hop neighbors of a node on the canvas.
+        """列出画布上与某节点直接相连的一跳邻居。
 
-        Returns only one hop; for multi-hop chained follow-ups like "the family
-        of X's mentor", use multi_hop_neighbors instead, otherwise you would
-        have to call this tool repeatedly and assemble the path yourself.
+        只返回一跳；如果是“X 的导师的家族”这类多跳链式追问，请改用
+        multi_hop_neighbors，否则就需要反复调用本工具并自行拼路径。
 
-        Args:
-            node_id: node ID.
+        参数：
+            node_id: 节点 ID。
 
-        Returns:
-            A JSON list, each item with id / title / type / direction /
-            relation.
+        返回：
+            JSON 列表，每项包含 id / title / type / direction / relation。
         """
         with SessionLocal() as db:
             edges = (
@@ -256,30 +234,23 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
     def multi_hop_neighbors(
         node_id: str, depth: int = 2, max_nodes: int = 20
     ) -> str:
-        """Expand N-hop reachable nodes centered on node_id, with shortest relation-path backtracking.
+        """以 node_id 为中心展开 N 跳可达节点，并回溯最短关系路径。
 
-        Suitable for chained relation Q&A ("the family of Elara's mentor" /
-        "which nodes connect A and B"); for one-hop questions list_neighbors
-        saves more tokens.
+        适合链式关系问答（“Elara 的导师的家族” / “哪些节点连接 A 和 B”）；一跳问题用
+        list_neighbors 更省 token。
 
-        The implementation runs a single BFS, completing in memory and
-        returning; not cached within a turn (canvas relations change frequently,
-        so the caching gain does not outweigh the invalidation cost).
+        实现会运行一次 BFS，在内存中完成并返回；本回合内不缓存（画布关系变化频繁，
+        缓存收益抵不过失效成本）。
 
-        Args:
-            node_id: starting node ID.
-            depth: BFS hop count, 1-3 (default 2); over 3 is auto-truncated to
-                prevent a result explosion.
-            max_nodes: upper bound on returned nodes, default 20, hard cap 50;
-                when exceeded, keep nodes closer to the start by ascending
-                distance.
+        参数：
+            node_id: 起始节点 ID。
+            depth: BFS 跳数，1-3（默认 2）；超过 3 会自动截断，避免结果爆炸。
+            max_nodes: 返回节点上限，默认 20，硬上限 50；超出时按距离升序保留更近节点。
 
-        Returns:
-            A JSON list, each item with id / title / type / content_preview /
-            distance / path; path looks like
-            "start → [relation] → middle → [relation] → end". The start node
-            itself is not in the results; returns "[]" if the start does not
-            exist or does not belong to this project.
+        返回：
+            JSON 列表，每项包含 id / title / type / content_preview / distance / path；
+            path 形如 "start -> [relation] -> middle -> [relation] -> end"。起始节点
+            本身不包含在结果中；起点不存在或不属于本项目时返回 "[]"。
         """
         bounded_depth = max(1, min(int(depth), 3))
         bounded_max = max(1, min(int(max_nodes), 50))
@@ -300,14 +271,14 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
                 .all()
             }
 
-        # Bidirectional adjacency list; relation prefers label, falling back to relation_type when missing
+        # 双向邻接表；关系优先使用 label，缺失时回退到 relation_type。
         adjacency: dict[str, list[tuple[str, str]]] = {}
         for edge in edges:
             relation = edge.label or edge.relation_type or "related"
             adjacency.setdefault(edge.source, []).append((edge.target, relation))
             adjacency.setdefault(edge.target, []).append((edge.source, relation))
 
-        # BFS: visited[id] = (distance, prev_id, relation_to_prev)
+        # BFS：visited[id] = (distance, prev_id, relation_to_prev)。
         visited: dict[str, tuple[int, str | None, str | None]] = {
             node_id: (0, None, None)
         }
@@ -324,7 +295,7 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
                 frontier.append(neighbor_id)
 
         def _trace_path(end_id: str) -> str:
-            """Backtrack from the end to the start, assembling a "start → [relation] → ... → end" string."""
+            """从终点回溯到起点，组装 "start -> [relation] -> ... -> end" 字符串。"""
             chain: list[str] = []
             cursor: str | None = end_id
             while cursor is not None:
@@ -334,7 +305,7 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
                 if prev is not None and relation:
                     chain.append(f"[{relation}]")
                 cursor = prev
-            return " → ".join(reversed(chain))
+            return " -> ".join(reversed(chain))
 
         result_ids = sorted(
             (vid for vid in visited if vid != node_id and vid in nodes_by_id),
@@ -357,28 +328,28 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
 
     @tool
     def web_search(query: str, top_k: int = 5) -> str:
-        """Search the internet for external facts; only for "real-world reference" questions the project knowledge base can't answer.
+        """搜索互联网外部事实；仅用于项目知识库无法回答的“真实世界参考”问题。
 
-        Typical uses:
-        - Real-world research (medieval armor styles / real historical events / physics common sense / weapon names)
-        - Real-time information (weather / news / facts around the current date)
-        - Third-party knowledge (the specs of some external model / framework / library)
+        典型用途：
+        - 真实世界考据（中世纪盔甲样式 / 真实历史事件 / 物理常识 / 武器名称）
+        - 实时信息（天气 / 新闻 / 当前日期附近的事实）
+        - 第三方知识（外部模型 / 框架 / 库的规格）
 
-        Do not use for:
-        - In-project plot / character / setting questions — use search_nodes / list_nodes instead
-        - Asking about the agent itself (what model you use / what your name is) — this is system info, the web can't answer it
+        不要用于：
+        - 项目内剧情 / 角色 / 设定问题，应使用 search_nodes / list_nodes
+        - 询问 agent 自身（你用什么模型 / 你叫什么），这是系统信息，互联网无法回答
 
-        Within this turn, the same keyword combination (order-independent) hits the cache; don't
-        deliberately reword keywords to re-query, there's no new information.
+        本回合内，相同关键词组合（与词序无关）会命中缓存；不要故意改写关键词重新查询，
+        那不会带来新信息。
 
-        Args:
-            query: Search keywords or a natural-language question.
-            top_k: Maximum number of results to return, 3-6 recommended.
+        参数：
+            query: 搜索关键词或自然语言问题。
+            top_k: 最多返回的结果数，建议 3-6。
 
-        Returns:
-            A JSON string containing answer (a short answer synthesized by Tavily) and a hits list
-            (each with title / url / snippet / score). When the web is unavailable, returns an
-            "[ERROR] ..." string so the LLM wraps up immediately.
+        返回：
+            JSON 字符串，包含 answer（Tavily 综合出的短回答）和 hits 列表（每项含
+            title / url / snippet / score）。网络不可用时返回 "[ERROR] ..." 字符串，
+            使 LLM 立即收束。
         """
         key = _cache_key(query)
         cached = search_cache.get(f"web::{key}")
@@ -389,13 +360,13 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
             response = search_web(query, top_k)
         except WebSearchUnavailable as exc:
             error_payload = (
-                f"[ERROR] {exc}. For this turn, answer based on the existing context and "
-                f"project knowledge base; do not call web_search to retry."
+                f"[ERROR] {exc}。本轮请基于已有上下文和项目知识库回答；"
+                f"不要调用 web_search 重试。"
             )
             search_cache[f"web::{key}"] = error_payload
             return error_payload
         except WebSearchError as exc:
-            error_payload = f"[ERROR] web_search call failed: {exc}"
+            error_payload = f"[ERROR] web_search 调用失败：{exc}"
             search_cache[f"web::{key}"] = error_payload
             return error_payload
 

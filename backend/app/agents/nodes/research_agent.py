@@ -1,14 +1,10 @@
-"""Research agent node.
+"""研究 agent 节点。
 
-Receives "research-type" intents (looking up what has been written in the
-project, comparing, summarizing) and calls search_nodes / get_node /
-list_neighbors as needed within a ReAct loop to gather evidence, finally
-producing ResearchOutput.
+接收“研究型”意图（查询项目里已写内容、比较、总结），并在 ReAct 循环中按需调用
+search_nodes / get_node / list_neighbors 收集证据，最终生成 ResearchOutput。
 
-Tool-call results are the LLM's only basis for its statements; the "must call a
-tool first" constraint in the prompt keeps the agent from bypassing the
-knowledge base and fabricating things out of thin air, while handing the
-judgment of "when to look something up again" back to the LLM.
+工具调用结果是 LLM 陈述的唯一依据；prompt 中“必须先调用工具”的约束防止 agent 绕过知识库
+凭空编造，同时把“何时再次查询”的判断交还给 LLM。
 """
 
 from __future__ import annotations
@@ -41,7 +37,7 @@ _SYSTEM_PROMPT = load_prompt("research")
 
 
 def research_agent_node(state: AgentState) -> dict[str, Any]:
-    """Gather evidence in a ReAct loop then produce ResearchOutput; degrade to an empty summary when the LLM fails."""
+    """在 ReAct 循环中收集证据并生成 ResearchOutput；LLM 失败时降级为空摘要。"""
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "")
 
@@ -66,12 +62,12 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
     initial_messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
-            f"[Runtime info]\nCurrent time: {now_str}\n"
-            f"Agent model: determined by the backend OC_LLM_MODEL config (state it directly if the user asks)\n\n"
+            f"[运行时信息]\n当前时间：{now_str}\n"
+            f"Agent 模型：由后端 OC_LLM_MODEL 配置决定（用户询问时可直接说明）\n\n"
             f"{build_memory_block(state, 'research')}\n\n"
-            f"[User question]\n{user_message}"
+            f"[用户问题]\n{user_message}"
             + (
-                f"\n\n[Pre-fetched web_search result — use for external facts; cite the answer field]\n"
+                f"\n\n[预取的 web_search 结果——用于外部事实；引用 answer 字段]\n"
                 f"{web_prefetch_block}"
                 if web_prefetch_block
                 else ""
@@ -95,18 +91,17 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
         if output is None:
             if web_fallback_answer:
                 output = ResearchOutput(
-                    reasoning="Structured output was empty; used pre-fetched web_search.",
+                    reasoning="结构化输出为空；已使用预取的 web_search。",
                     summary=web_fallback_answer,
                 )
             else:
                 output = ResearchOutput(
-                    reasoning="Structured output was empty.",
+                    reasoning="结构化输出为空。",
                     summary=(
                         "这次没能整理出查询结果。你可以在输入框引用情节节点后再问，或直接说「我有哪些情节节点」。"
                         if any("\u4e00" <= c <= "\u9fff" for c in user_message)
                         else (
-                            "I couldn't assemble a research summary this turn. "
-                            "Try quoting the plot node in the composer, or ask again."
+                            "这轮我没能整理出研究摘要。请在输入框引用剧情节点后再问，或换个说法。"
                         )
                     ),
                 )
@@ -116,13 +111,13 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
         logger.warning("research_agent LLM call failed, degrading: %s", error)
         if web_fallback_answer:
             output = ResearchOutput(
-                reasoning=f"Call failed ({type(error).__name__}); used pre-fetched web_search.",
+                reasoning=f"调用失败（{type(error).__name__}）；已使用预取的 web_search。",
                 summary=web_fallback_answer,
                 web_sources=merge_web_sources(prefetch_sources),
             )
         else:
             output = ResearchOutput(
-                reasoning=f"Call failed ({type(error).__name__}).",
-                summary="I couldn't find anything relevant this time. You could rephrase your question or try again later.",
+                reasoning=f"调用失败（{type(error).__name__}）。",
+                summary="这次我没有找到相关内容。你可以换个问法，或稍后再试。",
             )
     return {"research_output": output}

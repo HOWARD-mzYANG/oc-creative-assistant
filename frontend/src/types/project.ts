@@ -24,7 +24,7 @@ export interface GraphInfo {
   section: GraphSection
 }
 
-/** Overview information needed for project library cards. */
+/** 概览 information needed for project library cards. */
 export interface ProjectSummary {
   id: string
   name: string

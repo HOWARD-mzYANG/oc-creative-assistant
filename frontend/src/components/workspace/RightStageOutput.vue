@@ -49,11 +49,11 @@ function goToNode(node: { id: string; title: string; node_type: string }) {
 }
 
 const AGENT_LABELS: Record<string, string> = {
-  inspiration: 'Inspiration',
-  research: 'Research',
-  structure: 'Structure',
-  simulation: 'Simulation',
-  small_talk: 'Chat',
+  inspiration: '灵感',
+  research: '资料',
+  structure: '结构',
+  simulation: '模拟',
+  small_talk: '闲聊',
 }
 
 /* ---- chat auto-scroll ---- */
@@ -72,7 +72,7 @@ watch([messages, streamingReply, streamingApplied], scrollToBottom, { deep: true
       <PanelToggleButton
         direction="right"
         expanded
-        label="Collapse agent panel"
+        label="收起 Agent 面板"
         @click="$emit('collapse')"
       />
     </header>
@@ -80,7 +80,7 @@ watch([messages, streamingReply, streamingApplied], scrollToBottom, { deep: true
     <div class="right-stage__body">
       <div ref="streamRef" class="right-stage__chat">
         <p v-if="messages.length === 0 && !streamingReply && !isStreaming" class="right-stage__empty">
-          Ask in the composer below — the agent can guide, extract entities, and suggest structure.
+          在下方输入框提问。Agent 可以协助引导、抽取实体并提出结构建议。
         </p>
 
         <div
@@ -115,7 +115,7 @@ watch([messages, streamingReply, streamingApplied], scrollToBottom, { deep: true
             />
           </div>
           <div v-if="message.relatedNodes?.length" class="chat-msg__related">
-            <span class="chat-msg__related-label">Related nodes</span>
+            <span class="chat-msg__related-label">相关节点</span>
             <button
               v-for="rn in message.relatedNodes"
               :key="rn.id"
@@ -155,7 +155,7 @@ watch([messages, streamingReply, streamingApplied], scrollToBottom, { deep: true
           <span v-if="lastAgent" class="right-stage__thinking-agent">
             {{ AGENT_LABELS[lastAgent] ?? lastAgent }}
           </span>
-          <span class="right-stage__thinking-label">{{ progressLabel || 'Thinking' }}</span>
+          <span class="right-stage__thinking-label">{{ progressLabel || '思考中' }}</span>
           <span class="right-stage__dots" aria-hidden="true"><i></i><i></i><i></i></span>
         </div>
         <p v-if="error" class="right-stage__error">{{ error }}</p>

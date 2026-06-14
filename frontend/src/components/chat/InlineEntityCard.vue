@@ -7,7 +7,7 @@ import type { AppliedEntityDto } from '../../api/chatApi'
  *
  * The backend already persists extracted entities by default, so this only does
  * "notify + optional edit/undo":
- * - Collapsed: a single line like "✅ Added Character X"; if not expanded it stays added by default;
+ * - Collapsed: a single line like "✅ 已添加 角色 X"; if not expanded it stays added by default;
  * - Expanded: edit title/body -> save (update), or reject (delete) to undo this addition.
  */
 const props = defineProps<{ item: AppliedEntityDto }>()
@@ -17,12 +17,12 @@ const emit = defineEmits<{
 }>()
 
 const NODE_TYPE_LABELS: Record<string, string> = {
-  character: 'Character',
+  character: '角色',
   worldbuilding: 'World',
-  plot: 'Story',
+  plot: '故事',
   idea: 'Idea',
-  research: 'Research',
-  structure: 'Structure',
+  research: '资料',
+  structure: '结构',
 }
 
 const expanded = ref(false)
@@ -31,17 +31,17 @@ const title = ref(props.item.title)
 const content = ref(props.item.content)
 const saveState = ref('')
 
-const verb = props.item.change_type === 'update_node' ? 'Updated' : 'Added'
+const verb = props.item.change_type === 'update_node' ? '已更新' : '已添加'
 const icon = props.item.change_type === 'update_node' ? '✏️' : '✅'
 const typeLabel = NODE_TYPE_LABELS[props.item.node_type] ?? props.item.node_type
 
 async function handleSave() {
-  saveState.value = 'Saving…'
+  saveState.value = '保存中…'
   try {
     emit('edit', props.item.node_id, { title: title.value, content: content.value })
-    saveState.value = 'Saved'
+    saveState.value = '已保存'
   } catch {
-    saveState.value = 'Save failed'
+    saveState.value = '保存失败'
   }
 }
 
@@ -59,16 +59,16 @@ function handleRemove() {
     </button>
 
     <div v-if="expanded" class="inline-card__editor">
-      <input v-model="title" class="inline-card__title" placeholder="Title" />
-      <textarea v-model="content" rows="3" class="inline-card__content" placeholder="Body"></textarea>
+      <input v-model="title" class="inline-card__title" placeholder="标题" />
+      <textarea v-model="content" rows="3" class="inline-card__content" placeholder="正文"></textarea>
       <div class="inline-card__actions">
-        <button type="button" class="inline-card__save" @click="handleSave">Save</button>
-        <button type="button" class="inline-card__remove" @click="handleRemove">Discard</button>
+        <button type="button" class="inline-card__save" @click="handleSave">保存</button>
+        <button type="button" class="inline-card__remove" @click="handleRemove">丢弃</button>
         <span class="inline-card__state">{{ saveState }}</span>
       </div>
     </div>
   </div>
-  <div v-else class="inline-card inline-card--removed">Discarded “{{ title }}”</div>
+  <div v-else class="inline-card inline-card--removed">已丢弃“{{ title }}”</div>
 </template>
 
 <style scoped>

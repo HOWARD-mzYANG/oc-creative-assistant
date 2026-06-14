@@ -1,14 +1,11 @@
-"""Strategy Pattern entry point for LLM calls.
+"""LLM 调用的策略模式入口。
 
-Encapsulates the LangChain / OpenAI SDK details inside the Provider, so agent
-nodes only see two unified methods, ``chat`` (string) and ``structured``
-(Pydantic), shielding them from low-level protocol differences.
+将 LangChain / OpenAI SDK 细节封装在 Provider 内部，让 agent 节点只看到 ``chat``
+（字符串）和 ``structured``（Pydantic）等统一方法，从而屏蔽底层协议差异。
 
-OpenAI-compatible services like DeepSeek / Tongyi generally don't support
-``response_format=json_schema``, so the real provider explicitly pins
-``method="function_calling"`` to use the tool-calls protocol for the widest
-compatibility. The Mock provider is fully offline and returns registered samples
-keyed by schema name, which is convenient for offline development and CI.
+DeepSeek / 通义等 OpenAI 兼容服务通常不支持 ``response_format=json_schema``，
+因此真实 provider 会显式固定 ``method="function_calling"``，用 tool-calls 协议获得
+更广兼容。Mock provider 完全离线，并按 schema 名返回已注册样例，便于离线开发和 CI。
 """
 
 from __future__ import annotations
@@ -44,7 +41,7 @@ def _strip_json_fence(text: str) -> str:
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
-    """Pull a JSON object from a plain-text model reply."""
+    """从纯文本模型回复中提取 JSON 对象。"""
     cleaned = _strip_json_fence(text)
     try:
         data = json.loads(cleaned)
@@ -55,10 +52,10 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
     if match is None:
-        raise ValueError("No JSON object found in model response")
+        raise ValueError("模型回复中未找到 JSON 对象")
     data = json.loads(match.group(0))
     if not isinstance(data, dict):
-        raise ValueError("Model JSON root must be an object")
+        raise ValueError("模型 JSON 根节点必须是对象")
     return data
 
 
@@ -84,11 +81,10 @@ def _raw_message_snippet(raw: Any, *, limit: int = 240) -> str:
 
 
 class LlmProvider(Protocol):
-    """The unified interface contract for LLM calls.
+    """LLM 调用的统一接口契约。
 
-    Every agent node accesses the model through an implementation of this
-    protocol; the Strategy Pattern lets the mock and real providers swap
-    seamlessly via .env without changing business code.
+    每个 agent 节点都通过该协议的实现访问模型；策略模式允许 mock 与真实 provider 通过
+    .env 无缝切换，无需修改业务代码。
     """
 
     def chat(self, messages: list[BaseMessage]) -> str: ...
@@ -109,16 +105,15 @@ class LlmProvider(Protocol):
 
 
 class OpenAICompatibleProvider:
-    """Calls services like DeepSeek / Tongyi / official OpenAI via the OpenAI-compatible protocol.
+    """通过 OpenAI 兼容协议调用 DeepSeek / 通义 / 官方 OpenAI 等服务。
 
-    Under the hood it uses LangChain's ``ChatOpenAI``, so when wiring up
-    ToolNode / Checkpointer later we can reuse the LangChain ecosystem directly
-    instead of hand-writing a tool-calling loop.
+    底层使用 LangChain 的 ``ChatOpenAI``，后续接入 ToolNode / Checkpointer 时可以直接
+    复用 LangChain 生态，而不用手写 tool-calling 循环。
     """
 
     def __init__(self, settings: LlmSettings) -> None:
         if not settings.is_configured:
-            raise ValueError("OC_LLM_* config is missing, cannot initialize the OpenAI-compatible provider")
+            raise ValueError("缺少 OC_LLM_* 配置，无法初始化 OpenAI 兼容 provider")
 
         self._client = ChatOpenAI(
             base_url=settings.base_url,
@@ -133,11 +128,10 @@ class OpenAICompatibleProvider:
         return content if isinstance(content, str) else str(content)
 
     def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
-        """Yield text deltas chunk by chunk; natively supported by LangChain ChatOpenAI's .stream().
+        """逐块产出文本增量；LangChain ChatOpenAI 的 .stream() 原生支持。
 
-        Empty chunks (e.g. the LLM is still thinking and hasn't produced a token)
-        are skipped, so the upper layer only sees tokens with real content and we
-        avoid feeding None / "" into the string accumulation.
+        空 chunk（例如 LLM 仍在思考、尚未产出 token）会被跳过，因此上层只会看到有真实内容的
+        token，避免把 None / "" 放进字符串累积。
         """
         for chunk in self._client.stream(messages):
             content = chunk.content if isinstance(chunk, AIMessage) else chunk
@@ -149,7 +143,7 @@ class OpenAICompatibleProvider:
         messages: list[BaseMessage],
         schema: type[TSchema],
     ) -> TSchema:
-        """Structured output with fallbacks for OpenAI-compatible providers that return empty parses."""
+        """结构化输出；为返回空解析结果的 OpenAI 兼容 provider 提供兜底。"""
         errors: list[str] = []
 
         for method in _STRUCTURED_METHODS:
@@ -216,13 +210,13 @@ class OpenAICompatibleProvider:
         messages: list[BaseMessage],
         schema: type[TSchema],
     ) -> TSchema:
-        """Last resort: plain chat + manual JSON parse (works when tool-calls are ignored)."""
+        """最后兜底：普通 chat + 手动 JSON 解析（适用于 tool-calls 被忽略的情况）。"""
         schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False)
         prompt_messages = [
             *messages,
             HumanMessage(
-                "Respond with ONLY one JSON object matching this schema "
-                "(no markdown fences, no commentary):\n"
+                "只回复一个符合该 schema 的 JSON 对象"
+                "（不要 markdown 代码块，不要说明文字）：\n"
                 f"{schema_json}"
             ),
         ]
@@ -235,7 +229,7 @@ class OpenAICompatibleProvider:
         messages: list[BaseMessage],
         tools: list[BaseTool],
     ) -> AIMessage:
-        """Bind tools and call the LLM once, returning the raw AIMessage so tool_loop can parse tool_calls."""
+        """绑定工具并调用一次 LLM，返回原始 AIMessage 供 tool_loop 解析 tool_calls。"""
         bound = self._client.bind_tools(tools)
         response = bound.invoke(messages)
         if isinstance(response, AIMessage):
@@ -339,12 +333,10 @@ _MOCK_SAMPLES: dict[str, dict[str, Any]] = {
 
 
 class MockProvider:
-    """An offline, deterministic stub that makes no network requests.
+    """离线、确定性的桩实现，不发起网络请求。
 
-    Returns the sample registered in ``_MOCK_SAMPLES`` based on the target schema
-    name, so frontend integration and unit tests can run without an LLM. It raises
-    on an unregistered schema, since surfacing the omission is safer than silently
-    returning None.
+    根据目标 schema 名返回 ``_MOCK_SAMPLES`` 中注册的样例，让前端集成和单元测试在没有 LLM
+    时也能运行。未注册 schema 会抛错，因为暴露遗漏比静默返回 None 更安全。
     """
 
     def chat(self, messages: list[BaseMessage]) -> str:
@@ -356,7 +348,7 @@ class MockProvider:
         return f"[mock] received: {text[:60]}"
 
     def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
-        """Split by character to simulate a token stream, so mock mode can also verify the frontend's progressive rendering."""
+        """按字符拆分来模拟 token 流，使 mock 模式也能验证前端渐进渲染。"""
         for ch in self.chat(messages):
             yield ch
 
@@ -368,7 +360,7 @@ class MockProvider:
         sample = _MOCK_SAMPLES.get(schema.__name__)
         if sample is None:
             raise ValueError(
-                f"MockProvider is missing a {schema.__name__} sample; please register it in _MOCK_SAMPLES"
+                f"MockProvider 缺少 {schema.__name__} 样例；请在 _MOCK_SAMPLES 中注册"
             )
         return schema.model_validate(sample)
 
@@ -377,5 +369,5 @@ class MockProvider:
         messages: list[BaseMessage],
         tools: list[BaseTool],
     ) -> AIMessage:
-        """Mock mode skips tool calls and returns an empty reply so tool_loop exits immediately."""
+        """Mock 模式跳过工具调用并返回空回复，让 tool_loop 立即退出。"""
         return AIMessage(content="")

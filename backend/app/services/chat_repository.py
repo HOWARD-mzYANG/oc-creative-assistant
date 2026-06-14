@@ -1,10 +1,8 @@
-"""Database operation helpers for chat and staging.
+"""聊天与暂存相关的数据库操作辅助函数。
 
-This is the persistence boundary between the service layer and the ORM,
-responsible for CRUD on the three tables: sessions, messages, and staging.
-The transaction strategy aligns with graph_repository: write operations are
-wrapped by the caller in a ``SessionLocal.begin`` transaction, while read
-operations each open their own independent session.
+这里是服务层与 ORM 之间的持久化边界，负责 sessions、messages、staging 三张表的
+CRUD。事务策略与 graph_repository 保持一致：写操作由调用方包在
+``SessionLocal.begin`` 事务中，读操作各自打开独立 session。
 """
 
 from __future__ import annotations
@@ -22,36 +20,36 @@ from app.schemas import AgentStagingCreateItem
 
 
 def new_id() -> str:
-    """Generate a 32-character hex UUID, used as table primary key and LangGraph thread_id."""
+    """生成 32 字符十六进制 UUID，用作表主键和 LangGraph thread_id。"""
     return uuid.uuid4().hex
 
 
 def require_session(db: Session, session_id: str) -> ChatSessionORM:
-    """Read a session and ensure it exists; raises 404 if not."""
+    """读取 session 并确认存在；不存在则抛 404。"""
     session = db.get(ChatSessionORM, session_id)
     if session is None:
-        raise HTTPException(status_code=404, detail="Chat session not found")
+        raise HTTPException(status_code=404, detail="未找到聊天会话")
     return session
 
 
 def require_message(db: Session, message_id: str) -> ChatMessageORM:
-    """Read a message and ensure it exists; raises 404 if not."""
+    """读取 message 并确认存在；不存在则抛 404。"""
     message = db.get(ChatMessageORM, message_id)
     if message is None:
-        raise HTTPException(status_code=404, detail="Chat message not found")
+        raise HTTPException(status_code=404, detail="未找到聊天消息")
     return message
 
 
 def require_staging(db: Session, staging_id: str) -> AgentStagingORM:
-    """Read a staging record and ensure it exists; raises 404 if not."""
+    """读取暂存记录并确认存在；不存在则抛 404。"""
     record = db.get(AgentStagingORM, staging_id)
     if record is None:
-        raise HTTPException(status_code=404, detail="Staging item not found")
+        raise HTTPException(status_code=404, detail="未找到暂存项")
     return record
 
 
 def insert_session(db: Session, *, project_id: str, title: str = "") -> ChatSessionORM:
-    """Create a session, auto-assigning an id; ``thread_id`` reuses the same id, one-to-one."""
+    """创建 session 并自动分配 ID；``thread_id`` 一对一复用同一个 ID。"""
     session_id = new_id()
     record = ChatSessionORM(
         id=session_id,
@@ -66,7 +64,7 @@ def insert_session(db: Session, *, project_id: str, title: str = "") -> ChatSess
 
 
 def list_project_sessions(db: Session, project_id: str) -> list[ChatSessionORM]:
-    """List sessions under a project, newest created first."""
+    """列出项目下的会话，最新创建的排在前面。"""
     return list(
         db.scalars(
             select(ChatSessionORM)
@@ -77,14 +75,14 @@ def list_project_sessions(db: Session, project_id: str) -> list[ChatSessionORM]:
 
 
 def delete_session(db: Session, session_id: str) -> None:
-    """Delete a session; messages / staging cascade via FK ondelete=CASCADE."""
+    """删除 session；messages / staging 通过 FK ondelete=CASCADE 级联删除。"""
     record = require_session(db, session_id)
     db.delete(record)
     db.flush()
 
 
 def rename_session(db: Session, session_id: str, title: str) -> ChatSessionORM:
-    """Update a session's title."""
+    """更新 session 标题。"""
     record = require_session(db, session_id)
     record.title = title
     db.flush()
@@ -92,7 +90,7 @@ def rename_session(db: Session, session_id: str, title: str) -> ChatSessionORM:
 
     
 def list_session_messages(db: Session, session_id: str) -> list[ChatMessageORM]:
-    """List session messages in chronological order."""
+    """按时间顺序列出会话消息。"""
     return list(
         db.scalars(
             select(ChatMessageORM)
@@ -110,7 +108,7 @@ def append_message(
     content: str,
     meta: dict[str, Any] | None = None,
 ) -> ChatMessageORM:
-    """Append a message without modifying existing records."""
+    """追加消息，不修改已有记录。"""
     record = ChatMessageORM(
         id=new_id(),
         session_id=session_id,
@@ -132,7 +130,7 @@ def insert_staging_batch(
     agent_type: str,
     items: list[AgentStagingCreateItem],
 ) -> tuple[str, list[AgentStagingORM]]:
-    """Persist multiple changes from the same Agent turn into the staging table, sharing one batch_id."""
+    """将同一 Agent 回合的多项变更写入 staging 表，并共享一个 batch_id。"""
     batch_id = new_id()
     records: list[AgentStagingORM] = []
     for index, item in enumerate(items):
@@ -163,7 +161,7 @@ def list_staging_by_session(
     session_id: str,
     status: str | None = None,
 ) -> list[AgentStagingORM]:
-    """List staging by session, optionally filtered by status; ordered by batch creation time + order within batch."""
+    """按会话列出暂存项，可按状态过滤；按批次创建时间 + 批次内顺序排序。"""
     stmt = (
         select(AgentStagingORM)
         .where(AgentStagingORM.session_id == session_id)
@@ -179,7 +177,7 @@ def list_staging_by_project(
     project_id: str,
     status: str | None = None,
 ) -> list[AgentStagingORM]:
-    """List staging by project (first_revision phase 4: ChatWorkspace cross-session pending-review aggregation)."""
+    """按项目列出暂存项（first_revision 第 4 阶段：ChatWorkspace 跨会话待审核聚合）。"""
     stmt = (
         select(AgentStagingORM)
         .where(AgentStagingORM.project_id == project_id)
@@ -191,7 +189,7 @@ def list_staging_by_project(
 
 
 def list_staging_by_batch(db: Session, batch_id: str) -> list[AgentStagingORM]:
-    """Read all changes for a given batch, returned in order within the batch."""
+    """读取指定批次的所有变更，并按批次内顺序返回。"""
     return list(
         db.scalars(
             select(AgentStagingORM)
@@ -207,11 +205,11 @@ def transition_staging(
     new_status: str,
     payload_edited: dict[str, Any] | None = None,
 ) -> None:
-    """State machine transition; only transitions out of pending are allowed, operating again on a resolved record returns 409."""
+    """状态机转移；只允许从 pending 转出，重复操作已处理记录会返回 409。"""
     if record.status != "pending":
         raise HTTPException(
             status_code=409,
-            detail=f"Staging item already resolved (status={record.status})",
+            detail=f"暂存项已处理（status={record.status}）",
         )
     record.status = new_status
     record.resolved_at = datetime.now(timezone.utc)
@@ -226,13 +224,11 @@ def update_session_summary(
     key_facts: list[str],
     message_count: int,
 ) -> None:
-    """Write back the conversation summary + core facts layer + high-water mark; silently skips if it does not exist.
+    """写回对话摘要、核心事实层与高水位标记；记录不存在时静默跳过。
 
-    key_facts is designed as a "cumulative merge": new facts are deduplicated
-    against the old ones and appended, so key settings accumulated early are not
-    overwritten by this round. Duplicate facts are roughly detected
-    case-insensitively + whitespace-stripped, so the LLM's likely repeated
-    phrasings get absorbed.
+    key_facts 设计为“累积合并”：新事实会与旧事实去重后追加，因此早期积累的关键设定
+    不会被本轮覆盖。重复事实用忽略大小写 + 去空白的粗略方式检测，以吸收 LLM 可能
+    反复表达的内容。
     """
     record = db.get(ChatSessionORM, session_id)
     if record is None:

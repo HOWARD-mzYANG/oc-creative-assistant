@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-/** Worldbuilding center view: folder notes or hierarchy tree canvas. */
+/** 世界观 center view: folder notes or hierarchy tree canvas. */
 export const useWorldViewStore = defineStore('worldView', {
   state: () => ({
     mode: 'notes' as 'notes' | 'canvas',

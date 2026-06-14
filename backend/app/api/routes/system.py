@@ -20,7 +20,7 @@ _BOOT_ID = uuid.uuid4().hex
 
 @router.get("/")
 async def root() -> dict[str, str]:
-    """Return the backend root route health message."""
+    """返回 backend root route health message."""
     return {"message": "OC Creative Assistant backend is running"}
 
 

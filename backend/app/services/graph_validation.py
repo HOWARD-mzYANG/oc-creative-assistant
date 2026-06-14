@@ -16,11 +16,11 @@ from app.schemas import EdgePayload, NodePayload
 def validate_edges_against_payload_nodes(nodes: list[NodePayload], edges: list[EdgePayload]) -> None:
     """Validate that edges in a full graph snapshot only reference nodes from this submission.
 
-    Args:
+    参数：
         nodes: The complete list of nodes submitted in this save.
         edges: The complete list of edges submitted in this save.
 
-    Raises:
+    抛出：
         HTTPException: Raised when any edge references a node outside the current
             graph.
     """
@@ -45,13 +45,13 @@ def validate_edge_endpoints_in_project(
 ) -> None:
     """Validate that both endpoints of a single edge belong to the same project.
 
-    Args:
+    参数：
         session: The current database session.
         project_id: The ID of the project the edge belongs to.
         source: The source node ID.
         target: The target node ID.
 
-    Raises:
+    抛出：
         HTTPException: Raised when an endpoint is missing or does not belong to the
             current project.
     """

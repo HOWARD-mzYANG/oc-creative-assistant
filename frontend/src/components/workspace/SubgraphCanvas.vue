@@ -113,12 +113,12 @@ const { handleGlobalKeydown } = useGraphMutations({
 })
 
 const TYPE_LABEL_EN: Record<string, string> = {
-  character: 'Character',
-  worldbuilding: 'Worldbuilding',
-  plot: 'Story node',
+  character: '角色',
+  worldbuilding: '世界观',
+  plot: '故事节点',
   idea: 'Idea',
-  research: 'Research',
-  structure: 'Structure',
+  research: '资料',
+  structure: '结构',
 }
 const createButtons = computed(() =>
   props.createTypes.map((type) => ({
@@ -260,7 +260,7 @@ watch(
               class="toolbar-save-dot"
               :class="{ 'is-saving': isSaving, 'is-error': saveState.includes('failed') }"
             ></span>
-            {{ isSaving ? 'Saving…' : saveState }}
+            {{ isSaving ? '保存中…' : saveState }}
           </span>
         </template>
       </CanvasWorkspace>

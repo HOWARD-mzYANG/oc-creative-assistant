@@ -24,7 +24,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       projects.value = await listProjects()
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load project list'
+      error.value = e instanceof Error ? e.message : '项目列表加载失败'
       projects.value = []
     } finally {
       isLoading.value = false

@@ -1,15 +1,12 @@
-"""LangGraph StateGraph assembly.
+"""LangGraph StateGraph 组装。
 
-Wires AgentState, nodes, and routing rules into one executable graph; binds the
-SqliteSaver at compile time so multiple calls with the same thread_id can
-inherit the previously saved intermediate state.
+把 AgentState、节点和路由规则连接成一个可执行图；在 compile 阶段绑定
+SqliteSaver，使同一 thread_id 的多次调用可以继承此前保存的中间状态。
 
-Two routing stages follow intent_router:
-- Stage 1 ``_route_after_intent``: small_talk goes straight to chat_assembler,
-  hitting neither chroma nor any agent; the other four substantive intents
-  enter the full retrieval + agent pipeline
-- Stage 2 ``_route_to_agent``: after context_compress, dispatch precisely to the
-  matching agent by intent
+intent_router 之后有两段路由：
+- 第 1 段 ``_route_after_intent``：small_talk 直接进入 chat_assembler，
+  不触碰 chroma 或任何 agent；另外四类实质性意图进入完整的检索 + agent 流水线
+- 第 2 段 ``_route_to_agent``：context_compress 之后，根据 intent 精确分发到匹配 agent
 
 START → load_context → intent_router
                             │
@@ -71,20 +68,18 @@ _AGENT_NODE_BY_INTENT: dict[str, str] = {
     "structure": "structure_agent",
     "simulation": "simulation_agent",
 }
-"""Only the four "substantive" intents are mapped here; small_talk is already
-intercepted in _route_after_intent and never reaches this routing layer, so it
-is no longer included in the table."""
+"""这里只映射四类“实质性”意图；small_talk 已在 _route_after_intent 被拦截，
+不会到达这一层路由，因此不再放入表中。"""
 
 _AGENT_NODES: tuple[str, ...] = tuple(_AGENT_NODE_BY_INTENT.values())
 
 
 def _route_after_intent(state: AgentState) -> str:
-    """First routing after intent_router: small_talk skips retrieval / agent.
+    """intent_router 之后的第一段路由：small_talk 跳过检索 / agent。
 
-    A missing intent also falls back to small_talk, so chit-chat replies never
-    hit chroma anywhere in the graph. Either path first passes through
-    question_planner (which is a no-op when the gate is off), then enters
-    chat_assembler.
+    缺失 intent 时也回退到 small_talk，因此闲聊回复在图中任何位置都不会命中
+    chroma。任一路径都会先经过 question_planner（开关关闭时为空操作），
+    然后进入 chat_assembler。
     """
     intent = state.get("intent")
     if intent is None or intent.primary == "small_talk":
@@ -93,12 +88,11 @@ def _route_after_intent(state: AgentState) -> str:
 
 
 def _route_to_agent(state: AgentState) -> str:
-    """Second routing after context_compress: dispatch to a concrete agent by intent.primary.
+    """context_compress 之后的第二段路由：按 intent.primary 分发到具体 agent。
 
-    By the time we reach this layer, intent is guaranteed to be one of the four
-    substantive intents (small_talk was intercepted upstream); if the LLM
-    occasionally returns a new, unregistered primary, fall back to
-    inspiration_agent so the graph does not crash.
+    到达这一层时，intent 保证是四类实质性意图之一（small_talk 已在上游拦截）；
+    如果 LLM 偶尔返回新的、未注册的 primary，则回退到 inspiration_agent，
+    避免图崩溃。
     """
     intent = state["intent"]
     return _AGENT_NODE_BY_INTENT.get(intent.primary, "inspiration_agent")
@@ -116,9 +110,8 @@ def _build_graph() -> StateGraph:
     builder.add_node("structure_agent", structure_agent_node)
     builder.add_node("simulation_agent", simulation_agent_node)
     builder.add_node("boundary_check", boundary_check_node)
-    # Background B-agents (first_revision decision 5): question_planner plans
-    # follow-up questions before assembly, structured_extractor extracts
-    # entities after persistence; both are no-ops when extraction_enabled is off.
+    # 后台 B-agents（first_revision 决策 5）：question_planner 在组装前规划追问，
+    # structured_extractor 在持久化后抽取实体；extraction_enabled 关闭时二者都是空操作。
     builder.add_node("question_planner", question_planner_node)
     builder.add_node("chat_assembler", chat_assembler_node)
     builder.add_node("persistence_hub", persistence_hub_node)
@@ -128,7 +121,7 @@ def _build_graph() -> StateGraph:
     builder.add_edge(START, "load_context")
     builder.add_edge("load_context", "intent_router")
 
-    # Stage 1 routing: small_talk skips retrieval / agent, but still passes through question_planner first
+    # 第 1 段路由：small_talk 跳过检索 / agent，但仍会先经过 question_planner。
     builder.add_conditional_edges(
         "intent_router",
         _route_after_intent,
@@ -140,7 +133,7 @@ def _build_graph() -> StateGraph:
 
     builder.add_edge("parallel_retrieval", "context_compress")
 
-    # Stage 2 routing: each of the four substantive intents goes to its own agent
+    # 第 2 段路由：四类实质性意图分别进入各自的 agent。
     builder.add_conditional_edges(
         "context_compress",
         _route_to_agent,
@@ -150,11 +143,11 @@ def _build_graph() -> StateGraph:
     for agent in _AGENT_NODES:
         builder.add_edge(agent, "boundary_check")
 
-    # Substantive intents: boundary_check → question_planner → chat_assembler
+    # 实质性意图：boundary_check -> question_planner -> chat_assembler。
     builder.add_edge("boundary_check", "question_planner")
     builder.add_edge("question_planner", "chat_assembler")
     builder.add_edge("chat_assembler", "persistence_hub")
-    # Extract in the background after persistence (without blocking the already-streamed reply), then compress the summary.
+    # 持久化后在后台抽取（不阻塞已经流式返回的回复），然后压缩摘要。
     builder.add_edge("persistence_hub", "structured_extractor")
     builder.add_edge("structured_extractor", "summary_compress")
     builder.add_edge("summary_compress", END)
@@ -164,5 +157,5 @@ def _build_graph() -> StateGraph:
 
 @lru_cache(maxsize=1)
 def get_agent_graph():
-    """Singleton compiled graph to avoid rebuilding on each call; the checkpointer is bound at compile time."""
+    """单例编译图，避免每次调用都重建；checkpointer 在 compile 阶段绑定。"""
     return _build_graph().compile(checkpointer=get_checkpointer())

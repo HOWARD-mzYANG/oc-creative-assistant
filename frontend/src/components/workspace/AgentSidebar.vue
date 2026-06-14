@@ -4,11 +4,10 @@ import EdgeDetailPanel from './EdgeDetailPanel.vue'
 import NodeDetailPanel from './NodeDetailPanel.vue'
 
 /**
- * Thin routing container for the right-hand detail panel.
+ * 右侧详情面板的轻量路由容器。
  *
- * Mounts NodeDetailPanel when a node is selected; EdgeDetailPanel when an edge
- * is selected; otherwise shows an empty state. All edit events are re-emitted
- * as-is, and the actual persistence is handled by the parent AppShell.
+ * 选中节点时挂载 NodeDetailPanel，选中边时挂载 EdgeDetailPanel；未选中时显示空状态。
+ * 所有编辑事件会原样向外转发，实际持久化由父级 AppShell 处理。
  */
 defineProps<{
   selectedNode: CreativeFlowNode | null
@@ -16,12 +15,28 @@ defineProps<{
   nodes: CreativeFlowNode[]
 }>()
 
-defineEmits<{
-  nodeUpdated: [node: CreativeFlowNode]
-  nodeDeleted: [nodeId: string]
-  edgeUpdated: [edge: CreativeFlowEdge]
-  edgeDeleted: [edgeId: string]
+const emit = defineEmits<{
+  'node-updated': [node: CreativeFlowNode]
+  'node-deleted': [nodeId: string]
+  'edge-updated': [edge: CreativeFlowEdge]
+  'edge-deleted': [edgeId: string]
 }>()
+
+function forwardNodeUpdated(node: CreativeFlowNode) {
+  emit('node-updated', node)
+}
+
+function forwardNodeDeleted(nodeId: string) {
+  emit('node-deleted', nodeId)
+}
+
+function forwardEdgeUpdated(edge: CreativeFlowEdge) {
+  emit('edge-updated', edge)
+}
+
+function forwardEdgeDeleted(edgeId: string) {
+  emit('edge-deleted', edgeId)
+}
 </script>
 
 <template>
@@ -29,21 +44,21 @@ defineEmits<{
     <NodeDetailPanel
       v-if="selectedNode"
       :selected-node="selectedNode"
-      @node-updated="(node) => $emit('nodeUpdated', node)"
-      @node-deleted="(id) => $emit('nodeDeleted', id)"
+      @node-updated="forwardNodeUpdated"
+      @node-deleted="forwardNodeDeleted"
     />
 
     <EdgeDetailPanel
       v-else-if="selectedEdge"
       :selected-edge="selectedEdge"
       :nodes="nodes"
-      @edge-updated="(edge) => $emit('edgeUpdated', edge)"
-      @edge-deleted="(id) => $emit('edgeDeleted', id)"
+      @edge-updated="forwardEdgeUpdated"
+      @edge-deleted="forwardEdgeDeleted"
     />
 
     <section v-else class="empty-state">
-      <p>Nothing selected</p>
-      <span>Select a node to edit its content, or select an edge to edit its relation label.</span>
+      <p>未选择内容</p>
+      <span>选择一个节点来编辑内容，或选择一条边来编辑关系标签。</span>
     </section>
   </aside>
 </template>

@@ -1,10 +1,9 @@
-"""Prompt loader.
+"""Prompt 加载器。
 
-Reads .md files from the prompts directory by `name + version` with an LRU cache;
-fully decouples prompts from the Python code, so changing text needs no logic
-changes and makes future versioned rollouts easy.
+按 `name + version` 从 prompts 目录读取 .md 文件，并用 LRU 缓存结果。
+这样 prompt 文本与 Python 逻辑解耦，后续改文案或灰度版本时不需要改业务代码。
 
-File naming convention: ``{name}.{version}.md`` (e.g. ``structure.v1.md``).
+文件命名约定：``{name}.{version}.md``，例如 ``structure.v1.md``。
 """
 
 from __future__ import annotations
@@ -27,17 +26,17 @@ DEFAULT_VERSIONS: dict[str, str] = {
     "chat_assembler_metadata": "v1",
     "summary_compress": "v1",
 }
-"""The currently active version of each prompt; change here for staged rollouts."""
+"""各 prompt 当前启用的版本；需要灰度发布时在这里切换。"""
 
 
 @lru_cache(maxsize=None)
 def load_prompt(name: str, version: str | None = None) -> str:
-    """Read and cache prompt text; a missing file raises FileNotFoundError directly so it surfaces at startup."""
+    """读取并缓存 prompt 文本；文件缺失时直接抛出 FileNotFoundError，便于启动阶段暴露问题。"""
     actual_version = version or DEFAULT_VERSIONS.get(name, "v1")
     path = PROMPTS_DIR / f"{name}.{actual_version}.md"
     return path.read_text(encoding="utf-8").strip()
 
 
 def get_prompt_version(name: str) -> str:
-    """For instrumentation / debug logs, to know which prompt version is in use."""
+    """返回当前使用的 prompt 版本，供埋点和调试日志使用。"""
     return DEFAULT_VERSIONS.get(name, "v1")

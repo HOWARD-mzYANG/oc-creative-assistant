@@ -38,7 +38,7 @@ _ALLOWED_MSGPACK_MODULES: list[tuple[str, str]] = [
 
 @lru_cache(maxsize=1)
 def get_checkpointer() -> SqliteSaver:
-    """Return the LangGraph Checkpointer singleton."""
+    """返回 LangGraph Checkpointer singleton."""
     from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
     settings = get_agent_settings()

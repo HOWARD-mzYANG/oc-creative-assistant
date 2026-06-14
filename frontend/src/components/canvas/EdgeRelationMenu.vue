@@ -23,7 +23,7 @@ const emit = defineEmits<{
       :style="{ left: `${x}px`, top: `${y}px` }"
       @contextmenu.prevent
     >
-      <p class="edge-relation-menu__title">Relation type</p>
+      <p class="edge-relation-menu__title">关系类型</p>
       <button
         v-for="option in RELATION_TYPE_OPTIONS"
         :key="option.value"

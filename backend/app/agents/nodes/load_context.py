@@ -1,11 +1,8 @@
-"""Read session metadata + recent messages + current nodes, writing the memory and context fields of AgentState.
+"""读取会话元数据、最近消息和当前节点，并写入 AgentState 的记忆与上下文字段。
 
-This node is the graph's "entry loader"; subsequent RAG / agent nodes all
-depend on the snapshot it writes. ``world_brief`` comes from the project-level
-ProjectORM, letting multi-turn conversations share one worldbuilding context;
-``recent_message_window`` works together with the summary_compress node's
-``keep_recent`` to jointly decide which messages are "fed verbatim" and which
-enter the summary.
+该节点是图的“入口加载器”；后续 RAG / agent 节点都依赖它写入的快照。``world_brief``
+来自项目级 ProjectORM，使多轮对话共享同一份世界观上下文；``recent_message_window`` 与
+summary_compress 节点的 ``keep_recent`` 协同决定哪些消息“原样喂入”，哪些进入摘要。
 """
 
 from __future__ import annotations
@@ -22,11 +19,10 @@ from app.indexing.document_loader import node_to_current_payload
 
 
 def _empty_context() -> dict[str, Any]:
-    """Return a zeroing delta for all AgentState fields that "may linger across turns".
+    """为所有“可能跨轮残留”的 AgentState 字段返回清零 delta。
 
-    Both return paths (session missing / normal load) start from these zero
-    values, preventing the previous turn's *_output or boundary_warnings from
-    contaminating this turn's assembler input when LangGraph reuses a checkpoint.
+    两条返回路径（session 缺失 / 正常加载）都从这些零值开始，避免 LangGraph 复用 checkpoint
+    时上一轮的 *_output 或 boundary_warnings 污染本轮 assembler 输入。
     """
     return {
         "world_brief": "",
@@ -53,7 +49,7 @@ def _empty_context() -> dict[str, Any]:
 
 
 def load_context_node(state: AgentState) -> dict[str, Any]:
-    """Pull context from SQLite; return an empty skeleton when the session is missing or not provided."""
+    """从 SQLite 拉取上下文；session 缺失或未提供时返回空骨架。"""
     session_id = state.get("session_id", "")
     selected_ids = state.get("selected_node_ids") or []
 
@@ -70,7 +66,7 @@ def load_context_node(state: AgentState) -> dict[str, Any]:
         project = db.get(ProjectORM, session.project_id)
         world_brief = project.world_brief if project is not None else ""
 
-        # Latest project seed (decision 4): a low-cost full-project snapshot injected at startup.
+        # 最新项目 seed（决策 4）：启动时注入的低成本全项目快照。
         latest_seed = (
             db.query(ProjectSeedORM)
             .filter(ProjectSeedORM.project_id == session.project_id)
@@ -87,7 +83,7 @@ def load_context_node(state: AgentState) -> dict[str, Any]:
                 .limit(window)
             )
         )
-        # SQL fetches in descending order for LIMIT; flip back to chronological order to feed the prompt
+        # SQL 为了 LIMIT 按倒序取数；喂给 prompt 前再翻回时间正序。
         recent.reverse()
 
         current_node_payloads: list[Any] = []

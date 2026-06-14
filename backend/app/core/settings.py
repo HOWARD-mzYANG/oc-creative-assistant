@@ -1,8 +1,7 @@
-"""Application runtime configuration.
+"""应用运行时配置。
 
-Centralizes reading of .env / environment variables, avoiding having business
-modules depend directly on os.getenv, making it easier to switch to
-pydantic-settings or inject test configuration in the future.
+集中读取 .env / 环境变量，避免业务模块直接依赖 os.getenv，便于后续切换到
+pydantic-settings 或注入测试配置。
 """
 
 from __future__ import annotations
@@ -17,11 +16,10 @@ from app.core.paths import BACKEND_ROOT, DATA_DIR
 
 
 def _load_env() -> None:
-    """Load backend/.env into the current process's environment variables.
+    """将 backend/.env 加载到当前进程环境变量中。
 
-    Runs only once at module import; silently skips when .env does not exist, so
-    that environments without a .env (such as CI) can still start up (falling back
-    to placeholder embeddings in that case).
+    模块导入时只运行一次；.env 不存在时静默跳过，使没有 .env 的环境（如 CI）仍可启动
+    （此时会回退到占位 embedding）。
     """
     env_path: Path = BACKEND_ROOT / ".env"
     load_dotenv(env_path, override=False)
@@ -31,7 +29,7 @@ _load_env()
 
 
 def _get_bool(name: str, default: bool = False) -> bool:
-    """Read a boolean environment variable, treating 1/true/yes as True."""
+    """读取布尔环境变量，将 1/true/yes/on 视为 True。"""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -50,7 +48,7 @@ def _get_int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class EmbeddingSettings:
-    """Embedding service configuration."""
+    """Embedding 服务配置。"""
 
     base_url: str | None
     api_key: str | None
@@ -59,13 +57,13 @@ class EmbeddingSettings:
 
     @property
     def is_configured(self) -> bool:
-        """Determine whether the minimum configuration to call a real embedding service is present."""
+        """判断调用真实 embedding 服务所需的最低配置是否存在。"""
         return bool(self.base_url and self.api_key and self.model)
 
 
 @dataclass(frozen=True)
 class IndexingSettings:
-    """Index debugging-related switches."""
+    """索引调试相关开关。"""
 
     debug_log: bool
 
@@ -85,11 +83,10 @@ def get_indexing_settings() -> IndexingSettings:
 
 @dataclass(frozen=True)
 class LlmSettings:
-    """Chat LLM service configuration.
+    """聊天 LLM 服务配置。
 
-    ``provider`` determines the Strategy Pattern implementation choice: ``openai``
-    uses a real OpenAI-compatible protocol (DeepSeek/Tongyi/official OpenAI),
-    ``mock`` uses a local deterministic stub for offline development and unit tests.
+    ``provider`` 决定策略模式的实现选择：``openai`` 使用真实 OpenAI 兼容协议
+    （DeepSeek / 通义 / 官方 OpenAI），``mock`` 使用本地确定性桩，供离线开发和单测使用。
     """
 
     provider: str
@@ -115,11 +112,10 @@ def get_llm_settings() -> LlmSettings:
 
 @dataclass(frozen=True)
 class WebSearchSettings:
-    """Web search tool configuration.
+    """联网搜索工具配置。
 
-    When api_key is left empty, the ``web_search`` tool directly returns a
-    degraded notice instead of erroring, ensuring offline development and CI/unit
-    tests without a configured key can still run the entire Agent pipeline.
+    api_key 为空时，``web_search`` 工具会直接返回降级提示而不是报错，确保未配置 key 的
+    离线开发和 CI/单测仍能跑完整 Agent 流水线。
     """
 
     provider: str
@@ -141,18 +137,16 @@ def get_web_search_settings() -> WebSearchSettings:
 
 @dataclass(frozen=True)
 class AgentSettings:
-    """Agent graph runtime configuration.
+    """Agent 图运行时配置。
 
-    ``checkpointer_db_path`` provides the persistence path for LangGraph's
-    SqliteSaver, kept separate from the business SQLite to avoid transaction
-    conflicts; ``context_token_cap`` controls the upper bound of retrieval context
-    injected into the conversation each turn, preventing long projects from
-    blowing the prompt past the LLM's window.
+    ``checkpointer_db_path`` 提供 LangGraph SqliteSaver 的持久化路径，并与业务 SQLite
+    分离以避免事务冲突；``context_token_cap`` 控制每轮注入对话的检索上下文上限，避免
+    长项目把 prompt 撑爆 LLM 窗口。
 
-    Multi-layer memory related:
-    - ``recent_message_window``: load_context takes the last N messages verbatim to feed the prompt
-    - ``summary_keep_recent``: how many messages to keep out of the summary during summary compression
-    - ``summary_compress_every``: how many more old messages must accumulate beyond the high-water mark before compression is triggered again
+    多层记忆相关：
+    - ``recent_message_window``：load_context 原样取最近 N 条消息喂给 prompt
+    - ``summary_keep_recent``：摘要压缩时保留多少条最新消息不纳入摘要
+    - ``summary_compress_every``：超过高水位后再积累多少条旧消息才再次触发压缩
     """
 
     checkpointer_db_path: Path
@@ -174,7 +168,7 @@ def get_agent_settings() -> AgentSettings:
 
 @dataclass(frozen=True)
 class AppSettings:
-    """Application-wide runtime switches."""
+    """应用级运行时开关。"""
 
     dev_mode: bool
 

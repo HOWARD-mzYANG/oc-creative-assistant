@@ -6,7 +6,7 @@ import { loadSubgraph } from '../api/graphApi'
 /**
  * Currently open sub-graph store (first_revision decision 6 / phase 3).
  *
- * Mainly serves the two Character-card routes (CharacterCardList ↔ CharacterCardDetail), letting them share the same
+ * Mainly serves the two 角色-card routes (CharacterCardList ↔ CharacterCardDetail), letting them share the same
  * sub-graph data and avoiding a second full fetch on the detail page. The Plot/World canvases use useGraphPersistence's
  * injected loading and do not depend on this store.
  */
@@ -28,7 +28,7 @@ export const useGraphStore = defineStore('graph', () => {
       nodes.value = graph.nodes
       edges.value = graph.edges
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load sub-graph'
+      error.value = e instanceof Error ? e.message : '子图加载失败'
       nodes.value = []
       edges.value = []
     } finally {
@@ -41,7 +41,7 @@ export const useGraphStore = defineStore('graph', () => {
     return nodes.value.find((node) => node.id === nodeId)
   }
 
-  /** Get a node's outgoing edges (Character relations, shown as labels rather than drawn lines). */
+  /** Get a node's outgoing edges (角色 relations, shown as labels rather than drawn lines). */
   function outgoingEdges(nodeId: string): GraphEdgeDto[] {
     return edges.value.filter((edge) => edge.source === nodeId)
   }
