@@ -59,13 +59,14 @@ from app.services.graph_seed import (
 from app.services.graph_validation import validate_edge_endpoints_in_project
 
 
-_HAN_RE = re.compile(r"[\u4e00-\u9fff]")
+_LATIN_RE = re.compile(r"[A-Za-z]")
 _LEGACY_DEFAULT_PROJECT_NAMES = frozenset(
     {
         "《咒术回战》涉谷站线",
         "咒术回战：涉谷站线",
         "Jujutsu Kaisen: The Shibuya Station Line",
         "Jujutsu Kaisen - Shibuya Station Line",
+        "Hogwarts: The Final Siege",
     }
 )
 _LEGACY_DEMO_NODE_IDS = frozenset(
@@ -86,18 +87,18 @@ _DEFAULT_SEED_NODES_BY_ID = {node.id: node for node in DEFAULT_NODES}
 _DEFAULT_SEED_EDGES_BY_ID = {edge.id: edge for edge in DEFAULT_EDGES}
 
 
-def _contains_han(text: str | None) -> bool:
-    return bool(text and _HAN_RE.search(text))
+def _contains_latin(text: str | None) -> bool:
+    return bool(text and _LATIN_RE.search(text))
 
 
 def _node_needs_locale_resync(node: NodeORM) -> bool:
-    if _contains_han(node.title) or _contains_han(node.content) or _contains_han(node.type_label):
+    if _contains_latin(node.title) or _contains_latin(node.content) or _contains_latin(node.type_label):
         return True
-    return any(_contains_han(tag) for tag in db_tags_to_api(node.meta))
+    return any(_contains_latin(tag) for tag in db_tags_to_api(node.meta))
 
 
 def _should_resync_default_locale(session, project_id: str) -> bool:
-    """当内置演示图仍使用旧中文本地化内容时，重新写入 seed。"""
+    """当内置演示图仍使用旧英文内容时，重新写入中文 seed。"""
     project = session.get(ProjectORM, project_id)
     if project is not None and project.name in _LEGACY_DEFAULT_PROJECT_NAMES:
         return True
@@ -106,7 +107,7 @@ def _should_resync_default_locale(session, project_id: str) -> bool:
     if not nodes:
         return False
 
-    if project is not None and _contains_han(project.name):
+    if project is not None and _contains_latin(project.name):
         return True
 
     for node in nodes:
@@ -114,7 +115,7 @@ def _should_resync_default_locale(session, project_id: str) -> bool:
             return True
 
     for edge in read_ordered_edges(session, project_id):
-        if edge.id in _DEFAULT_SEED_EDGES_BY_ID and _contains_han(edge.label):
+        if edge.id in _DEFAULT_SEED_EDGES_BY_ID and _contains_latin(edge.label):
             return True
 
     return False
@@ -125,7 +126,7 @@ def _patch_legacy_seed_content(session, project_id: str) -> bool:
     changed = False
     project = session.get(ProjectORM, project_id)
     if project is not None and (
-        project.name in _LEGACY_DEFAULT_PROJECT_NAMES or _contains_han(project.name)
+        project.name in _LEGACY_DEFAULT_PROJECT_NAMES or _contains_latin(project.name)
     ):
         project.name = DEFAULT_PROJECT_NAME
         project.description = DEFAULT_PROJECT_DESCRIPTION
@@ -149,9 +150,9 @@ def _patch_legacy_seed_content(session, project_id: str) -> bool:
 
     for edge in read_ordered_edges(session, project_id):
         seed = _DEFAULT_SEED_EDGES_BY_ID.get(edge.id)
-        if seed is None or not _contains_han(edge.label):
+        if seed is None or not _contains_latin(edge.label):
             continue
-        edge.label = seed.label or "related"
+        edge.label = seed.label or "相关"
         edge.relation_type = seed.relationType
         changed = True
 
