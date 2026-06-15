@@ -4,8 +4,8 @@
 ``app.agents.schemas``；如果后续 LLM 输出协议需要从
 function_calling 切回 json_schema，也只需改动一处。
 
-每个 agent 输出都要求携带 ``reasoning`` 字段：它既是显式 CoT 的落点，
-也方便用户在 UI 中看到“为什么提出这个建议”，并与 staging 表中的
+每个 agent 输出都要求携带 ``reasoning`` 字段：它是简短推理摘要的落点，
+方便用户在 UI 中看到“为什么提出这个建议”，并与 staging 表中的
 ``reason`` 字段相呼应。
 """
 

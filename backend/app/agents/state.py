@@ -68,7 +68,9 @@ class AgentState(TypedDict, total=False):
     web_search_mode: str
     seed_context: str
     next_question_hint: str
+    question_planner_reasoning: str
     deferred_fields: list[dict]
     extraction_batch_id: str | None
     extraction_count: int
+    extraction_reasoning: str
     extraction_applied: list[dict]

@@ -60,4 +60,7 @@ def question_planner_node(state: AgentState) -> dict[str, Any]:
     if out is None:
         return {}
 
-    return {"next_question_hint": out.next_question}
+    return {
+        "next_question_hint": out.next_question,
+        "question_planner_reasoning": out.reasoning,
+    }

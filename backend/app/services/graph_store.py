@@ -4,8 +4,6 @@
 可重建的向量索引。它不直接处理 HTTP 请求，也不决定 RAG prompt 或检索策略。
 """
 
-import re
-
 from fastapi import HTTPException
 
 from app.db.database import SessionLocal, _ensure_subgraph_backfill
@@ -48,6 +46,7 @@ from app.services.graph_repository import (
     replace_subgraph,
     require_graph,
     require_project,
+    resolve_graph_id_for_node_type,
 )
 from app.services.graph_seed import (
     DEFAULT_EDGES,
@@ -57,106 +56,6 @@ from app.services.graph_seed import (
     DEFAULT_PROJECT_NAME,
 )
 from app.services.graph_validation import validate_edge_endpoints_in_project
-
-
-_LATIN_RE = re.compile(r"[A-Za-z]")
-_LEGACY_DEFAULT_PROJECT_NAMES = frozenset(
-    {
-        "《咒术回战》涉谷站线",
-        "咒术回战：涉谷站线",
-        "Jujutsu Kaisen: The Shibuya Station Line",
-        "Jujutsu Kaisen - Shibuya Station Line",
-        "Hogwarts: The Final Siege",
-    }
-)
-_LEGACY_DEMO_NODE_IDS = frozenset(
-    {
-        "char-yuji-ticket",
-        "char-gojo-stationmaster",
-        "char-nobara-lostfound",
-        "world-cursed-station",
-        "world-ticket-curse",
-        "world-announcement",
-        "plot-last-train",
-        "plot-ticket-awakening",
-        "plot-final-transfer",
-    }
-)
-_DEFAULT_SEED_NODE_IDS = frozenset(node.id for node in DEFAULT_NODES)
-_DEFAULT_SEED_NODES_BY_ID = {node.id: node for node in DEFAULT_NODES}
-_DEFAULT_SEED_EDGES_BY_ID = {edge.id: edge for edge in DEFAULT_EDGES}
-
-
-def _contains_latin(text: str | None) -> bool:
-    return bool(text and _LATIN_RE.search(text))
-
-
-def _node_needs_locale_resync(node: NodeORM) -> bool:
-    if _contains_latin(node.title) or _contains_latin(node.content) or _contains_latin(node.type_label):
-        return True
-    return any(_contains_latin(tag) for tag in db_tags_to_api(node.meta))
-
-
-def _should_resync_default_locale(session, project_id: str) -> bool:
-    """当内置演示图仍使用旧英文内容时，重新写入中文 seed。"""
-    project = session.get(ProjectORM, project_id)
-    if project is not None and project.name in _LEGACY_DEFAULT_PROJECT_NAMES:
-        return True
-
-    nodes = read_ordered_nodes(session, project_id)
-    if not nodes:
-        return False
-
-    if project is not None and _contains_latin(project.name):
-        return True
-
-    for node in nodes:
-        if node.id in _DEFAULT_SEED_NODE_IDS and _node_needs_locale_resync(node):
-            return True
-
-    for edge in read_ordered_edges(session, project_id):
-        if edge.id in _DEFAULT_SEED_EDGES_BY_ID and _contains_latin(edge.label):
-            return True
-
-    return False
-
-
-def _patch_legacy_seed_content(session, project_id: str) -> bool:
-    """将已知演示节点/边升级到当前 seed，同时不清除用户新增内容。"""
-    changed = False
-    project = session.get(ProjectORM, project_id)
-    if project is not None and (
-        project.name in _LEGACY_DEFAULT_PROJECT_NAMES or _contains_latin(project.name)
-    ):
-        project.name = DEFAULT_PROJECT_NAME
-        project.description = DEFAULT_PROJECT_DESCRIPTION
-        changed = True
-
-    for node in read_ordered_nodes(session, project_id):
-        seed = _DEFAULT_SEED_NODES_BY_ID.get(node.id)
-        if seed is None or not _node_needs_locale_resync(node):
-            continue
-        node.title = seed.title
-        node.content = seed.content
-        node.node_type = seed.nodeType or seed.type
-        node.type_label = seed.typeLabel
-        node.meta = api_meta_to_db(
-            seed.meta,
-            seed.tags,
-            seed.status,
-            existing_meta=node.meta,
-        )
-        changed = True
-
-    for edge in read_ordered_edges(session, project_id):
-        seed = _DEFAULT_SEED_EDGES_BY_ID.get(edge.id)
-        if seed is None or not _contains_latin(edge.label):
-            continue
-        edge.label = seed.label or "相关"
-        edge.relation_type = seed.relationType
-        changed = True
-
-    return changed
 
 
 def _indexing_result_to_payload(result: IndexingSyncResult | None) -> IndexingStatusPayload:
@@ -184,8 +83,8 @@ def _indexing_result_to_payload(result: IndexingSyncResult | None) -> IndexingSt
 def ensure_default_project() -> ProjectPayload:
     """确保默认项目存在。
 
-    首次启动时写入默认项目和示例图；如果只有项目记录但没有节点，也会回填示例图，
-    修复半初始化状态。
+    首次启动时写入默认项目和示例图；如果只有项目记录但没有节点，也会回填示例图。
+    这里不再根据文本内容猜测旧 seed 版本，避免启动时误重写用户数据。
 
     返回：
         默认项目 DTO。
@@ -204,24 +103,13 @@ def ensure_default_project() -> ProjectPayload:
             replace_graph(session, DEFAULT_PROJECT_ID, DEFAULT_NODES, DEFAULT_EDGES)
             payload = project_to_payload(project)
         else:
-            has_nodes = read_ordered_nodes(session, DEFAULT_PROJECT_ID)
-            node_ids = {node.id for node in has_nodes}
-            if not has_nodes or node_ids == _LEGACY_DEMO_NODE_IDS:
+            if not read_ordered_nodes(session, DEFAULT_PROJECT_ID):
                 project.name = DEFAULT_PROJECT_NAME
                 project.description = DEFAULT_PROJECT_DESCRIPTION
                 replace_graph(session, DEFAULT_PROJECT_ID, DEFAULT_NODES, DEFAULT_EDGES)
-            elif node_ids == _DEFAULT_SEED_NODE_IDS and _should_resync_default_locale(
-                session, DEFAULT_PROJECT_ID
-            ):
-                project.name = DEFAULT_PROJECT_NAME
-                project.description = DEFAULT_PROJECT_DESCRIPTION
-                replace_graph(session, DEFAULT_PROJECT_ID, DEFAULT_NODES, DEFAULT_EDGES)
-            elif _patch_legacy_seed_content(session, DEFAULT_PROJECT_ID):
-                pass
             payload = project_to_payload(project)
 
-    # 默认项目的示例节点由 replace_graph 写入时没有 graph_id；这里复用迁移回填逻辑，
-    # 为它们创建三个子图并按类型分配，确保全新安装的默认项目也符合多子图架构。
+    # 兜底执行一次子图兼容回填：为旧项目创建三个子图，并修复缺失 graph_id 的节点。
     _ensure_subgraph_backfill()
     return payload
 
@@ -358,8 +246,15 @@ def create_node(project_id: str, node: NodePayload) -> NodePayload:
         HTTPException: Raised when the project does not exist.
     """
     with SessionLocal.begin() as session:
-        require_project(session, project_id)
-        session.merge(node_to_orm(project_id, node, sort_order=0))
+        project = require_project(session, project_id)
+        session.merge(
+            node_to_orm(
+                project_id,
+                node,
+                sort_order=0,
+                graph_id=resolve_graph_id_for_node_type(project, node.nodeType or node.type),
+            )
+        )
 
     latest_node = read_project_node(project_id, node.id)
 
@@ -384,7 +279,7 @@ def update_node(project_id: str, node_id: str, payload: UpdateNodeRequest) -> No
         HTTPException: Raised when the project or node does not exist.
     """
     with SessionLocal.begin() as session:
-        require_project(session, project_id)
+        project = require_project(session, project_id)
         node = session.get(NodeORM, node_id)
 
         if node is None or node.project_id != project_id:
@@ -407,6 +302,7 @@ def update_node(project_id: str, node_id: str, payload: UpdateNodeRequest) -> No
             node.type_label = payload.typeLabel
         if payload.nodeType is not None:
             node.node_type = payload.nodeType
+            node.graph_id = resolve_graph_id_for_node_type(project, node.node_type)
         if payload.tags is not None:
             node.meta = api_meta_to_db(
                 db_meta_to_api(node.meta),

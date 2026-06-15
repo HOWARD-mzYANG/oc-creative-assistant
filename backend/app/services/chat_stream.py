@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from app.agents.graph import get_agent_graph
+from app.agents.progress import NODE_LABELS
 from app.core.settings import get_app_settings
 from app.db.database import SessionLocal
 from app.db.models import NodeORM
@@ -30,22 +31,12 @@ logger = logging.getLogger(__name__)
 
 _PROD_ERROR_MESSAGE = "推理过程中出了点问题，请稍后再试"
 
-
-_NODE_LABELS: dict[str, str] = {
-    "load_context": "加载上下文",
-    "intent_router": "判断意图",
-    "parallel_retrieval": "检索知识库",
-    "context_compress": "压缩上下文",
-    "inspiration_agent": "发散创意",
-    "research_agent": "研究与核查",
-    "structure_agent": "整理结构",
-    "simulation_agent": "模拟分支",
-    "boundary_check": "边界检查",
-    "chat_assembler": "生成回复",
-    "persistence_hub": "持久化结果",
-    "structured_extractor": "提取实体",
-    "question_planner": "规划追问",
-    "summary_compress": "压缩对话摘要",
+_INTENT_LABELS: dict[str, str] = {
+    "inspiration": "灵感",
+    "research": "资料",
+    "structure": "结构",
+    "simulation": "模拟",
+    "small_talk": "对话",
 }
 
 
@@ -109,18 +100,115 @@ def _resolve_related_nodes(node_ids: list[str]) -> list[dict[str, str]]:
     ]
 
 
+def _clip(text: str, limit: int = 240) -> str:
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "..."
+
+
+def _reasoning_of(value: Any) -> str:
+    reasoning = getattr(value, "reasoning", "")
+    return reasoning if isinstance(reasoning, str) else str(reasoning or "")
+
+
+def _trace_event(node_name: str, title: str, content: str) -> dict[str, Any]:
+    return {
+        "type": "trace_item",
+        "node": node_name,
+        "title": title,
+        "content": _clip(content),
+    }
+
+
+def _build_trace_events(node_name: str, node_output: dict[str, Any]) -> list[dict[str, Any]]:
+    """把显式 reasoning 和确定性节点摘要转换为前端可展示的思考轨迹。"""
+    events: list[dict[str, Any]] = []
+
+    if node_name == "intent_router":
+        intent = node_output.get("intent")
+        if intent is not None:
+            primary = getattr(intent, "primary", "")
+            confidence = getattr(intent, "confidence", 0)
+            reasoning = _reasoning_of(intent)
+            content = f"{_INTENT_LABELS.get(primary, primary)} · 置信度 {confidence:.2f}"
+            if reasoning:
+                content += f"\n{reasoning}"
+            events.append(_trace_event(node_name, "意图判断", content))
+
+    elif node_name == "parallel_retrieval":
+        graph_count = len(node_output.get("graph_context") or [])
+        vector_count = len(node_output.get("vector_context") or [])
+        merged_count = len(node_output.get("merged_context") or [])
+        events.append(
+            _trace_event(
+                node_name,
+                "检索上下文",
+                f"图关系 {graph_count} 条，向量命中 {vector_count} 条，合并后 {merged_count} 条。",
+            )
+        )
+
+    elif node_name in {
+        "inspiration_agent",
+        "research_agent",
+        "structure_agent",
+        "simulation_agent",
+    }:
+        output_key = node_name.replace("_agent", "_output")
+        output = node_output.get(output_key)
+        reasoning = _reasoning_of(output)
+        if reasoning:
+            events.append(_trace_event(node_name, NODE_LABELS.get(node_name, node_name), reasoning))
+
+    elif node_name == "boundary_check":
+        warnings = node_output.get("boundary_warnings") or []
+        if warnings:
+            events.append(_trace_event(node_name, "边界检查", "\n".join(f"- {w}" for w in warnings)))
+
+    elif node_name == "question_planner":
+        hint = str(node_output.get("next_question_hint") or "").strip()
+        reasoning = str(node_output.get("question_planner_reasoning") or "").strip()
+        if hint or reasoning:
+            content = reasoning
+            if hint:
+                content = f"{content}\n下一步追问：{hint}" if content else f"下一步追问：{hint}"
+            events.append(_trace_event(node_name, "追问规划", content))
+
+    elif node_name == "persistence_hub":
+        count = int(node_output.get("staging_count") or 0)
+        if count:
+            events.append(_trace_event(node_name, "结果暂存", f"已生成 {count} 条待应用变更。"))
+
+    elif node_name == "structured_extractor":
+        count = int(node_output.get("extraction_count") or 0)
+        reasoning = str(node_output.get("extraction_reasoning") or "").strip()
+        if count or reasoning:
+            content = reasoning
+            if count:
+                content = f"{content}\n抽取到 {count} 条结构化变更。" if content else f"抽取到 {count} 条结构化变更。"
+            events.append(_trace_event(node_name, "后台抽取", content))
+
+    elif node_name == "summary_compress" and node_output.get("conversation_summary"):
+        facts = node_output.get("key_facts") or []
+        events.append(_trace_event(node_name, "对话摘要", f"已更新长期摘要，保留 {len(facts)} 条关键事实。"))
+
+    return events
+
+
 def _build_events(node_name: str, node_output: Any) -> list[dict[str, Any]]:
     """将节点输出转成 SSE 事件列表（主事件 + 关键节点附带的元数据事件）。"""
     events: list[dict[str, Any]] = [
         {
             "type": "node_end",
             "node": node_name,
-            "label": _NODE_LABELS.get(node_name, node_name),
+            "label": NODE_LABELS.get(node_name, node_name),
         }
     ]
 
     if not isinstance(node_output, dict):
         return events
+
+    events.extend(_build_trace_events(node_name, node_output))
 
     if node_name == "intent_router":
         intent = node_output.get("intent")
@@ -227,6 +315,8 @@ async def stream_chat_turn(payload: ChatRequest) -> AsyncIterator[str]:
             if mode == "custom":
                 # chat_assembler 通过 get_stream_writer 推送的 token 事件，原样传给前端。
                 if isinstance(payload, dict) and payload.get("type"):
+                    if payload.get("type") == "node_start" and isinstance(payload.get("node"), str):
+                        last_node = payload["node"]
                     yield _sse(payload)
                 continue
 

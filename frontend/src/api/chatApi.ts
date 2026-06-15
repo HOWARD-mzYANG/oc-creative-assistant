@@ -49,6 +49,12 @@ export interface ChatResponseDto {
   staging_summary: string
 }
 
+export interface AgentTraceItemDto {
+  node: string
+  title: string
+  content: string
+}
+
 /** Single staging item DTO; aligned with the backend AgentStagingPayload. */
 export interface AgentStagingItemDto {
   id: string
@@ -184,8 +190,12 @@ export async function resolveStagingBatch(
 
 /** SSE event types, aligned with the payload of the backend chat_stream._sse. */
 export type ChatStreamEvent =
+  | { type: 'node_start'; node: string; label: string }
   | { type: 'node_end'; node: string; label: string }
+  | { type: 'node_timing'; node: string; label: string; elapsed_ms: number }
+  | ({ type: 'trace_item' } & AgentTraceItemDto)
   | { type: 'intent'; primary: string; confidence: number }
+  | { type: 'reasoning_token'; text: string }
   | { type: 'reply_token'; text: string }
   | {
       type: 'reply_ready'

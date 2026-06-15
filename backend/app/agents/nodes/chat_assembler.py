@@ -139,13 +139,17 @@ def _stream_reply(messages: list[BaseMessage]) -> str:
         writer = None
 
     chunks: list[str] = []
-    for token in get_llm_provider().chat_stream(messages):
-        chunks.append(token)
+    for chunk in get_llm_provider().chat_stream_chunks(messages):
         if writer is not None:
             try:
-                writer({"type": "reply_token", "text": token})
+                if chunk.reasoning:
+                    writer({"type": "reasoning_token", "text": chunk.reasoning})
+                if chunk.text:
+                    writer({"type": "reply_token", "text": chunk.text})
             except Exception:
                 writer = None
+        if chunk.text:
+            chunks.append(chunk.text)
     return "".join(chunks)
 
 

@@ -11,7 +11,7 @@
 ``compact_history_for_structured`` 会把循环后的历史压平为纯 SystemMessage + HumanMessage
 序列，避免后续 ``with_structured_output`` 的 function_calling parser 把旧 tool_calls 当作
 “unknown tool”并抛 KeyError。工具结果按 token（不是字符）截断，因此 list_nodes 这类一次返回
-几十条 JSON 的工具不会被切掉关键内容；中间思考 CoT 对长度不那么敏感，仍按字符截断。
+几十条 JSON 的工具不会被切掉关键内容；中间说明对长度不那么敏感，仍按字符截断。
 """
 
 from __future__ import annotations
@@ -25,8 +25,10 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
+from langgraph.config import get_stream_writer
 
-from app.llm.provider import LlmProvider
+from app.core.settings import get_llm_settings
+from app.llm.provider import LlmProvider, extract_provider_reasoning
 
 
 MAX_TOOL_LOOPS = 3
@@ -54,9 +56,13 @@ def run_tool_loop(
     tool_by_name = {tool.name: tool for tool in tools}
     history: list[BaseMessage] = list(initial_messages)
     total_calls = 0
+    writer = _get_optional_stream_writer()
+    stream_reasoning = get_llm_settings().stream_reasoning
 
     for _ in range(MAX_TOOL_LOOPS):
         response = provider.chat_with_tools(history, tools)
+        if stream_reasoning:
+            _emit_provider_reasoning(writer, response)
         history.append(response)
 
         tool_calls = getattr(response, "tool_calls", None) or []
@@ -90,8 +96,27 @@ def run_tool_loop(
     return history
 
 
+def _get_optional_stream_writer():
+    try:
+        return get_stream_writer()
+    except Exception:
+        return None
+
+
+def _emit_provider_reasoning(writer, response: AIMessage) -> None:
+    if writer is None:
+        return
+    reasoning = extract_provider_reasoning(response)
+    if not reasoning:
+        return
+    try:
+        writer({"type": "reasoning_token", "text": reasoning})
+    except Exception:
+        pass
+
+
 def _truncate_chars(text: str, limit: int) -> str:
-    """按字符数截断，适合对长度不敏感的 CoT 中间思考。"""
+    """按字符数截断，适合对长度不敏感的中间说明。"""
     text = text.strip()
     if len(text) <= limit:
         return text

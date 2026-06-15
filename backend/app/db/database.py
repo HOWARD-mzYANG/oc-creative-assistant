@@ -159,10 +159,11 @@ _DEFAULT_SECTION = "plot"
 
 
 def _ensure_subgraph_backfill() -> None:
-    """为缺少子图的旧项目回填三个子图，并相应放置已有节点。
+    """为项目补齐三个子图，并相应放置缺少归属的节点。
 
-    幂等：只处理 ``plot_graph_id`` 仍为空的项目；已迁移项目会跳过。
-    迁移不会破坏旧数据，node / edge 记录保持原样，只新增 ``graph_id`` 维度。
+    幂等：旧项目会创建 plot / character / world 三个子图；已经有子图的项目会继续检查
+    节点 ``graph_id`` 是否缺失。这样可以修复默认图被项目级 ``replace_graph`` 重写后，
+    节点存在但三个子图页面为空的问题。
     """
     import uuid
 
@@ -171,20 +172,39 @@ def _ensure_subgraph_backfill() -> None:
     with SessionLocal.begin() as session:
         projects = session.query(ProjectORM).all()
         for project in projects:
-            if project.plot_graph_id:
-                continue  # 已迁移。
-
             graph_ids: dict[str, str] = {}
+            section_attrs = {
+                "plot": "plot_graph_id",
+                "character": "character_graph_id",
+                "world": "world_graph_id",
+            }
             for section in ("plot", "character", "world"):
-                graph_id = uuid.uuid4().hex
-                session.add(GraphORM(id=graph_id, project_id=project.id, section=section))
-                graph_ids[section] = graph_id
+                attr = section_attrs[section]
+                graph_id = getattr(project, attr)
+                graph = session.get(GraphORM, graph_id) if graph_id else None
+                if graph is None or graph.project_id != project.id or graph.section != section:
+                    graph = (
+                        session.query(GraphORM)
+                        .filter(
+                            GraphORM.project_id == project.id,
+                            GraphORM.section == section,
+                        )
+                        .first()
+                    )
+                if graph is None:
+                    graph = GraphORM(
+                        id=uuid.uuid4().hex,
+                        project_id=project.id,
+                        section=section,
+                    )
+                    session.add(graph)
+                graph_ids[section] = graph.id
+                setattr(project, attr, graph.id)
 
-            project.plot_graph_id = graph_ids["plot"]
-            project.character_graph_id = graph_ids["character"]
-            project.world_graph_id = graph_ids["world"]
-
+            valid_graph_ids = set(graph_ids.values())
             nodes = session.query(NodeORM).filter(NodeORM.project_id == project.id).all()
             for node in nodes:
+                if node.graph_id in valid_graph_ids:
+                    continue
                 section = _SECTION_BY_NODE_TYPE.get(node.node_type, _DEFAULT_SECTION)
                 node.graph_id = graph_ids[section]

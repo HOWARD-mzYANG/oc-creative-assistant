@@ -15,6 +15,37 @@ from app.services.graph_mappers import edge_to_orm, node_to_orm
 from app.services.graph_validation import validate_edges_against_payload_nodes
 
 
+_SECTION_BY_NODE_TYPE: dict[str, str] = {
+    "character": "character",
+    "worldbuilding": "world",
+    "plot": "plot",
+}
+_DEFAULT_SECTION = "plot"
+_GRAPH_ATTR_BY_SECTION = {
+    "plot": "plot_graph_id",
+    "character": "character_graph_id",
+    "world": "world_graph_id",
+}
+
+
+def resolve_graph_id_for_node_type(
+    project: ProjectORM | None,
+    node_type: str | None,
+) -> str | None:
+    """按节点类型找到项目下对应子图 ID；旧项目缺少子图时返回 None。"""
+    if project is None:
+        return None
+    section = _SECTION_BY_NODE_TYPE.get(node_type or "", _DEFAULT_SECTION)
+    attr = _GRAPH_ATTR_BY_SECTION[section]
+    value = getattr(project, attr, None)
+    return value if isinstance(value, str) and value else None
+
+
+def _graph_id_for_project_node(project: ProjectORM | None, node: NodePayload) -> str | None:
+    """按节点 payload 找到项目下对应子图 ID。"""
+    return resolve_graph_id_for_node_type(project, node.nodeType or node.type)
+
+
 def require_project(session: Session, project_id: str) -> ProjectORM:
     """读取项目并确认存在。
 
@@ -127,12 +158,20 @@ def replace_graph(
         HTTPException: 边引用当前图谱之外节点时抛出。
     """
     validate_edges_against_payload_nodes(nodes, edges)
+    project = session.get(ProjectORM, project_id)
     # SQLite 外键约束会阻止删除仍被边引用的节点，因此整体替换时必须先删边。
     session.query(EdgeORM).filter(EdgeORM.project_id == project_id).delete(synchronize_session=False)
     session.query(NodeORM).filter(NodeORM.project_id == project_id).delete(synchronize_session=False)
 
     for index, node in enumerate(nodes):
-        session.add(node_to_orm(project_id, node, index))
+        session.add(
+            node_to_orm(
+                project_id,
+                node,
+                index,
+                graph_id=_graph_id_for_project_node(project, node),
+            )
+        )
 
     for index, edge in enumerate(edges):
         session.add(edge_to_orm(project_id, edge, index))

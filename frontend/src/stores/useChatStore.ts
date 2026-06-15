@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type {
+  AgentTraceItemDto,
   AgentStagingItemDto,
   AppliedEntityDto,
   ChatMessageDto,
@@ -40,6 +41,10 @@ export interface ChatMessage {
   webSources?: WebSourceDto[]
   /** Related nodes (cited in the reply). */
   relatedNodes?: RelatedNodeDto[]
+  /** Visible reasoning trace for the current local turn; not persisted in history. */
+  trace?: AgentTraceItemDto[]
+  /** Raw provider thinking returned by reasoning models; current local turn only. */
+  providerThinking?: string
 }
 
 /**
@@ -55,6 +60,8 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([])
   const streamingReply = ref('')
   const streamingWebSources = ref<WebSourceDto[]>([])
+  const streamingTrace = ref<AgentTraceItemDto[]>([])
+  const streamingProviderThinking = ref('')
   /** Inline ✅ cards while the current turn is still streaming (workspace auto-apply). */
   const streamingApplied = ref<AppliedEntityDto[]>([])
   const isStreaming = ref(false)
@@ -208,6 +215,8 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push({ id: `local-${Date.now()}`, role: 'user', content })
     streamingReply.value = ''
     streamingWebSources.value = []
+    streamingTrace.value = []
+    streamingProviderThinking.value = ''
     streamingApplied.value = []
     progressLabel.value = '思考中…'
     error.value = ''
@@ -224,8 +233,20 @@ export const useChatStore = defineStore('chat', () => {
         (event) => {
           if (event.type === 'reply_token') {
             streamingReply.value += event.text
+          } else if (event.type === 'reasoning_token') {
+            streamingProviderThinking.value += event.text
+          } else if (event.type === 'node_start') {
+            progressLabel.value = event.label
           } else if (event.type === 'node_end') {
             progressLabel.value = event.label
+          } else if (event.type === 'node_timing') {
+            console.debug(`[agent-timing] ${event.node} ${event.elapsed_ms}ms`)
+          } else if (event.type === 'trace_item') {
+            streamingTrace.value.push({
+              node: event.node,
+              title: event.title,
+              content: event.content,
+            })
           } else if (event.type === 'intent') {
             lastAgent.value = event.primary
           } else if (event.type === 'reply_ready') {
@@ -252,6 +273,8 @@ export const useChatStore = defineStore('chat', () => {
         shouldAutoApply,
       )
       // Replace optimistic local copies with server-persisted messages (avoids duplicates).
+      const traceThisTurn = [...streamingTrace.value]
+      const providerThinkingThisTurn = streamingProviderThinking.value
       await reloadMessages()
       const lastAssistant = [...messages.value].reverse().find((m) => m.role === 'assistant')
       if (lastAssistant) {
@@ -259,6 +282,8 @@ export const useChatStore = defineStore('chat', () => {
           lastAssistant.applied?.length ? lastAssistant.applied : appliedThisTurn.length ? appliedThisTurn : streamingApplied.value
         if (applied.length) lastAssistant.applied = [...applied]
         if (relatedThisTurn.length) lastAssistant.relatedNodes = [...relatedThisTurn]
+        if (traceThisTurn.length) lastAssistant.trace = traceThisTurn
+        if (providerThinkingThisTurn) lastAssistant.providerThinking = providerThinkingThisTurn
         if (!lastAssistant.agentType && lastAgent.value) {
           lastAssistant.agentType = lastAgent.value
         }
@@ -268,6 +293,8 @@ export const useChatStore = defineStore('chat', () => {
     } finally {
       streamingReply.value = ''
       streamingWebSources.value = []
+      streamingTrace.value = []
+      streamingProviderThinking.value = ''
       streamingApplied.value = []
       progressLabel.value = ''
       isStreaming.value = false
@@ -320,6 +347,8 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     streamingReply,
     streamingWebSources,
+    streamingTrace,
+    streamingProviderThinking,
     streamingApplied,
     isStreaming,
     progressLabel,

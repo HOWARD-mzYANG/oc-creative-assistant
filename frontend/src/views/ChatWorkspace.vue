@@ -7,7 +7,9 @@ import { useChatStore } from '../stores/useChatStore'
 import { useProjectStore } from '../stores/useProjectStore'
 import { rebuildProjectSeed } from '../api/projectApi'
 import ChatSessionSidebar from '../components/chat/ChatSessionSidebar.vue'
+import AgentTracePanel from '../components/chat/AgentTracePanel.vue'
 import InlineEntityCard from '../components/chat/InlineEntityCard.vue'
+import ProviderThinkingPanel from '../components/chat/ProviderThinkingPanel.vue'
 import WebSourceCard from '../components/chat/WebSourceCard.vue'
 
 marked.use({ gfm: true, breaks: true })
@@ -29,6 +31,8 @@ const {
   messages,
   streamingReply,
   streamingWebSources,
+  streamingTrace,
+  streamingProviderThinking,
   streamingApplied,
   isStreaming,
   progressLabel,
@@ -69,7 +73,11 @@ async function scrollToBottom() {
   if (streamRef.value) streamRef.value.scrollTop = streamRef.value.scrollHeight
 }
 
-watch([messages, streamingReply, streamingApplied], scrollToBottom, { deep: true })
+watch(
+  [messages, streamingReply, streamingTrace, streamingProviderThinking, streamingApplied],
+  scrollToBottom,
+  { deep: true },
+)
 
 async function handleSend() {
   const text = draft.value.trim()
@@ -129,6 +137,14 @@ async function handleExit() {
               v-html="renderMarkdown(message.content)"
             ></div>
             <div v-else class="chat-msg__bubble">{{ message.content }}</div>
+            <AgentTracePanel
+              v-if="message.role === 'assistant' && message.trace?.length"
+              :items="message.trace"
+            />
+            <ProviderThinkingPanel
+              v-if="message.role === 'assistant' && message.providerThinking"
+              :content="message.providerThinking"
+            />
             <div v-if="message.webSources?.length" class="chat-msg__sources">
               <WebSourceCard
                 v-for="(source, index) in message.webSources"
@@ -153,6 +169,8 @@ async function handleExit() {
               class="chat-msg__bubble chat-msg__bubble--md"
               v-html="renderMarkdown(streamingReply)"
             ></div>
+            <AgentTracePanel :items="streamingTrace" />
+            <ProviderThinkingPanel :content="streamingProviderThinking" />
             <div v-if="streamingWebSources.length" class="chat-msg__sources">
               <WebSourceCard
                 v-for="(source, index) in streamingWebSources"
@@ -177,6 +195,11 @@ async function handleExit() {
             <span>{{ progressLabel || '思考中' }}</span>
             <span class="chat-workspace__dots" aria-hidden="true"><i></i><i></i><i></i></span>
           </div>
+          <AgentTracePanel v-if="isStreaming && !streamingReply" :items="streamingTrace" />
+          <ProviderThinkingPanel
+            v-if="isStreaming && !streamingReply"
+            :content="streamingProviderThinking"
+          />
           <p v-if="error" class="chat-workspace__error">{{ error }}</p>
         </div>
 

@@ -218,8 +218,12 @@ def _apply_update_node(
         return None
 
     for field in _UPDATABLE_NODE_FIELDS:
-        if field in payload and payload[field] is not None:
-            setattr(node, field, str(payload[field]))
+        if field not in payload or payload[field] is None:
+            continue
+        value = str(payload[field])
+        setattr(node, field, value)
+        if field == "node_type":
+            node.graph_id = _resolve_graph_id(db, record.project_id, value)
 
     db.flush()
     return target_id

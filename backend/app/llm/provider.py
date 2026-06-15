@@ -3,9 +3,10 @@
 将 LangChain / OpenAI SDK 细节封装在 Provider 内部，让 agent 节点只看到 ``chat``
 （字符串）和 ``structured``（Pydantic）等统一方法，从而屏蔽底层协议差异。
 
-DeepSeek / 通义等 OpenAI 兼容服务通常不支持 ``response_format=json_schema``，
-因此真实 provider 会显式固定 ``method="function_calling"``，用 tool-calls 协议获得
-更广兼容。Mock provider 完全离线，并按 schema 名返回已注册样例，便于离线开发和 CI。
+DeepSeek / 通义等 OpenAI 兼容服务对 ``function_calling`` / ``json_mode`` / thinking
+模式的支持差异较大，因此真实 provider 支持按配置选择结构化输出策略，并在协议不兼容时
+降级到普通 JSON prompt。Mock provider 完全离线，并按 schema 名返回已注册样例，便于
+离线开发和 CI。
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import json
 import logging
 import re
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -28,7 +30,31 @@ logger = logging.getLogger(__name__)
 
 TSchema = TypeVar("TSchema", bound=BaseModel)
 
-_STRUCTURED_METHODS = ("function_calling", "json_mode")
+_VALID_STRUCTURED_METHODS = frozenset({"function_calling", "json_mode", "plain_json"})
+_REASONING_CHUNK_KEYS = (
+    "reasoning_content",
+    "reasoning",
+    "reasoning_text",
+    "thinking",
+    "thinking_content",
+)
+
+
+@dataclass(frozen=True)
+class ChatStreamDelta:
+    """流式 LLM 增量：text 是可见回复，reasoning 是 provider 返回的可选 thinking。"""
+
+    text: str = ""
+    reasoning: str = ""
+
+
+def _is_tool_choice_unsupported_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    return "tool_choice" in text and (
+        "does not support" in text
+        or "unsupported" in text
+        or "not support" in text
+    )
 
 
 def _strip_json_fence(text: str) -> str:
@@ -80,6 +106,76 @@ def _raw_message_snippet(raw: Any, *, limit: int = 240) -> str:
     return text[:limit] + "…"
 
 
+def _content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict):
+                block_type = str(block.get("type") or "")
+                if "reason" in block_type or "thinking" in block_type:
+                    continue
+                text = block.get("text") or block.get("content")
+                if isinstance(text, str):
+                    parts.append(text)
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    return ""
+
+
+def _extract_reasoning_text(value: Any, *, known_reasoning_field: bool = False) -> str:
+    if isinstance(value, str):
+        return value if known_reasoning_field else ""
+    if isinstance(value, dict):
+        parts: list[str] = []
+        for key in _REASONING_CHUNK_KEYS:
+            item = value.get(key)
+            if isinstance(item, str):
+                parts.append(item)
+        return "".join(parts)
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                item_type = str(item.get("type") or "")
+                if "reason" in item_type or "thinking" in item_type:
+                    text = item.get("text") or item.get("content")
+                    if isinstance(text, str):
+                        parts.append(text)
+                else:
+                    parts.append(_extract_reasoning_text(item))
+            elif isinstance(item, str) and known_reasoning_field:
+                parts.append(item)
+        return "".join(parts)
+    return ""
+
+
+def _reasoning_from_chunk(chunk: Any) -> str:
+    parts: list[str] = []
+    for attr_name in ("additional_kwargs", "response_metadata"):
+        data = getattr(chunk, attr_name, None)
+        if not isinstance(data, dict):
+            continue
+        for key in _REASONING_CHUNK_KEYS:
+            value = data.get(key)
+            text = _extract_reasoning_text(value, known_reasoning_field=True)
+            if text:
+                parts.append(text)
+    content = getattr(chunk, "content", None)
+    if isinstance(content, list):
+        content_text = _extract_reasoning_text(content)
+        if content_text:
+            parts.append(content_text)
+    return "".join(parts)
+
+
+def extract_provider_reasoning(message: Any) -> str:
+    """提取 OpenAI 兼容响应中显式返回的 provider thinking。"""
+    return _reasoning_from_chunk(message)
+
+
 class LlmProvider(Protocol):
     """LLM 调用的统一接口契约。
 
@@ -90,6 +186,8 @@ class LlmProvider(Protocol):
     def chat(self, messages: list[BaseMessage]) -> str: ...
 
     def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]: ...
+
+    def chat_stream_chunks(self, messages: list[BaseMessage]) -> Iterator[ChatStreamDelta]: ...
 
     def structured(
         self,
@@ -115,6 +213,15 @@ class OpenAICompatibleProvider:
         if not settings.is_configured:
             raise ValueError("缺少 OC_LLM_* 配置，无法初始化 OpenAI 兼容 provider")
 
+        methods = tuple(
+            method
+            for method in settings.structured_methods
+            if method in _VALID_STRUCTURED_METHODS
+        )
+        self._structured_methods = methods or ("function_calling", "json_mode", "plain_json")
+        self._disabled_structured_methods: set[str] = set()
+        self._stream_reasoning = settings.stream_reasoning
+
         self._client = ChatOpenAI(
             base_url=settings.base_url,
             api_key=settings.api_key,
@@ -127,16 +234,24 @@ class OpenAICompatibleProvider:
         content = response.content if isinstance(response, AIMessage) else response
         return content if isinstance(content, str) else str(content)
 
-    def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
-        """逐块产出文本增量；LangChain ChatOpenAI 的 .stream() 原生支持。
+    def chat_stream_chunks(self, messages: list[BaseMessage]) -> Iterator[ChatStreamDelta]:
+        """逐块产出文本/思考增量；LangChain ChatOpenAI 的 .stream() 原生支持。
 
-        空 chunk（例如 LLM 仍在思考、尚未产出 token）会被跳过，因此上层只会看到有真实内容的
-        token，避免把 None / "" 放进字符串累积。
+        DeepSeek 等模型可能把 thinking 放在 chunk.additional_kwargs.reasoning_content；
+        只有开启 OC_LLM_STREAM_REASONING 时才向上游暴露这部分内容。
         """
         for chunk in self._client.stream(messages):
-            content = chunk.content if isinstance(chunk, AIMessage) else chunk
-            if isinstance(content, str) and content:
-                yield content
+            content = getattr(chunk, "content", chunk)
+            text = _content_to_text(content)
+            reasoning = _reasoning_from_chunk(chunk) if self._stream_reasoning else ""
+            if text or reasoning:
+                yield ChatStreamDelta(text=text, reasoning=reasoning)
+
+    def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
+        """逐块产出可见回复文本增量。"""
+        for chunk in self.chat_stream_chunks(messages):
+            if chunk.text:
+                yield chunk.text
 
     def structured(
         self,
@@ -146,11 +261,24 @@ class OpenAICompatibleProvider:
         """结构化输出；为返回空解析结果的 OpenAI 兼容 provider 提供兜底。"""
         errors: list[str] = []
 
-        for method in _STRUCTURED_METHODS:
+        for method in self._structured_methods:
+            if method in self._disabled_structured_methods:
+                continue
             try:
+                if method == "plain_json":
+                    return self._structured_via_plain_json(messages, schema)
                 parsed, err = self._try_structured(messages, schema, method)
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{method}: {exc}")
+                if method == "function_calling" and _is_tool_choice_unsupported_error(exc):
+                    self._disabled_structured_methods.add(method)
+                    logger.warning(
+                        "%s structured via %s is unsupported by this model; "
+                        "will skip it for the rest of this process. "
+                        "For thinking models, set OC_LLM_STRUCTURED_METHOD=plain_json.",
+                        schema.__name__,
+                        method,
+                    )
                 logger.warning(
                     "%s structured via %s raised: %s",
                     schema.__name__,
@@ -164,13 +292,15 @@ class OpenAICompatibleProvider:
             if err:
                 errors.append(err)
 
-        try:
-            return self._structured_via_plain_json(messages, schema)
-        except Exception as exc:  # noqa: BLE001
-            detail = "; ".join(errors) if errors else str(exc)
-            raise ValueError(
-                f"structured output failed for {schema.__name__}: {detail}"
-            ) from exc
+        detail = "; ".join(errors) if errors else "no structured methods were available"
+        raise ValueError(f"structured output failed for {schema.__name__}: {detail}")
+
+    def _messages_for_json_mode(self, messages: list[BaseMessage]) -> list[BaseMessage]:
+        """确保 json_mode 请求满足 OpenAI 兼容服务的 JSON 关键词要求。"""
+        return [
+            *messages,
+            HumanMessage("请只输出一个 JSON 对象，不要 markdown 代码块，不要说明文字。"),
+        ]
 
     def _try_structured(
         self,
@@ -183,7 +313,8 @@ class OpenAICompatibleProvider:
             method=method,
             include_raw=True,
         )
-        result = runnable.invoke(messages)
+        invoke_messages = self._messages_for_json_mode(messages) if method == "json_mode" else messages
+        result = runnable.invoke(invoke_messages)
 
         if not isinstance(result, dict):
             if result is None:
@@ -230,8 +361,18 @@ class OpenAICompatibleProvider:
         tools: list[BaseTool],
     ) -> AIMessage:
         """绑定工具并调用一次 LLM，返回原始 AIMessage 供 tool_loop 解析 tool_calls。"""
-        bound = self._client.bind_tools(tools)
-        response = bound.invoke(messages)
+        try:
+            bound = self._client.bind_tools(tools)
+            response = bound.invoke(messages)
+        except Exception as exc:  # noqa: BLE001
+            if not _is_tool_choice_unsupported_error(exc):
+                raise
+            logger.warning(
+                "Tool calling is unsupported by this model; falling back to plain chat. "
+                "For thinking models, this skips active tool use in the current turn: %s",
+                exc,
+            )
+            return AIMessage(content=self.chat(messages))
         if isinstance(response, AIMessage):
             return response
         return AIMessage(content=str(getattr(response, "content", response)))
@@ -351,6 +492,11 @@ class MockProvider:
         """按字符拆分来模拟 token 流，使 mock 模式也能验证前端渐进渲染。"""
         for ch in self.chat(messages):
             yield ch
+
+    def chat_stream_chunks(self, messages: list[BaseMessage]) -> Iterator[ChatStreamDelta]:
+        """Mock 模式只模拟可见文本，不模拟 provider thinking。"""
+        for token in self.chat_stream(messages):
+            yield ChatStreamDelta(text=token)
 
     def structured(
         self,

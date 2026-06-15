@@ -40,9 +40,14 @@ START → load_context → intent_router
 
 from __future__ import annotations
 
+import logging
+import time
+from collections.abc import Callable
 from functools import lru_cache
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.config import get_stream_writer
 
 from app.agents.checkpointer import get_checkpointer
 from app.agents.nodes.boundary_check import boundary_check_node
@@ -59,7 +64,11 @@ from app.agents.nodes.simulation_agent import simulation_agent_node
 from app.agents.nodes.structure_agent import structure_agent_node
 from app.agents.nodes.structured_extractor import structured_extractor_node
 from app.agents.nodes.summary_compress import summary_compress_node
+from app.agents.progress import NODE_LABELS, NODE_RUNNING_LABELS
 from app.agents.state import AgentState
+
+
+logger = logging.getLogger(__name__)
 
 
 _AGENT_NODE_BY_INTENT: dict[str, str] = {
@@ -72,6 +81,71 @@ _AGENT_NODE_BY_INTENT: dict[str, str] = {
 不会到达这一层路由，因此不再放入表中。"""
 
 _AGENT_NODES: tuple[str, ...] = tuple(_AGENT_NODE_BY_INTENT.values())
+
+
+AgentNode = Callable[[AgentState], dict[str, Any]]
+
+
+def _safe_write_progress(
+    writer: Callable[[dict[str, Any]], None] | None,
+    event: dict[str, Any],
+) -> None:
+    if writer is None:
+        return
+    try:
+        writer(event)
+    except Exception:
+        # 进度事件只是观测层；即使当前调用不是 stream 模式，也不能影响主流程。
+        return
+
+
+def _with_progress(node_name: str, node: AgentNode) -> AgentNode:
+    """给 LangGraph 节点增加开始事件和耗时日志。"""
+
+    def wrapped(state: AgentState) -> dict[str, Any]:
+        try:
+            writer = get_stream_writer()
+        except Exception:
+            writer = None
+
+        _safe_write_progress(
+            writer,
+            {
+                "type": "node_start",
+                "node": node_name,
+                "label": NODE_RUNNING_LABELS.get(node_name, f"正在{node_name}"),
+            },
+        )
+
+        start = time.perf_counter()
+        try:
+            return node(state)
+        finally:
+            elapsed_ms = round((time.perf_counter() - start) * 1000)
+            logger.info(
+                "agent-timing node=%s label=%s elapsed_ms=%s",
+                node_name,
+                NODE_LABELS.get(node_name, node_name),
+                elapsed_ms,
+            )
+            print(
+                "[agent-timing] "
+                f"node={node_name} "
+                f"label={NODE_LABELS.get(node_name, node_name)} "
+                f"elapsed_ms={elapsed_ms}",
+                flush=True,
+            )
+            _safe_write_progress(
+                writer,
+                {
+                    "type": "node_timing",
+                    "node": node_name,
+                    "label": NODE_LABELS.get(node_name, node_name),
+                    "elapsed_ms": elapsed_ms,
+                },
+            )
+
+    return wrapped
 
 
 def _route_after_intent(state: AgentState) -> str:
@@ -101,22 +175,61 @@ def _route_to_agent(state: AgentState) -> str:
 def _build_graph() -> StateGraph:
     builder = StateGraph(AgentState)
 
-    builder.add_node("load_context", load_context_node)
-    builder.add_node("intent_router", intent_router_node)
-    builder.add_node("parallel_retrieval", parallel_retrieval_node)
-    builder.add_node("context_compress", context_compress_node)
-    builder.add_node("inspiration_agent", inspiration_agent_node)
-    builder.add_node("research_agent", research_agent_node)
-    builder.add_node("structure_agent", structure_agent_node)
-    builder.add_node("simulation_agent", simulation_agent_node)
-    builder.add_node("boundary_check", boundary_check_node)
+    builder.add_node("load_context", _with_progress("load_context", load_context_node))
+    builder.add_node(
+        "intent_router",
+        _with_progress("intent_router", intent_router_node),
+    )
+    builder.add_node(
+        "parallel_retrieval",
+        _with_progress("parallel_retrieval", parallel_retrieval_node),
+    )
+    builder.add_node(
+        "context_compress",
+        _with_progress("context_compress", context_compress_node),
+    )
+    builder.add_node(
+        "inspiration_agent",
+        _with_progress("inspiration_agent", inspiration_agent_node),
+    )
+    builder.add_node(
+        "research_agent",
+        _with_progress("research_agent", research_agent_node),
+    )
+    builder.add_node(
+        "structure_agent",
+        _with_progress("structure_agent", structure_agent_node),
+    )
+    builder.add_node(
+        "simulation_agent",
+        _with_progress("simulation_agent", simulation_agent_node),
+    )
+    builder.add_node(
+        "boundary_check",
+        _with_progress("boundary_check", boundary_check_node),
+    )
     # 后台 B-agents（first_revision 决策 5）：question_planner 在组装前规划追问，
     # structured_extractor 在持久化后抽取实体；extraction_enabled 关闭时二者都是空操作。
-    builder.add_node("question_planner", question_planner_node)
-    builder.add_node("chat_assembler", chat_assembler_node)
-    builder.add_node("persistence_hub", persistence_hub_node)
-    builder.add_node("structured_extractor", structured_extractor_node)
-    builder.add_node("summary_compress", summary_compress_node)
+    builder.add_node(
+        "question_planner",
+        _with_progress("question_planner", question_planner_node),
+    )
+    builder.add_node(
+        "chat_assembler",
+        _with_progress("chat_assembler", chat_assembler_node),
+    )
+    builder.add_node(
+        "persistence_hub",
+        _with_progress("persistence_hub", persistence_hub_node),
+    )
+    builder.add_node(
+        "structured_extractor",
+        _with_progress("structured_extractor", structured_extractor_node),
+    )
+    builder.add_node(
+        "summary_compress",
+        _with_progress("summary_compress", summary_compress_node),
+    )
 
     builder.add_edge(START, "load_context")
     builder.add_edge("load_context", "intent_router")

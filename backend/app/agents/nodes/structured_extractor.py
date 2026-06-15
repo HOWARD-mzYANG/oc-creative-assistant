@@ -143,7 +143,11 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
     deferred = [d.model_dump() for d in out.deferred_fields]
 
     if not out.entities:
-        return {"deferred_fields": deferred, "extraction_count": 0}
+        return {
+            "deferred_fields": deferred,
+            "extraction_count": 0,
+            "extraction_reasoning": out.reasoning,
+        }
 
     items: list[AgentStagingCreateItem] = []
     # 实体名 -> 持久化时引用的 ID（已有 = 真实 node_id，新建 = pending_id）。
@@ -227,11 +231,19 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
         )
 
     if not items:
-        return {"deferred_fields": deferred, "extraction_count": 0}
+        return {
+            "deferred_fields": deferred,
+            "extraction_count": 0,
+            "extraction_reasoning": out.reasoning,
+        }
 
     with SessionLocal.begin() as db:
         if db.get(ChatSessionORM, session_id) is None:
-            return {"deferred_fields": deferred, "extraction_count": 0}
+            return {
+                "deferred_fields": deferred,
+                "extraction_count": 0,
+                "extraction_reasoning": out.reasoning,
+            }
         batch_id, _ = insert_staging_batch(
             db,
             session_id=session_id,
@@ -251,6 +263,7 @@ def structured_extractor_node(state: AgentState) -> dict[str, Any]:
         "extraction_count": len(items),
         "extraction_applied": applied,
         "deferred_fields": deferred,
+        "extraction_reasoning": out.reasoning,
     }
 
 

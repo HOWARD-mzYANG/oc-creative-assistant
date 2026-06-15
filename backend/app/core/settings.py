@@ -46,6 +46,18 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
+def _get_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    values = [
+        item.strip().lower()
+        for item in raw.replace(";", ",").split(",")
+        if item.strip()
+    ]
+    return tuple(values) or default
+
+
 @dataclass(frozen=True)
 class EmbeddingSettings:
     """Embedding 服务配置。"""
@@ -93,6 +105,8 @@ class LlmSettings:
     base_url: str | None
     api_key: str | None
     model: str
+    structured_methods: tuple[str, ...]
+    stream_reasoning: bool
 
     @property
     def is_configured(self) -> bool:
@@ -102,11 +116,20 @@ class LlmSettings:
 
 
 def get_llm_settings() -> LlmSettings:
+    structured_methods = _get_csv(
+        "OC_LLM_STRUCTURED_METHODS",
+        _get_csv(
+            "OC_LLM_STRUCTURED_METHOD",
+            ("function_calling", "json_mode", "plain_json"),
+        ),
+    )
     return LlmSettings(
         provider=os.getenv("OC_LLM_PROVIDER", "openai").strip().lower(),
         base_url=os.getenv("OC_LLM_BASE_URL"),
         api_key=os.getenv("OC_LLM_API_KEY"),
         model=os.getenv("OC_LLM_MODEL", "deepseek/deepseek-chat"),
+        structured_methods=structured_methods,
+        stream_reasoning=_get_bool("OC_LLM_STREAM_REASONING", False),
     )
 
 
