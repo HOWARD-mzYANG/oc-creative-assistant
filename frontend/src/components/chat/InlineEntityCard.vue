@@ -48,6 +48,9 @@ async function handleSave() {
 
 function handleRemove() {
   removed.value = true
+  if (props.item.change_type === 'update_node') {
+    return
+  }
   emit('remove', props.item.node_id)
 }
 </script>
@@ -64,12 +67,16 @@ function handleRemove() {
       <textarea v-model="content" rows="3" class="inline-card__content" placeholder="正文"></textarea>
       <div class="inline-card__actions">
         <button type="button" class="inline-card__save" @click="handleSave">保存</button>
-        <button type="button" class="inline-card__remove" @click="handleRemove">丢弃</button>
+        <button type="button" class="inline-card__remove" @click="handleRemove">
+          {{ item.change_type === 'update_node' ? '隐藏' : '丢弃' }}
+        </button>
         <span class="inline-card__state">{{ saveState }}</span>
       </div>
     </div>
   </div>
-  <div v-else class="inline-card inline-card--removed">已丢弃“{{ title }}”</div>
+  <div v-else class="inline-card inline-card--removed">
+    {{ item.change_type === 'update_node' ? '已隐藏' : `已丢弃“${title}”` }}
+  </div>
 </template>
 
 <style scoped>

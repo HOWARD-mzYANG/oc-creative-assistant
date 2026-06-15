@@ -33,9 +33,11 @@ const STATUS_LABELS: Record<string, string> = {
 const titleHint = computed(() => {
   const type = props.item.change_type
   if (type === 'create_node') {
-    const payload = props.item.payload as { title?: string; node_type?: string }
+    const payload = props.item.payload as { title?: string; node_type?: string; parent_id?: string; parentId?: string }
     const title = payload.title ?? '未命名节点'
-    return payload.node_type ? `${title} · ${payload.node_type}` : title
+    const parentId = payload.parent_id ?? payload.parentId
+    const typeText = payload.node_type ? `${title} · ${payload.node_type}` : title
+    return parentId ? `${typeText} · 子笔记` : typeText
   }
   return CHANGE_TYPE_LABELS[type] ?? type
 })
@@ -45,7 +47,12 @@ const contentPreview = computed(() => {
   const payload = (item.payload ?? {}) as Record<string, unknown>
 
   if (item.change_type === 'create_node') {
-    return (payload.content as string | undefined) ?? ''
+    const lines = [(payload.content as string | undefined) ?? '']
+    const parentId = (payload.parent_id as string | undefined) ?? (payload.parentId as string | undefined)
+    const sortOrder = (payload.sort_order as number | string | undefined) ?? (payload.sortOrder as number | string | undefined)
+    if (parentId) lines.push(`父笔记 ID：${parentId}`)
+    if (sortOrder !== undefined) lines.push(`排序：${sortOrder}`)
+    return lines.filter(Boolean).join('\n')
   }
 
   if (item.change_type === 'create_edge') {
@@ -56,7 +63,7 @@ const contentPreview = computed(() => {
   }
 
   if (item.change_type === 'update_node') {
-    const fields = ['title', 'content', 'node_type']
+    const fields = ['title', 'content', 'node_type', 'parent_id', 'parentId', 'sort_order', 'sortOrder']
       .filter((key) => payload[key] !== undefined)
       .map((key) => `${key}: ${payload[key]}`)
     return fields.join('\n')

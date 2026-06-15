@@ -56,6 +56,10 @@ function fallbackRows(node: CreativeFlowNode): DocFieldRow[] {
   return [{ key: '', value: '' }]
 }
 
+function hasRowContent(rows: DocFieldRow[]): boolean {
+  return rows.some((row) => row.key.trim() || row.value.trim())
+}
+
 function applyRows(rows: DocFieldRow[]) {
   fieldRows.value = rows.map((row) => ({ ...row }))
 }
@@ -68,8 +72,12 @@ async function loadFields(node: CreativeFlowNode, generation: number) {
 
   const cached = fieldsCache.get(props.projectId, node.id)
   if (cached) {
-    applyRows(cached)
-    return
+    if (!hasRowContent(cached) && node.data.content.trim()) {
+      fieldsCache.invalidateNode(props.projectId, node.id)
+    } else {
+      applyRows(cached)
+      return
+    }
   }
 
   applyRows(fallbackRows(node))

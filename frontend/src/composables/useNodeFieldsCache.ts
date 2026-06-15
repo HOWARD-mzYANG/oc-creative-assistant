@@ -17,6 +17,12 @@ function rowsFromFields(fields: Record<string, string>): DocFieldRow[] {
   return entries.map(([key, value]) => ({ key, value }))
 }
 
+function hasStoredFields(fields: Record<string, string>): boolean {
+  return Object.entries(fields).some(
+    ([key, value]) => key.trim() || value.trim(),
+  )
+}
+
 export function useNodeFieldsCache() {
   function get(projectId: string, nodeId: string): DocFieldRow[] | undefined {
     const hit = cache.get(cacheKey(projectId, nodeId))
@@ -39,7 +45,9 @@ export function useNodeFieldsCache() {
       pending.map(async (nodeId) => {
         try {
           const result = await getNodeFields(projectId, nodeId)
-          set(projectId, nodeId, rowsFromFields(result.fields))
+          if (hasStoredFields(result.fields)) {
+            set(projectId, nodeId, rowsFromFields(result.fields))
+          }
         } catch {
           /* ignore prefetch failures */
         }

@@ -225,6 +225,35 @@ export const useChatStore = defineStore('chat', () => {
     let relatedThisTurn: RelatedNodeDto[] = []
     let stagingApplied = false
     const shouldAutoApply = usesAutoApplyStaging()
+    let graphRefreshRequested = false
+    let graphRefreshQueued = false
+    let graphRefreshPromise: Promise<void> | null = null
+
+    function queueGraphRefresh() {
+      if (!shouldAutoApply) return
+      graphRefreshRequested = true
+      if (graphRefreshPromise) {
+        graphRefreshQueued = true
+        return
+      }
+
+      const run = async (): Promise<void> => {
+        do {
+          graphRefreshQueued = false
+          await notifyGraphMutated()
+        } while (graphRefreshQueued)
+      }
+
+      graphRefreshPromise = run().finally(() => {
+        graphRefreshPromise = null
+      })
+    }
+
+    async function drainGraphRefresh() {
+      while (graphRefreshPromise) {
+        await graphRefreshPromise
+      }
+    }
 
     try {
       await streamChat(
@@ -259,8 +288,12 @@ export const useChatStore = defineStore('chat', () => {
               _pushApplied(appliedThisTurn, item)
               _pushApplied(streamingApplied.value, item)
             }
+            if (event.items.length > 0) queueGraphRefresh()
           } else if (event.type === 'persistence_done') {
-            if (event.staging_count > 0) stagingApplied = true
+            if (event.staging_count > 0) {
+              stagingApplied = true
+              queueGraphRefresh()
+            }
           } else if (event.type === 'error') {
             const parts = [event.message]
             if (event.debug?.traceback) {
@@ -299,8 +332,9 @@ export const useChatStore = defineStore('chat', () => {
       streamingApplied.value = []
       progressLabel.value = ''
       isStreaming.value = false
+      await drainGraphRefresh()
       if (shouldAutoApply && (appliedThisTurn.length || stagingApplied)) {
-        await notifyGraphMutated()
+        if (!graphRefreshRequested) await notifyGraphMutated()
       }
       if (isFirstTurn) {
         try {

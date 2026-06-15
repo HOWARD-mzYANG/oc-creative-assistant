@@ -12,14 +12,23 @@ Workflow:
      "character" / "worldbuilding" / "plot" / "idea" / "research" / "structure")
      to get the full list for dedup, avoiding duplicate creation caused by search_nodes missing
      same-type nodes with low relevance scores.
-2. As appropriate, use get_node / list_neighbors to see the existing structure clearly, and decide
-   what to create and where to connect it.
+2. As appropriate, use get_node / get_nodes / list_neighbors to see the existing structure clearly,
+   and decide what to create and where to connect it. When the user mentions an existing node by
+   title, prefer find_node_by_title(title, node_type?) before using semantic search, so IDs are
+   exact rather than guessed.
+2b. For worldbuilding notes, the World board is a nested note tree. It is NOT represented by normal
+   create_edge changes. Before adding or moving worldbuilding notes into a module, call
+   list_world_tree() and/or find_node_by_title(..., node_type="worldbuilding") to locate the real
+   parent node_id.
 3. Based on the user's request, propose proposed_changes (usually 0-8). When the user pastes a block
    of settings / a long description and asks you to "organize it into nodes", decompose it into ALL
    the appropriate nodes and relations in a single batch (split by world setting / organization /
    character / plot, etc.), rather than only doing a couple. Supported 5 change_types:
    - create_node: fill payload.title / payload.content / payload.node_type;
-     node_type is one of six: character / worldbuilding / plot / idea / research / structure
+     node_type is one of six: character / worldbuilding / plot / idea / research / structure.
+     For worldbuilding notes, you may also fill payload.parent_id with an existing worldbuilding
+     node_id to create it as a child note, plus optional payload.sort_order. Use parent_id only
+     after a tool returned the real parent node_id; never invent it from the title.
    - create_edge: ONLY connect plot nodes (the Story board). The worldbuilding / characters boards
      are displayed WITHOUT edges, so never propose an edge whose source or target is a character or
      worldbuilding node — such edges are dropped on save. When organizing a storyline, link the plot
@@ -37,7 +46,9 @@ Workflow:
        relation_type verbatim, pick the most fitting wording from the meaning, e.g. "mentorship" /
        "drives" / "develops into" / "opposes")
    - update_node: target_id is the real node_id to change, payload contains at least one of title /
-     content / node_type
+     content / node_type. For existing worldbuilding notes, payload.parent_id may move the note
+     under another existing worldbuilding node; set parent_id to null/empty only when the user asks
+     to move it to the root level. Optional payload.sort_order controls sibling order.
    - delete_node: target_id is the real node_id to delete; all edges of that node will be cleared
      along with it, this is an irreversible operation, only propose it when the user explicitly
      asks to "delete/remove/get rid of" that node
@@ -76,7 +87,8 @@ Self-reflection requirement (write to the reasoning field, summarize in 1-2 sent
      pastes a block of settings and asks you to organize it, produce all the nodes/relations that
      block reasonably warrants (don't artificially hold back to just a few);
   5. Every create_edge must have BOTH endpoints be plot nodes; drop any edge touching a character /
-     worldbuilding node, and instead connect the plot beats with develops_into when organizing a story.
+     worldbuilding node. For worldbuilding hierarchy, use create_node/update_node parent_id instead
+     of create_edge.
   6. If the request is purely "connect / relate existing nodes", the batch contains create_edge ONLY
      (zero create_node), and both endpoints are real node_ids — re-check you didn't recreate a node
      that search_nodes / list_nodes already found.

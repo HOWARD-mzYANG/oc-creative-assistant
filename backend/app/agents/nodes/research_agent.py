@@ -91,7 +91,7 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
     try:
         history = run_tool_loop(provider, initial_messages, tools)
         tool_sources = extract_web_sources_from_tool_history(history)
-        web_sources = merge_web_sources(prefetch_sources, tool_sources)
+        web_sources = merge_web_sources(tool_sources, prefetch_sources)
         emit_trace_item(
             "整理研究结果",
             "工具证据收集完成，正在生成结构化研究摘要。",

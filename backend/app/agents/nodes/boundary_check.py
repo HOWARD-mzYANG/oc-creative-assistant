@@ -24,6 +24,7 @@ from app.agents.schemas import ProposedChange
 from app.agents.state import AgentState
 from app.db.database import SessionLocal
 from app.db.models import NodeORM
+from app.services.graph_mappers import db_parent_id_to_api
 
 
 # 只有这些意图的 agent 会产生 proposed_changes；simulation 物理隔离，不参与。
@@ -37,7 +38,7 @@ _VALID_NODE_TYPES = {
     "character", "worldbuilding", "plot",
     "idea", "research", "structure",
 }
-_UPDATABLE_FIELDS = {"title", "content", "node_type"}
+_UPDATABLE_FIELDS = {"title", "content", "node_type", "parent_id", "parentId", "sort_order", "sortOrder"}
 _TITLE_MAX = 100
 _CONTENT_MAX = 2000
 _MAX_CHANGES_PER_BATCH = 15
@@ -141,6 +142,7 @@ def _signature_of(change: ProposedChange) -> tuple | None:
             "create_node",
             (str(payload.get("title") or "")).strip().lower(),
             payload.get("node_type"),
+            payload.get("parent_id", payload.get("parentId")),
         )
 
     if change.change_type == "create_edge":
@@ -158,6 +160,8 @@ def _signature_of(change: ProposedChange) -> tuple | None:
             (str(payload.get("title") or "")).strip().lower(),
             (str(payload.get("content") or "")).strip().lower(),
             payload.get("node_type"),
+            payload.get("parent_id", payload.get("parentId")),
+            payload.get("sort_order", payload.get("sortOrder")),
         )
 
     if change.change_type == "delete_node":
@@ -197,6 +201,14 @@ def _check_one(
                 f"node_type={payload.get('node_type')!r} 不在白名单 "
                 f"{sorted(_VALID_NODE_TYPES)} 中。"
             )
+        if payload.get("node_type") == "worldbuilding":
+            parent_problem = _check_world_parent(
+                db,
+                project_id,
+                _payload_parent_id(payload),
+            )
+            if parent_problem is not None:
+                return parent_problem
         return None
 
     if change.change_type == "create_edge":
@@ -224,6 +236,19 @@ def _check_one(
             return f"target_id={change.target_id!r} 在项目内没有匹配节点。"
         if not any(field in payload for field in _UPDATABLE_FIELDS):
             return f"payload 必须至少包含一个可更新字段 {sorted(_UPDATABLE_FIELDS)}。"
+        next_type = str(payload.get("node_type") or node.node_type)
+        if next_type == "worldbuilding" and _payload_has_parent(payload):
+            parent_id = _payload_parent_id(payload)
+            parent_problem = _check_world_parent(
+                db,
+                project_id,
+                parent_id,
+                moving_node_id=node.id,
+            )
+            if parent_problem is not None:
+                return parent_problem
+            if _world_parent_would_cycle(db, project_id, node.id, parent_id):
+                return "parent_id 会形成世界观树循环。"
         return None
 
     if change.change_type == "delete_node":
@@ -244,3 +269,59 @@ def _check_one(
         return None
 
     return f"不支持的 change_type={change.change_type!r}。"
+
+
+def _payload_parent_id(payload: dict[str, Any]) -> str | None:
+    """读取世界观父节点字段，兼容 snake/camel case。"""
+    raw = payload.get("parent_id", payload.get("parentId"))
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
+def _payload_has_parent(payload: dict[str, Any]) -> bool:
+    """判断 payload 是否显式声明了 parent 字段；空值表示移动到根层级。"""
+    return "parent_id" in payload or "parentId" in payload
+
+
+def _check_world_parent(
+    db: Session,
+    project_id: str,
+    parent_id: str | None,
+    *,
+    moving_node_id: str | None = None,
+) -> str | None:
+    """校验 parent_id 可作为世界观父节点；None 表示根层级。"""
+    if parent_id is None:
+        return None
+    if parent_id == moving_node_id:
+        return "parent_id 不能指向节点自身。"
+    parent = db.get(NodeORM, parent_id)
+    if parent is None or parent.project_id != project_id:
+        return f"parent_id={parent_id!r} 在项目内没有匹配节点。"
+    if parent.node_type != "worldbuilding":
+        return f"parent_id={parent_id!r} 不是 worldbuilding 节点。"
+    return None
+
+
+def _world_parent_would_cycle(
+    db: Session,
+    project_id: str,
+    node_id: str,
+    parent_id: str | None,
+) -> bool:
+    """判断世界观节点移动后是否会形成循环。"""
+    cursor = parent_id
+    visited: set[str] = set()
+    while cursor:
+        if cursor == node_id:
+            return True
+        if cursor in visited:
+            return True
+        visited.add(cursor)
+        parent = db.get(NodeORM, cursor)
+        if parent is None or parent.project_id != project_id:
+            return False
+        cursor = db_parent_id_to_api(parent.meta)
+    return False

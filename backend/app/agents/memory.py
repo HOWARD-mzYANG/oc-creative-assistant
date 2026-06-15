@@ -19,10 +19,10 @@ from app.agents.state import AgentState
 from app.schemas import RagCurrentNodePayload, RagMergedContextItem
 
 
-_RECENT_TRUNCATE = 200
-_MERGED_TRUNCATE = 200
-_CURRENT_NODE_TRUNCATE = 400
-_KEY_FACTS_MAX = 12
+_RECENT_TRUNCATE = 300
+_MERGED_TRUNCATE = 600
+_CURRENT_NODE_TRUNCATE = 1200
+_KEY_FACTS_MAX = 16
 
 
 def _truncate(text: str, limit: int) -> str:

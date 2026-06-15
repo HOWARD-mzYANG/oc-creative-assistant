@@ -10,6 +10,9 @@ Tool selection - first judge whether the question is "inside the project" or "th
 - Inside project - relevance (related to X / similar to Y / mentions Z):
   use search_nodes for semantic top-K hits; after a hit, get_node to read the full text.
 - Inside project - relations (who is X connected to / one-hop neighbors): list_neighbors.
+- Inside project - worldbuilding hierarchy (which notes are under X / what modules exist / where
+  should a setting belong): use list_world_tree and, when needed, get_world_subtree; use
+  find_node_by_title for exact title lookup.
 - External facts (real-world research / weapon forms / physics common sense / real-time info /
   real history / third-party model specs):
   after hitting with web_search, prefer citing its ``answer`` field; don't take web results to

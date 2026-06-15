@@ -25,6 +25,14 @@ from sqlalchemy.orm import Session
 
 from app.db.database import _SECTION_BY_NODE_TYPE, _DEFAULT_SECTION
 from app.db.models import AgentStagingORM, EdgeORM, NodeORM, ProjectORM
+from app.services.graph_mappers import (
+    api_meta_to_db,
+    db_meta_to_api,
+    db_parent_id_to_api,
+    db_sort_order_to_api,
+    db_status_to_api,
+    db_tags_to_api,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +58,104 @@ def _resolve_graph_id(db: Session, project_id: str, node_type: str) -> str | Non
         return None
     section = _SECTION_BY_NODE_TYPE.get(node_type, _DEFAULT_SECTION)
     return getattr(project, _GRAPH_ID_ATTR_BY_SECTION[section], None)
+
+
+def _payload_parent_id(payload: dict[str, Any]) -> str | None:
+    """读取 staging payload 中的世界观父节点字段，兼容 snake/camel case。"""
+    raw = payload.get("parent_id", payload.get("parentId"))
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
+def _payload_has_parent(payload: dict[str, Any]) -> bool:
+    """区分“未传 parent 字段”和“显式移动到根层级”。"""
+    return "parent_id" in payload or "parentId" in payload
+
+
+def _payload_sort_order(payload: dict[str, Any]) -> int | None:
+    """读取 staging payload 中的排序字段，兼容 snake/camel case。"""
+    raw = payload.get("sort_order", payload.get("sortOrder"))
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_world_parent(
+    db: Session,
+    project_id: str,
+    parent_id: str | None,
+    *,
+    exclude_node_id: str | None = None,
+) -> str | None:
+    """校验世界观父节点存在且不会形成自引用；失败时返回 None。"""
+    if parent_id is None:
+        return None
+    if parent_id == exclude_node_id:
+        return None
+
+    parent = db.get(NodeORM, parent_id)
+    if parent is None or parent.project_id != project_id or parent.node_type != "worldbuilding":
+        return None
+    return parent_id
+
+
+def _next_world_sort_order(db: Session, project_id: str, parent_id: str | None) -> int:
+    """计算世界观某个父节点下的下一个排序值。"""
+    max_order = -1
+    nodes = (
+        db.query(NodeORM)
+        .filter(NodeORM.project_id == project_id, NodeORM.node_type == "worldbuilding")
+        .all()
+    )
+    for node in nodes:
+        if db_parent_id_to_api(node.meta) != parent_id:
+            continue
+        max_order = max(max_order, db_sort_order_to_api(node.meta))
+    return max_order + 1
+
+
+def _world_parent_would_cycle(
+    db: Session,
+    project_id: str,
+    node_id: str,
+    parent_id: str | None,
+) -> bool:
+    """判断把 node_id 放到 parent_id 下是否会形成世界观树循环。"""
+    cursor = parent_id
+    visited: set[str] = set()
+    while cursor:
+        if cursor == node_id:
+            return True
+        if cursor in visited:
+            return True
+        visited.add(cursor)
+        parent = db.get(NodeORM, cursor)
+        if parent is None or parent.project_id != project_id:
+            return False
+        cursor = db_parent_id_to_api(parent.meta)
+    return False
+
+
+def _set_world_hierarchy_meta(
+    node: NodeORM,
+    *,
+    parent_id: str | None,
+    sort_order: int,
+) -> None:
+    """把世界观树层级写入 node.meta，保持与前端保存格式一致。"""
+    node.meta = api_meta_to_db(
+        db_meta_to_api(node.meta),
+        db_tags_to_api(node.meta),
+        db_status_to_api(node.meta),
+        existing_meta=node.meta,
+        parent_id=parent_id,
+        sort_order=sort_order,
+    )
 
 
 def apply_staging_record(
@@ -107,6 +213,14 @@ def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, 
     title = str(payload.get("title") or "AI 建议节点")
     content = str(payload.get("content") or "")
     node_type = str(payload.get("node_type") or "character")
+    parent_id = None
+    sort_order = _payload_sort_order(payload)
+    if node_type == "worldbuilding":
+        parent_id = _validate_world_parent(
+            db, record.project_id, _payload_parent_id(payload)
+        )
+        if sort_order is None:
+            sort_order = _next_world_sort_order(db, record.project_id, parent_id)
 
     db.add(
         NodeORM(
@@ -116,7 +230,13 @@ def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, 
             node_type=node_type,
             title=title,
             content=content,
-            meta={"tags": ["AI 建议"], "status": "synced"},
+            meta=api_meta_to_db(
+                "AI 建议",
+                ["AI 建议"],
+                "synced",
+                parent_id=parent_id,
+                sort_order=sort_order,
+            ),
             position_x=120.0,
             position_y=120.0,
             sort_order=9999,
@@ -205,9 +325,8 @@ def _apply_update_node(
 ) -> str | None:
     """将 staging.payload 合并到已有节点；目标节点不存在或越界时静默跳过。
 
-    LLM 常用 update_node 补全已有节点设定；payload 只能覆盖白名单字段。其他字段
-    （id / project_id / position 等）必须由用户在前端编辑，避免 AI 意外改变画布
-    坐标或归属关系。
+    LLM 常用 update_node 补全已有节点设定；payload 只能覆盖白名单字段。世界观节点额外
+    允许 parent_id / sort_order，以便 agent 把笔记放入树状层级；坐标仍由前端管理。
     """
     target_id = record.target_id
     if not target_id:
@@ -224,6 +343,36 @@ def _apply_update_node(
         setattr(node, field, value)
         if field == "node_type":
             node.graph_id = _resolve_graph_id(db, record.project_id, value)
+
+    if node.node_type == "worldbuilding":
+        parent_changed = _payload_has_parent(payload)
+        sort_changed = "sort_order" in payload or "sortOrder" in payload
+        if parent_changed or sort_changed:
+            current_parent = db_parent_id_to_api(node.meta)
+            next_parent = (
+                _validate_world_parent(
+                    db,
+                    record.project_id,
+                    _payload_parent_id(payload),
+                    exclude_node_id=node.id,
+                )
+                if parent_changed
+                else current_parent
+            )
+            if _world_parent_would_cycle(db, record.project_id, node.id, next_parent):
+                next_parent = current_parent
+            next_order = _payload_sort_order(payload)
+            if next_order is None:
+                next_order = (
+                    _next_world_sort_order(db, record.project_id, next_parent)
+                    if parent_changed
+                    else db_sort_order_to_api(node.meta)
+                )
+            _set_world_hierarchy_meta(
+                node,
+                parent_id=next_parent,
+                sort_order=next_order,
+            )
 
     db.flush()
     return target_id
