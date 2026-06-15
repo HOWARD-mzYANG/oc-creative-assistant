@@ -134,6 +134,45 @@ def get_llm_settings() -> LlmSettings:
     )
 
 
+def has_reply_llm_settings() -> bool:
+    """判断是否单独配置了回复润色模型。
+
+    只有 provider / base_url / api_key / model 这类真实路由字段非空时才启用独立
+    provider；``OC_LLM_REPLY_STREAM_REASONING=false`` 这类默认开关不会单独触发，
+    避免只写占位配置就意外多初始化一个相同模型。
+    """
+    return any(
+        (os.getenv(name) or "").strip()
+        for name in (
+            "OC_LLM_REPLY_PROVIDER",
+            "OC_LLM_REPLY_BASE_URL",
+            "OC_LLM_REPLY_API_KEY",
+            "OC_LLM_REPLY_MODEL",
+        )
+    )
+
+
+def get_reply_llm_settings() -> LlmSettings:
+    """读取 chat_assembler 专用的可选快模型配置。
+
+    该模型只负责把上游 agent 的结构化结果改写成最终自然语言回复；未配置时复用主
+    LLM。通常这里可以填非 thinking / 更便宜的模型，而主 agent 继续使用更强模型。
+    """
+    base = get_llm_settings()
+    structured_methods = _get_csv(
+        "OC_LLM_REPLY_STRUCTURED_METHODS",
+        base.structured_methods,
+    )
+    return LlmSettings(
+        provider=os.getenv("OC_LLM_REPLY_PROVIDER", base.provider).strip().lower(),
+        base_url=os.getenv("OC_LLM_REPLY_BASE_URL") or base.base_url,
+        api_key=os.getenv("OC_LLM_REPLY_API_KEY") or base.api_key,
+        model=os.getenv("OC_LLM_REPLY_MODEL") or base.model,
+        structured_methods=structured_methods,
+        stream_reasoning=_get_bool("OC_LLM_REPLY_STREAM_REASONING", False),
+    )
+
+
 @dataclass(frozen=True)
 class WebSearchSettings:
     """联网搜索工具配置。

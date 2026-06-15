@@ -77,6 +77,10 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
     内部维护回合级 search_cache，因此 LLM 在同一个 ReAct 循环中用相近查询反复调用
     search_nodes 时会命中已有结果，避免重复调用 chroma。
 
+    ``web_search`` 会始终注册到工具列表，避免模型在 prompt 中看过该能力后又收到
+    “未知工具”。当 include_web_search 为 false 时，工具内部会返回明确的禁用提示，
+    而不是执行联网请求。
+
     缓存键按“词集合”归一化（按空白切分 -> 排序 -> 重新拼接成字符串），因此无论
     LLM 调换词序（"Elara mentor" / "mentor Elara"）还是调整 top_k，都会命中同一份
     缓存；如果不归一化，ReAct 中的 LLM 很容易通过改写关键词绕过缓存并反复敲 chroma。
@@ -565,6 +569,14 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
         if cached is not None:
             return cached
 
+        if not include_web_search:
+            error_payload = (
+                "[ERROR] 本轮未启用联网搜索。请基于项目知识库、已检索上下文和已有工具结果回答；"
+                "不要调用 web_search 重试。若用户明确要求联网，请提示其打开联网搜索或明确说“联网查”。"
+            )
+            search_cache[f"web::{key}"] = error_payload
+            return error_payload
+
         try:
             response = search_web(query, top_k)
         except WebSearchUnavailable as exc:
@@ -607,7 +619,6 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
         get_world_subtree,
         list_neighbors,
         multi_hop_neighbors,
+        web_search,
     ]
-    if include_web_search:
-        tool_list.append(web_search)
     return tool_list

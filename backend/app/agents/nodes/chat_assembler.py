@@ -6,8 +6,8 @@
 为支持 token 级流式输出，主路径拆成两步：
   步骤 1 [流式]：chat_stream 生成纯文本 reply_text，并通过 get_stream_writer 将每个
                  token 推到 LangGraph custom stream
-  步骤 2 [非流式]：结构化调用从已生成的 reply_text 中提取 cited_node_ids 和
-                  staging_summary
+  步骤 2 [确定性]：从上游 agent 输出直接派生 cited_node_ids 和 staging_summary，
+                 避免为了元信息再跑一轮 LLM
 
 small_talk 文本很短，不值得额外走一轮请求，因此保留单次结构化调用。
 """
@@ -22,11 +22,11 @@ from langgraph.config import get_stream_writer
 
 from app.agents.memory import build_memory_block, format_current_nodes
 from app.agents.prompts import load_prompt
-from app.agents.schemas import ChatAssemblerOutput, ChatMetadataOutput
+from app.agents.schemas import ChatAssemblerOutput
 from app.agents.state import AgentState
 from app.agents.structured_call import call_structured
 from app.core.settings import get_llm_settings
-from app.llm.factory import get_llm_provider
+from app.llm.factory import get_llm_provider, get_reply_llm_provider
 
 
 _OUTPUT_KEY_BY_INTENT: dict[str, str] = {
@@ -39,7 +39,6 @@ _OUTPUT_KEY_BY_INTENT: dict[str, str] = {
 
 _SMALL_TALK_PROMPT = load_prompt("chat_assembler_small_talk")
 _REPLY_PROMPT = load_prompt("chat_assembler_reply")
-_METADATA_PROMPT = load_prompt("chat_assembler_metadata")
 
 
 def _hint_block(state: AgentState) -> str:
@@ -139,7 +138,7 @@ def _stream_reply(messages: list[BaseMessage]) -> str:
         writer = None
 
     chunks: list[str] = []
-    for chunk in get_llm_provider().chat_stream_chunks(messages):
+    for chunk in get_reply_llm_provider().chat_stream_chunks(messages):
         if writer is not None:
             try:
                 if chunk.reasoning:
@@ -153,14 +152,49 @@ def _stream_reply(messages: list[BaseMessage]) -> str:
     return "".join(chunks)
 
 
-def _build_meta_messages(output: Any, reply_text: str) -> list[BaseMessage]:
-    return [
-        SystemMessage(_METADATA_PROMPT),
-        HumanMessage(
-            f"[生成的回复]\n{reply_text}\n\n"
-            f"[原始 agent 输出]\n{output.model_dump_json()}"
-        ),
-    ]
+def _dedupe_node_ids(values: list[Any]) -> list[str]:
+    """保持原顺序去重，只保留非空字符串 node_id。"""
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        node_id = value.strip() if isinstance(value, str) else ""
+        if not node_id or node_id in seen:
+            continue
+        result.append(node_id)
+        seen.add(node_id)
+    return result
+
+
+def _derive_cited_node_ids(output: Any) -> list[str]:
+    """从上游 agent 的显式引用字段派生引用节点，替代额外 LLM 元信息整理。"""
+    values: list[Any] = list(getattr(output, "referenced_node_ids", []) or [])
+    for branch in getattr(output, "branches", []) or []:
+        values.extend(getattr(branch, "affected_node_ids", []) or [])
+    return _dedupe_node_ids(values)
+
+
+def _has_chinese(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+def _derive_staging_summary(state: AgentState, output: Any) -> str:
+    """根据 proposed_changes 数量生成短摘要，不再调用模型二次判断。"""
+    changes = list(getattr(output, "proposed_changes", []) or [])
+    count = len(changes)
+    if count == 0:
+        return ""
+
+    is_zh = _has_chinese(state.get("user_message", ""))
+    if state.get("auto_apply_staging"):
+        if is_zh:
+            return f"已应用 {count} 条画布变更，可在卡片中查看或调整。"
+        noun = "change" if count == 1 else "changes"
+        return f"Applied {count} canvas {noun}; review them in the cards."
+
+    if is_zh:
+        return f"已生成 {count} 条待确认变更。"
+    noun = "change" if count == 1 else "changes"
+    return f"Prepared {count} pending canvas {noun}."
 
 
 def chat_assembler_node(state: AgentState) -> dict[str, Any]:
@@ -181,15 +215,6 @@ def chat_assembler_node(state: AgentState) -> dict[str, Any]:
 
     reply_text = _stream_reply(_build_reply_messages(state, output, primary))
 
-    metadata = call_structured(
-        get_llm_provider(),
-        _build_meta_messages(output, reply_text),
-        ChatMetadataOutput,
-        label="chat_assembler.metadata",
-    )
-    if metadata is None:
-        metadata = ChatMetadataOutput(cited_node_ids=[], staging_summary="")
-
     web_sources = []
     if primary == "research":
         research = state.get("research_output")
@@ -199,8 +224,8 @@ def chat_assembler_node(state: AgentState) -> dict[str, Any]:
     return {
         "assembler_output": ChatAssemblerOutput(
             reply_text=reply_text,
-            cited_node_ids=metadata.cited_node_ids,
-            staging_summary=metadata.staging_summary,
+            cited_node_ids=_derive_cited_node_ids(output),
+            staging_summary=_derive_staging_summary(state, output),
             web_sources=web_sources,
         )
     }

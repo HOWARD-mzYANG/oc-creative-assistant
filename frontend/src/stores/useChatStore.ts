@@ -51,7 +51,8 @@ export interface ChatMessage {
  * Full-screen chat store (first_revision phase 4).
  *
  * Handles the session lifecycle, message stream (reusing streamChat SSE), and the staging list extracted in the background.
- * Enables extraction_enabled so that structured_extractor / question_planner step in.
+ * Keeps background extraction off by default; explicit canvas edits still go through
+ * structure_agent -> staging -> canvas_apply.
  */
 export const useChatStore = defineStore('chat', () => {
   const projectId = ref('')
@@ -302,7 +303,7 @@ export const useChatStore = defineStore('chat', () => {
             error.value = parts.join('\n\n')
           }
         },
-        true, // extraction_enabled
+        false, // extraction_enabled：默认关闭后台抽取/追问规划，避免回复结束后继续卡住。
         webSearchMode,
         shouldAutoApply,
       )

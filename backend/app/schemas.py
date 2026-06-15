@@ -448,8 +448,8 @@ class ChatRequest(BaseModel):
     session_id: str
     user_message: str
     selected_node_ids: list[str] = Field(default_factory=list)
-    # first_revision 第 4 阶段：ChatWorkspace 全屏聊天将其设为 True 以启用后台 B-agent；
-    # FloatingChatDock 不传该值，保持旧流程（没有 question_planner / structured_extractor 副作用）。
+    # 后台 B-agent 开关；默认关闭，避免 question_planner / structured_extractor
+    # 在回复完成后继续阻塞本轮聊天。需要自动抽取设定时由前端显式传 True。
     extraction_enabled: bool = False
     # 为 True 时，staging 会立即 accept_all（聊天 UI 中的行内确认卡 + 丢弃）。
     auto_apply_staging: bool = False

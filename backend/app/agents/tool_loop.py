@@ -33,10 +33,14 @@ from langgraph.config import get_stream_writer
 from app.core.settings import get_llm_settings
 from app.llm.provider import LlmProvider, extract_provider_reasoning
 
+# 模型最多规划几轮工具调用。
+MAX_TOOL_LOOPS = 4
 
-MAX_TOOL_LOOPS = 3
-MAX_CALLS_PER_BATCH = 3
-MAX_TOTAL_TOOL_CALLS = 5
+# 每一轮里最多允许并行/批量调用几个工具。
+MAX_CALLS_PER_BATCH = 4
+
+# 整轮对话里工具调用总次数上限。
+MAX_TOTAL_TOOL_CALLS = 10
 _TOOL_RESULT_TOKEN_CAP = 2000
 _MIDDLE_THOUGHT_CHAR_CAP = 400
 _TOOL_TRACE_PREVIEW_CHAR_CAP = 180
