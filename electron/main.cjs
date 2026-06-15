@@ -2,11 +2,14 @@ const fs = require('node:fs')
 const net = require('node:net')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron')
 
 // 打包模式下 Electron 主进程托管后端进程；开发模式通常复用外部 uvicorn。
 let backendProcess = null
 const PDF_EXPORT_CHANNEL = 'oc:export-project-pdf'
+const ZOOM_MIN = 0.5
+const ZOOM_MAX = 2
+const ZOOM_STEP = 0.1
 
 // 标准化端口输入；无效时回退到默认值。
 function resolvePort(rawPort, fallback) {
@@ -35,6 +38,28 @@ function buildHttpUrl(host, port) {
 // 根据后端基础 URL 构建健康检查端点 URL。
 function buildHealthUrl(baseUrl) {
   return `${baseUrl.replace(/\/$/, '')}/health`
+}
+
+// 避免浮点误差累积导致 1.2000000002 这类缩放值。
+function clampZoomFactor(value) {
+  const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
+  return Math.round(clamped * 100) / 100
+}
+
+function setWindowZoom(window, factor) {
+  if (!window || window.isDestroyed()) {
+    return
+  }
+
+  window.webContents.setZoomFactor(clampZoomFactor(factor))
+}
+
+function adjustWindowZoom(window, delta) {
+  if (!window || window.isDestroyed()) {
+    return
+  }
+
+  setWindowZoom(window, window.webContents.getZoomFactor() + delta)
 }
 
 // 检查指定本地端口当前是否可用。
@@ -368,6 +393,97 @@ function wireExternalNavigation(mainWindow, rendererUrl) {
   })
 }
 
+// 注册窗口级界面缩放快捷键：Ctrl/Cmd + +/-/0。
+function wireZoomShortcuts(mainWindow) {
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') {
+      return
+    }
+
+    const hasCommandModifier = process.platform === 'darwin'
+      ? input.meta
+      : input.control
+    if (!hasCommandModifier || input.alt) {
+      return
+    }
+
+    const key = String(input.key || '').toLowerCase()
+    const code = String(input.code || '')
+    if (key === '+' || key === '=' || code === 'Equal' || code === 'NumpadAdd') {
+      adjustWindowZoom(mainWindow, ZOOM_STEP)
+      event.preventDefault()
+      return
+    }
+
+    if (key === '-' || key === '_' || code === 'Minus' || code === 'NumpadSubtract') {
+      adjustWindowZoom(mainWindow, -ZOOM_STEP)
+      event.preventDefault()
+      return
+    }
+
+    if (key === '0' || code === 'Digit0' || code === 'Numpad0') {
+      setWindowZoom(mainWindow, 1)
+      event.preventDefault()
+    }
+  })
+}
+
+function installApplicationMenu() {
+  const template = [
+    ...(process.platform === 'darwin'
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: 'about', label: '关于' },
+            { type: 'separator' },
+            { role: 'hide', label: '隐藏' },
+            { role: 'hideOthers', label: '隐藏其他' },
+            { role: 'unhide', label: '全部显示' },
+            { type: 'separator' },
+            { role: 'quit', label: '退出' },
+          ],
+        }]
+      : []),
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        {
+          label: '放大',
+          accelerator: 'CommandOrControl+=',
+          click: (_menuItem, browserWindow) => adjustWindowZoom(browserWindow, ZOOM_STEP),
+        },
+        {
+          label: '缩小',
+          accelerator: 'CommandOrControl+-',
+          click: (_menuItem, browserWindow) => adjustWindowZoom(browserWindow, -ZOOM_STEP),
+        },
+        {
+          label: '重置缩放',
+          accelerator: 'CommandOrControl+0',
+          click: (_menuItem, browserWindow) => setWindowZoom(browserWindow, 1),
+        },
+        { type: 'separator' },
+        { role: 'reload', label: '重新加载' },
+        { role: 'toggleDevTools', label: '开发者工具' },
+      ],
+    },
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 // 创建主窗口，并把后端 URL 注入渲染进程。
 async function createWindow(runtimeConfig) {
   const mainWindow = new BrowserWindow({
@@ -391,6 +507,7 @@ async function createWindow(runtimeConfig) {
   })
 
   wireExternalNavigation(mainWindow, runtimeConfig.rendererUrl)
+  wireZoomShortcuts(mainWindow)
 
   if (runtimeConfig.rendererUrl) {
     await loadRenderer(mainWindow, runtimeConfig.rendererUrl)
@@ -418,6 +535,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.occreativeassistant.app')
   }
+
+  installApplicationMenu()
 
   const runtimeConfig = await resolveRuntimeConfig()
   await createWindow(runtimeConfig)
