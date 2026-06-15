@@ -16,7 +16,7 @@ from app.agents.graph import get_agent_graph
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.llm.factory import get_llm_provider
 from app.db.database import SessionLocal
-from app.db.models import AgentStagingORM, ChatMessageORM, ChatSessionORM
+from app.db.models import AgentStagingORM, ChatMessageORM, ChatSessionORM, NodeORM
 from app.indexing.sync import safe_sync_node_index
 from app.indexing.vector_store import delete_node as delete_node_vectors
 from app.services.canvas_apply import apply_staging_record
@@ -75,7 +75,23 @@ def _message_to_payload(record: ChatMessageORM) -> ChatMessagePayload:
     )
 
 
-def _staging_to_payload(record: AgentStagingORM) -> AgentStagingPayload:
+def _display_payload_for_staging(record: AgentStagingORM, db) -> dict[str, Any]:
+    """为前端展示补全 staging payload，不修改数据库中 LLM 原始输出。"""
+    payload = dict(record.payload_edited or record.payload or {})
+    if record.change_type != "update_node" or not record.target_id:
+        return payload
+
+    node = db.get(NodeORM, record.target_id)
+    if node is None or node.project_id != record.project_id:
+        return payload
+
+    payload.setdefault("title", node.title)
+    payload.setdefault("content", node.content)
+    payload.setdefault("node_type", node.node_type)
+    return payload
+
+
+def _staging_to_payload(record: AgentStagingORM, db) -> AgentStagingPayload:
     return AgentStagingPayload(
         id=record.id,
         session_id=record.session_id,
@@ -85,7 +101,7 @@ def _staging_to_payload(record: AgentStagingORM) -> AgentStagingPayload:
         change_type=record.change_type,
         target_id=record.target_id,
         pending_id=record.pending_id,
-        payload=record.payload,
+        payload=_display_payload_for_staging(record, db),
         payload_edited=record.payload_edited,
         agent_type=record.agent_type,
         reasoning=record.reasoning,
@@ -96,7 +112,7 @@ def _staging_to_payload(record: AgentStagingORM) -> AgentStagingPayload:
     )
 
 
-def _group_by_batch(records: list[AgentStagingORM]) -> list[AgentStagingBatchPayload]:
+def _group_by_batch(records: list[AgentStagingORM], db) -> list[AgentStagingBatchPayload]:
     """按 batch_id 聚合，保留批次首次出现顺序；批次内保留 order_in_batch。"""
     grouped: dict[str, list[AgentStagingORM]] = {}
     order: list[str] = []
@@ -108,7 +124,7 @@ def _group_by_batch(records: list[AgentStagingORM]) -> list[AgentStagingBatchPay
     return [
         AgentStagingBatchPayload(
             batch_id=batch_id,
-            items=[_staging_to_payload(r) for r in grouped[batch_id]],
+            items=[_staging_to_payload(r, db) for r in grouped[batch_id]],
         )
         for batch_id in order
     ]
@@ -221,7 +237,7 @@ def create_staging_batch(
         )
         return AgentStagingBatchPayload(
             batch_id=batch_id,
-            items=[_staging_to_payload(r) for r in records],
+            items=[_staging_to_payload(r, db) for r in records],
         )
 
 
@@ -233,7 +249,7 @@ def list_session_staging(
     with SessionLocal() as db:
         require_session(db, session_id)
         records = list_staging_by_session(db, session_id, status)
-        return _group_by_batch(records)
+        return _group_by_batch(records, db)
 
 
 def list_project_staging(
@@ -244,7 +260,7 @@ def list_project_staging(
     with SessionLocal() as db:
         require_project(db, project_id)
         records = list_staging_by_project(db, project_id, status)
-        return _group_by_batch(records)
+        return _group_by_batch(records, db)
 
 
 def resolve_staging_item(
@@ -295,7 +311,7 @@ def resolve_staging_item(
         if deleted_id:
             deleted.append((record.project_id, deleted_id))
 
-        result = _staging_to_payload(record)
+        result = _staging_to_payload(record, db)
 
     _sync_indices(upserted)
     _sync_deletions(deleted)
@@ -349,7 +365,7 @@ def resolve_staging_batch(
             if deleted_id:
                 deleted.append((record.project_id, deleted_id))
 
-        results = [_staging_to_payload(r) for r in records]
+        results = [_staging_to_payload(r, db) for r in records]
 
     _sync_indices(upserted)
     _sync_deletions(deleted)

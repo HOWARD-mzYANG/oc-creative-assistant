@@ -272,24 +272,28 @@ def _applied_cards_from_batch(batch_id: str) -> list[dict[str, Any]]:
     with SessionLocal() as db:
         records = list_staging_by_batch(db, batch_id)
 
-    applied: list[dict[str, Any]] = []
-    for record in records:
-        if record.status not in ("accepted", "edited"):
-            continue
-        if record.change_type not in ("create_node", "update_node"):
-            continue
-        if not record.target_id:
-            continue
-        payload = record.payload_edited or record.payload or {}
-        applied.append(
-            {
-                "node_id": record.target_id,
-                "title": str(payload.get("title") or "未命名"),
-                "node_type": str(payload.get("node_type") or "character"),
-                "content": str(payload.get("content") or ""),
-                "change_type": record.change_type,
-            }
-        )
+        applied: list[dict[str, Any]] = []
+        for record in records:
+            if record.status not in ("accepted", "edited"):
+                continue
+            if record.change_type not in ("create_node", "update_node"):
+                continue
+            if not record.target_id:
+                continue
+            payload = record.payload_edited or record.payload or {}
+            node = db.get(NodeORM, record.target_id)
+            title = payload.get("title") or (node.title if node else "未命名")
+            node_type = payload.get("node_type") or (node.node_type if node else "node")
+            content = payload.get("content") or (node.content if node else "")
+            applied.append(
+                {
+                    "node_id": record.target_id,
+                    "title": str(title),
+                    "node_type": str(node_type),
+                    "content": str(content),
+                    "change_type": record.change_type,
+                }
+            )
     return applied
 
 

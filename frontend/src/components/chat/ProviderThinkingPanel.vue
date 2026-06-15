@@ -5,7 +5,7 @@ defineProps<{
 </script>
 
 <template>
-  <details v-if="content.trim()" class="provider-thinking">
+  <details v-if="content.trim()" class="provider-thinking" open>
     <summary class="provider-thinking__summary">模型原始思考</summary>
     <pre class="provider-thinking__content">{{ content }}</pre>
   </details>

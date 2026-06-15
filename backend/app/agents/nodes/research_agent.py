@@ -26,7 +26,7 @@ from app.agents.web_query import (
 )
 from app.llm.factory import get_llm_provider
 from app.agents.structured_call import call_structured
-from app.agents.tool_loop import compact_history_for_structured, run_tool_loop
+from app.agents.tool_loop import compact_history_for_structured, emit_trace_item, run_tool_loop
 from app.agents.prompts import load_prompt
 from datetime import datetime
 
@@ -49,11 +49,21 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
     web_search_mode = state.get("web_search_mode", "auto")
     web_enabled = resolve_web_search_enabled(user_message, web_search_mode)
     if web_enabled:
+        emit_trace_item(
+            "外部检索预取",
+            "检测到可能需要外部事实，正在预取 web_search 结果。",
+            node="research_agent",
+        )
         prefetched = prefetch_web_search(user_message)
         if prefetched is not None:
             web_prefetch_block = prefetched.block
             web_fallback_answer = prefetched.fallback_answer
             prefetch_sources = prefetched.sources
+            emit_trace_item(
+                "外部检索预取",
+                f"已取得 {len(prefetch_sources)} 条网页来源。",
+                node="research_agent",
+            )
             logger.info(
                 "research_agent prefetched web_search (mode=%s)",
                 web_search_mode,
@@ -82,6 +92,11 @@ def research_agent_node(state: AgentState) -> dict[str, Any]:
         history = run_tool_loop(provider, initial_messages, tools)
         tool_sources = extract_web_sources_from_tool_history(history)
         web_sources = merge_web_sources(prefetch_sources, tool_sources)
+        emit_trace_item(
+            "整理研究结果",
+            "工具证据收集完成，正在生成结构化研究摘要。",
+            node="research_agent",
+        )
         output = call_structured(
             provider,
             compact_history_for_structured(history),

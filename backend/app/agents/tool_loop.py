@@ -16,6 +16,9 @@
 
 from __future__ import annotations
 
+import json
+import time
+
 import tiktoken
 from langchain_core.messages import (
     AIMessage,
@@ -36,6 +39,7 @@ MAX_CALLS_PER_BATCH = 3
 MAX_TOTAL_TOOL_CALLS = 5
 _TOOL_RESULT_TOKEN_CAP = 600
 _MIDDLE_THOUGHT_CHAR_CAP = 400
+_TOOL_TRACE_PREVIEW_CHAR_CAP = 180
 
 # 复用与 context_compress 相同的 encoding；可离线工作，并与主流 OpenAI 兼容模型一致。
 _encoder = tiktoken.get_encoding("cl100k_base")
@@ -59,7 +63,12 @@ def run_tool_loop(
     writer = _get_optional_stream_writer()
     stream_reasoning = get_llm_settings().stream_reasoning
 
-    for _ in range(MAX_TOOL_LOOPS):
+    for loop_index in range(MAX_TOOL_LOOPS):
+        _emit_trace_item(
+            writer,
+            "工具规划",
+            f"正在判断是否需要调用项目工具（第 {loop_index + 1} 轮）。",
+        )
         response = provider.chat_with_tools(history, tools)
         if stream_reasoning:
             _emit_provider_reasoning(writer, response)
@@ -67,9 +76,18 @@ def run_tool_loop(
 
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
+            _emit_trace_item(writer, "工具规划", "模型认为已有证据足够，结束工具调用。")
             return history
 
         for idx, call in enumerate(tool_calls):
+            tool_name = str(call.get("name") or "unknown_tool")
+            tool_args = call.get("args", {})
+            _emit_trace_item(
+                writer,
+                "工具调用",
+                f"{tool_name}({_format_tool_args(tool_args)})",
+            )
+            started = time.perf_counter()
             within_batch = idx < MAX_CALLS_PER_BATCH
             within_budget = total_calls < MAX_TOTAL_TOOL_CALLS
             if not within_batch or not within_budget:
@@ -79,15 +97,24 @@ def run_tool_loop(
                     "请直接基于已有证据收束，不要再调用工具。]"
                 )
             else:
-                tool_fn = tool_by_name.get(call["name"])
+                tool_fn = tool_by_name.get(tool_name)
                 if tool_fn is None:
-                    content = f"未知工具：{call['name']}"
+                    content = f"未知工具：{tool_name}"
                 else:
                     try:
-                        content = tool_fn.invoke(call["args"])
+                        content = tool_fn.invoke(tool_args)
                     except Exception as exc:  # noqa: BLE001
                         content = f"工具执行失败：{exc}"
                 total_calls += 1
+            elapsed_ms = round((time.perf_counter() - started) * 1000)
+            _emit_trace_item(
+                writer,
+                "工具结果",
+                (
+                    f"{tool_name} 完成，用时 {elapsed_ms}ms。\n"
+                    f"{_format_tool_result_preview(content)}"
+                ),
+            )
             history.append(ToolMessage(content=str(content), tool_call_id=call["id"]))
 
         if total_calls >= MAX_TOTAL_TOOL_CALLS:
@@ -97,6 +124,7 @@ def run_tool_loop(
 
 
 def _get_optional_stream_writer():
+    """尽力获取 LangGraph custom stream writer；非流式调用下返回 None。"""
     try:
         return get_stream_writer()
     except Exception:
@@ -104,6 +132,7 @@ def _get_optional_stream_writer():
 
 
 def _emit_provider_reasoning(writer, response: AIMessage) -> None:
+    """把 provider 返回的 reasoning_content 透传给前端；失败时静默跳过。"""
     if writer is None:
         return
     reasoning = extract_provider_reasoning(response)
@@ -113,6 +142,88 @@ def _emit_provider_reasoning(writer, response: AIMessage) -> None:
         writer({"type": "reasoning_token", "text": reasoning})
     except Exception:
         pass
+
+
+def _emit_trace_item(writer, title: str, content: str, *, node: str = "tool_loop") -> None:
+    """向前端推送工具循环中的实时可观察轨迹。"""
+    if writer is None:
+        return
+    try:
+        writer({
+            "type": "trace_item",
+            "node": node,
+            "title": title,
+            "content": _truncate_chars(content, 480),
+        })
+    except Exception:
+        pass
+
+
+def emit_trace_item(title: str, content: str, *, node: str = "agent") -> None:
+    """给 agent 节点复用的便捷 trace 推送入口。"""
+    _emit_trace_item(_get_optional_stream_writer(), title, content, node=node)
+
+
+def _format_tool_args(args: object) -> str:
+    """把工具参数压成适合在前端展示的一行文本。"""
+    try:
+        return json.dumps(args, ensure_ascii=False)
+    except TypeError:
+        return str(args)
+
+
+def _format_tool_result_preview(content: object) -> str:
+    """把工具返回值整理成更短的前端预览，完整内容仍会进入 LLM 历史。"""
+    if isinstance(content, (list, dict)):
+        data = content
+    else:
+        text = str(content).strip()
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return _truncate_chars(text, _TOOL_TRACE_PREVIEW_CHAR_CAP)
+
+    if isinstance(data, list):
+        if not data:
+            return "返回 0 条结果。"
+        preview_items = [_summarize_tool_item(item) for item in data[:2]]
+        suffix = f"\n…共 {len(data)} 条结果" if len(data) > 2 else f"\n共 {len(data)} 条结果"
+        return "\n".join(preview_items) + suffix
+
+    if isinstance(data, dict):
+        if {"id", "title", "type"} & data.keys():
+            return _summarize_tool_item(data)
+        if "answer" in data or "hits" in data:
+            answer = _truncate_chars(str(data.get("answer") or ""), 120)
+            hits = data.get("hits") if isinstance(data.get("hits"), list) else []
+            return f"answer: {answer or '无'}\n来源 {len(hits)} 条"
+        keys = ", ".join(list(data.keys())[:6])
+        return f"返回对象：{keys}"
+
+    return _truncate_chars(str(content), _TOOL_TRACE_PREVIEW_CHAR_CAP)
+
+
+def _summarize_tool_item(item: object) -> str:
+    """摘要化单条工具结果，避免在 trace 面板里展示大段 JSON。"""
+    if not isinstance(item, dict):
+        return _truncate_chars(str(item), _TOOL_TRACE_PREVIEW_CHAR_CAP)
+
+    title = str(item.get("title") or item.get("id") or "未命名")
+    item_type = str(item.get("type") or item.get("node_type") or "")
+    item_id = str(item.get("id") or "")
+    score = item.get("score")
+    preview = str(item.get("content_preview") or item.get("content") or item.get("snippet") or "")
+    head_parts = [title]
+    if item_type:
+        head_parts.append(item_type)
+    if item_id:
+        head_parts.append(item_id)
+    if isinstance(score, (int, float)):
+        head_parts.append(f"score={score:.3f}")
+    head = " · ".join(head_parts)
+    if preview:
+        return f"- {head}\n  {_truncate_chars(preview, 100)}"
+    return f"- {head}"
 
 
 def _truncate_chars(text: str, limit: int) -> str:

@@ -73,11 +73,12 @@ export const useChatStore = defineStore('chat', () => {
     if (item.change_type !== 'create_node' && item.change_type !== 'update_node') return null
     if (!item.target_id) return null
     if (item.status !== 'accepted' && item.status !== 'edited') return null
-    const payload = item.payload_edited ?? item.payload
+    const payload = { ...item.payload, ...(item.payload_edited ?? {}) }
+    const fallbackTitle = item.change_type === 'update_node' ? '已更新节点' : '未命名'
     return {
       node_id: item.target_id,
-      title: String(payload.title ?? '未命名'),
-      node_type: String(payload.node_type ?? 'character'),
+      title: String(payload.title ?? fallbackTitle),
+      node_type: String(payload.node_type ?? 'node'),
       content: String(payload.content ?? ''),
       change_type: item.change_type,
     }
@@ -279,7 +280,7 @@ export const useChatStore = defineStore('chat', () => {
       const lastAssistant = [...messages.value].reverse().find((m) => m.role === 'assistant')
       if (lastAssistant) {
         const applied =
-          lastAssistant.applied?.length ? lastAssistant.applied : appliedThisTurn.length ? appliedThisTurn : streamingApplied.value
+          appliedThisTurn.length ? appliedThisTurn : lastAssistant.applied?.length ? lastAssistant.applied : streamingApplied.value
         if (applied.length) lastAssistant.applied = [...applied]
         if (relatedThisTurn.length) lastAssistant.relatedNodes = [...relatedThisTurn]
         if (traceThisTurn.length) lastAssistant.trace = traceThisTurn

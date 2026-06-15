@@ -17,10 +17,11 @@ const emit = defineEmits<{
 }>()
 
 const NODE_TYPE_LABELS: Record<string, string> = {
+  node: '节点',
   character: '角色',
-  worldbuilding: 'World',
+  worldbuilding: '世界观',
   plot: '故事',
-  idea: 'Idea',
+  idea: '想法',
   research: '资料',
   structure: '结构',
 }

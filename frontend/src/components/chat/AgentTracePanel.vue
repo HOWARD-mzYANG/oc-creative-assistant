@@ -7,15 +7,18 @@ defineProps<{
 </script>
 
 <template>
-  <details v-if="items.length" class="agent-trace">
+  <details v-if="items.length" class="agent-trace" open>
     <summary class="agent-trace__summary">
-      <span>处理过程</span>
+      <span>思考过程</span>
       <span class="agent-trace__count">{{ items.length }}</span>
     </summary>
     <ol class="agent-trace__list">
       <li v-for="(item, index) in items" :key="`${item.node}-${index}`" class="agent-trace__item">
-        <span class="agent-trace__title">{{ item.title }}</span>
-        <p class="agent-trace__content">{{ item.content }}</p>
+        <span class="agent-trace__index">{{ index + 1 }}</span>
+        <div class="agent-trace__body">
+          <span class="agent-trace__title">{{ item.title }}</span>
+          <p class="agent-trace__content">{{ item.content }}</p>
+        </div>
       </li>
     </ol>
   </details>
@@ -57,12 +60,30 @@ defineProps<{
 
 .agent-trace__list {
   margin: 0;
-  padding: 0 9px 8px 24px;
+  padding: 0 9px 8px;
+  list-style: none;
 }
 
 .agent-trace__item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: start;
   margin-top: 7px;
-  padding-left: 2px;
+}
+
+.agent-trace__index {
+  display: inline-flex;
+  justify-content: flex-end;
+  padding-top: 1px;
+  color: var(--muted, #888);
+  font-size: 11px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-trace__body {
+  min-width: 0;
 }
 
 .agent-trace__title {

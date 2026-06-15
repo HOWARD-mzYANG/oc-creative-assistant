@@ -18,7 +18,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
@@ -49,6 +49,7 @@ class ChatStreamDelta:
 
 
 def _is_tool_choice_unsupported_error(exc: BaseException) -> bool:
+    """判断异常是否来自 thinking 模型不支持 tool_choice 的协议限制。"""
     text = str(exc).lower()
     return "tool_choice" in text and (
         "does not support" in text
@@ -58,6 +59,7 @@ def _is_tool_choice_unsupported_error(exc: BaseException) -> bool:
 
 
 def _strip_json_fence(text: str) -> str:
+    """去掉模型可能包在 JSON 外层的 markdown 代码块。"""
     stripped = text.strip()
     if not stripped.startswith("```"):
         return stripped
@@ -86,6 +88,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
 
 def _raw_message_snippet(raw: Any, *, limit: int = 240) -> str:
+    """把结构化调用返回的原始消息压成短片段，供 warning 日志诊断。"""
     if raw is None:
         return ""
     content = getattr(raw, "content", raw)
@@ -107,6 +110,11 @@ def _raw_message_snippet(raw: Any, *, limit: int = 240) -> str:
 
 
 def _content_to_text(content: Any) -> str:
+    """将 LangChain/OpenAI 的 content 结构转换成普通可见文本。
+
+    多模态或 OpenAI 兼容扩展有时会把 content 表示成 block 列表；这里只保留
+    普通文本块，跳过 reasoning/thinking 块，避免把模型思考混入最终回复。
+    """
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -125,7 +133,51 @@ def _content_to_text(content: Any) -> str:
     return ""
 
 
+def _message_role(message: BaseMessage) -> str:
+    """把 LangChain 消息类型映射成 OpenAI SDK 所需的 role 字符串。"""
+    message_type = getattr(message, "type", "")
+    if message_type == "human":
+        return "user"
+    if message_type == "ai":
+        return "assistant"
+    if message_type == "tool":
+        return "tool"
+    return "system"
+
+
+def _messages_to_openai(messages: list[BaseMessage]) -> list[dict[str, Any]]:
+    """将 LangChain 消息列表转换成 OpenAI SDK 原始 chat.completions payload。"""
+    payload: list[dict[str, Any]] = []
+    for message in messages:
+        item: dict[str, Any] = {
+            "role": _message_role(message),
+            "content": _content_to_text(message.content),
+        }
+        if isinstance(message, ToolMessage):
+            item["tool_call_id"] = message.tool_call_id
+        payload.append(item)
+    return payload
+
+
+def _delta_field(delta: Any, key: str) -> Any:
+    """兼容 dict / Pydantic 对象 / model_extra 三种 delta 字段读取方式。"""
+    if isinstance(delta, dict):
+        return delta.get(key)
+    value = getattr(delta, key, None)
+    if value is not None:
+        return value
+    model_extra = getattr(delta, "model_extra", None)
+    if isinstance(model_extra, dict):
+        return model_extra.get(key)
+    return None
+
+
 def _extract_reasoning_text(value: Any, *, known_reasoning_field: bool = False) -> str:
+    """从 provider 扩展字段或 reasoning block 中提取 thinking 文本。
+
+    普通字符串只有在已知来源就是 reasoning 字段时才会被采纳，防止把常规回复
+    content 误判成“模型原始思考”。
+    """
     if isinstance(value, str):
         return value if known_reasoning_field else ""
     if isinstance(value, dict):
@@ -153,6 +205,7 @@ def _extract_reasoning_text(value: Any, *, known_reasoning_field: bool = False) 
 
 
 def _reasoning_from_chunk(chunk: Any) -> str:
+    """从 LangChain/OpenAI 兼容消息块中收集 reasoning_content 等扩展字段。"""
     parts: list[str] = []
     for attr_name in ("additional_kwargs", "response_metadata"):
         data = getattr(chunk, attr_name, None)
@@ -221,6 +274,10 @@ class OpenAICompatibleProvider:
         self._structured_methods = methods or ("function_calling", "json_mode", "plain_json")
         self._disabled_structured_methods: set[str] = set()
         self._stream_reasoning = settings.stream_reasoning
+        self._base_url = settings.base_url
+        self._api_key = settings.api_key
+        self._model = settings.model
+        self._openai_client: Any | None = None
 
         self._client = ChatOpenAI(
             base_url=settings.base_url,
@@ -240,12 +297,52 @@ class OpenAICompatibleProvider:
         DeepSeek 等模型可能把 thinking 放在 chunk.additional_kwargs.reasoning_content；
         只有开启 OC_LLM_STREAM_REASONING 时才向上游暴露这部分内容。
         """
+        if self._stream_reasoning:
+            yield from self._chat_stream_chunks_openai_sdk(messages)
+            return
+
         for chunk in self._client.stream(messages):
             content = getattr(chunk, "content", chunk)
             text = _content_to_text(content)
             reasoning = _reasoning_from_chunk(chunk) if self._stream_reasoning else ""
             if text or reasoning:
                 yield ChatStreamDelta(text=text, reasoning=reasoning)
+
+    def _chat_stream_chunks_openai_sdk(
+        self,
+        messages: list[BaseMessage],
+    ) -> Iterator[ChatStreamDelta]:
+        """使用 OpenAI SDK 原始流读取 content / reasoning_content。
+
+        LangChain 对 OpenAI 兼容扩展字段的透传取决于版本；这里在开启原始 thinking 展示时
+        直接读取 delta.reasoning_content，使 DeepSeek 的思考流更可靠地到达前端。
+        """
+        stream = self._get_openai_client().chat.completions.create(
+            model=self._model,
+            messages=_messages_to_openai(messages),
+            temperature=0.3,
+            stream=True,
+        )
+        for chunk in stream:
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            if delta is None:
+                continue
+            text = _delta_field(delta, "content") or ""
+            reasoning = _delta_field(delta, "reasoning_content") or ""
+            if text or reasoning:
+                yield ChatStreamDelta(text=str(text), reasoning=str(reasoning))
+
+    def _get_openai_client(self) -> Any:
+        if self._openai_client is None:
+            try:
+                from openai import OpenAI
+            except ImportError as error:
+                raise RuntimeError("未安装 openai 依赖，无法读取原始 reasoning_content 流") from error
+            self._openai_client = OpenAI(api_key=self._api_key, base_url=self._base_url)
+        return self._openai_client
 
     def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
         """逐块产出可见回复文本增量。"""

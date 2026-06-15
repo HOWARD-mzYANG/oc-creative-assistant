@@ -47,6 +47,7 @@ def _get_int(name: str, default: int) -> int:
 
 
 def _get_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    """读取逗号/分号分隔的环境变量，并统一转成小写元组。"""
     raw = os.getenv(name)
     if raw is None or not raw.strip():
         return default

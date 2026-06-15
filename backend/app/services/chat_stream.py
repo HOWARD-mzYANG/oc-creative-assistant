@@ -101,6 +101,7 @@ def _resolve_related_nodes(node_ids: list[str]) -> list[dict[str, str]]:
 
 
 def _clip(text: str, limit: int = 240) -> str:
+    """将 trace 文本裁到适合聊天面板展示的长度。"""
     text = text.strip()
     if len(text) <= limit:
         return text
@@ -108,11 +109,13 @@ def _clip(text: str, limit: int = 240) -> str:
 
 
 def _reasoning_of(value: Any) -> str:
+    """从 Pydantic 输出对象中安全读取 reasoning 字段。"""
     reasoning = getattr(value, "reasoning", "")
     return reasoning if isinstance(reasoning, str) else str(reasoning or "")
 
 
 def _trace_event(node_name: str, title: str, content: str) -> dict[str, Any]:
+    """构建前端 AgentTracePanel 使用的单条思考/处理轨迹事件。"""
     return {
         "type": "trace_item",
         "node": node_name,

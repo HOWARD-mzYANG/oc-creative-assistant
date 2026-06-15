@@ -90,6 +90,7 @@ def _safe_write_progress(
     writer: Callable[[dict[str, Any]], None] | None,
     event: dict[str, Any],
 ) -> None:
+    """安全推送进度事件；进度层失败不能影响 Agent 主流程。"""
     if writer is None:
         return
     try:
