@@ -8,6 +8,7 @@ import type {
   CreativeNodeType,
   CreativeRelationType,
 } from '../types/node'
+import { arrangeNodesAsHierarchy, findFreeNodePosition } from '../utils/canvasLayout'
 import { createCreativeNode } from '../utils/nodeFactory'
 import {
   DEFAULT_SOURCE_HANDLE,
@@ -84,11 +85,23 @@ export function useCanvasGraph(options: Options) {
 
   function handleCreateNode(type: CreativeNodeType, position?: { x: number; y: number }) {
     addNodeCount.value += 1
-    const node = createCreativeNode(type, addNodeCount.value, position ?? getNextNodePosition())
+    const preferredPosition = position ?? getNextNodePosition()
+    const node = createCreativeNode(
+      type,
+      addNodeCount.value,
+      findFreeNodePosition(options.nodes.value, preferredPosition),
+    )
     options.nodes.value = [...options.nodes.value, node]
     options.onNodeAdded(node)
     emitGraphChanged()
     options.onNodeSelected(node.id)
+  }
+
+  function handleAutoArrange() {
+    if (options.nodes.value.length <= 1) return
+
+    options.nodes.value = arrangeNodesAsHierarchy(options.nodes.value, options.edges.value)
+    emitGraphChanged()
   }
 
   /**
@@ -231,6 +244,7 @@ export function useCanvasGraph(options: Options) {
 
   return {
     handleCreateNode,
+    handleAutoArrange,
     handleClearCanvas,
     handleConnect,
     handleEdgeUpdate,

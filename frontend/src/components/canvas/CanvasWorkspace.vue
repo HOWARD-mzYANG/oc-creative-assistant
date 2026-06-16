@@ -140,6 +140,7 @@ const {
 
 const {
   handleCreateNode,
+  handleAutoArrange,
   handleClearCanvas,
   handleConnect,
   handleEdgeUpdate,
@@ -563,6 +564,7 @@ watch(
         <div class="toolbar-group toolbar-group--view canvas-actions" aria-label="画布视图">
           <button type="button" class="toolbar-btn toolbar-btn--icon" title="放大" @click="handleZoomIn">+</button>
           <button type="button" class="toolbar-btn toolbar-btn--icon" title="缩小" @click="handleZoomOut">−</button>
+          <button type="button" class="toolbar-btn" title="按关系自动整理成树状图" @click="handleAutoArrange">树状整理</button>
           <button type="button" class="toolbar-btn" @click="handleFitView">适应</button>
           <button type="button" class="toolbar-btn toolbar-btn--danger" @click="handleClearCanvas">清空</button>
         </div>

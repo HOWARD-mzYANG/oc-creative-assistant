@@ -33,6 +33,7 @@ from app.services.graph_mappers import (
     db_status_to_api,
     db_tags_to_api,
 )
+from app.services.node_layout import find_free_node_position
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +180,7 @@ def apply_staging_record(
     payload = record.payload_edited or record.payload
 
     if record.change_type == "create_node":
-        new_id = _apply_create_node(db, record, payload)
+        new_id = _apply_create_node(db, record, payload, pending_id_map or {})
         if pending_id_map is not None and record.pending_id:
             pending_id_map[record.pending_id] = new_id
         return new_id, None
@@ -201,7 +202,83 @@ def apply_staging_record(
     return None, None
 
 
-def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, Any]) -> str:
+def _payload_anchor_node_id(payload: dict[str, Any]) -> str | None:
+    """读取可选布局锚点字段，兼容 snake/camel case。"""
+    raw = (
+        payload.get("anchor_node_id")
+        or payload.get("anchorNodeId")
+        or payload.get("related_node_id")
+        or payload.get("relatedNodeId")
+    )
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
+def _valid_project_node_id(db: Session, project_id: str, raw_id: str | None) -> str | None:
+    if not raw_id:
+        return None
+    node = db.get(NodeORM, raw_id)
+    if node is None or node.project_id != project_id:
+        return None
+    return node.id
+
+
+def _resolve_layout_anchor_id(
+    db: Session,
+    record: AgentStagingORM,
+    payload: dict[str, Any],
+    pending_id_map: dict[str, str],
+) -> str | None:
+    """优先把新节点放在相关节点旁边，而不是让 LLM 输出绝对坐标。"""
+    explicit_anchor = _valid_project_node_id(
+        db,
+        record.project_id,
+        _payload_anchor_node_id(payload),
+    )
+    if explicit_anchor:
+        return explicit_anchor
+
+    if not record.pending_id or not record.batch_id:
+        return None
+
+    siblings = (
+        db.query(AgentStagingORM)
+        .filter(
+            AgentStagingORM.batch_id == record.batch_id,
+            AgentStagingORM.change_type == "create_edge",
+        )
+        .order_by(AgentStagingORM.order_in_batch)
+        .all()
+    )
+    for sibling in siblings:
+        edge_payload = sibling.payload_edited or sibling.payload or {}
+        source = edge_payload.get("source")
+        target = edge_payload.get("target")
+        if source == record.pending_id:
+            other = target
+        elif target == record.pending_id:
+            other = source
+        else:
+            continue
+
+        other_id = str(other).strip() if other is not None else None
+        if other_id in pending_id_map:
+            return pending_id_map[other_id]
+        existing = _valid_project_node_id(db, record.project_id, other_id)
+        if existing:
+            return existing
+
+    return None
+
+
+def _apply_create_node(
+    db: Session,
+    record: AgentStagingORM,
+    payload: dict[str, Any],
+    pending_id_map: dict[str, str],
+) -> str:
     """将 staging.payload 转换成新节点。
 
     将生成的 node_id 写回 record.target_id，使之后“单条接受 create_edge”时可以从
@@ -213,6 +290,13 @@ def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, 
     title = str(payload.get("title") or "AI 建议节点")
     content = str(payload.get("content") or "")
     node_type = str(payload.get("node_type") or "character")
+    graph_id = _resolve_graph_id(db, record.project_id, node_type)
+    position = find_free_node_position(
+        db,
+        project_id=record.project_id,
+        graph_id=graph_id,
+        anchor_node_id=_resolve_layout_anchor_id(db, record, payload, pending_id_map),
+    )
     parent_id = None
     sort_order = _payload_sort_order(payload)
     if node_type == "worldbuilding":
@@ -226,7 +310,7 @@ def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, 
         NodeORM(
             id=node_id,
             project_id=record.project_id,
-            graph_id=_resolve_graph_id(db, record.project_id, node_type),
+            graph_id=graph_id,
             node_type=node_type,
             title=title,
             content=content,
@@ -237,8 +321,8 @@ def _apply_create_node(db: Session, record: AgentStagingORM, payload: dict[str, 
                 parent_id=parent_id,
                 sort_order=sort_order,
             ),
-            position_x=120.0,
-            position_y=120.0,
+            position_x=position.x,
+            position_y=position.y,
             sort_order=9999,
         )
     )
