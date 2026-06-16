@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -9,6 +9,11 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // 后端本地环境变量文件；用于固定打包所用的 Python（如 PYTHON_BIN），无需修改系统环境。
 const backendEnvPath = path.join(rootDir, 'backend', '.env')
 const backendPromptsPath = path.join(rootDir, 'backend', 'app', 'agents', 'prompts')
+const projectVenvPythonPath = path.join(
+  rootDir,
+  '.venv',
+  process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
+)
 
 /**
  * 极简 .env 解析器：仅支持 KEY=VALUE，并忽略空行和 # 注释。
@@ -131,16 +136,69 @@ function resolveNamedCondaPython() {
   return null
 }
 
+function getBooleanEnv(name) {
+  const value = process.env[name]
+  return typeof value === 'string' && ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
+
+function resolvePythonExecutable(command) {
+  const result = spawnSync(command, ['-c', 'import sys; print(sys.executable)'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    shell: false,
+  })
+
+  if (result.status === 0) {
+    return result.stdout.trim() || command
+  }
+
+  return command
+}
+
+function isCondaPython(executablePath) {
+  const normalizedPath = executablePath.replace(/\\/g, '/').toLowerCase()
+  return (
+    normalizedPath.includes('/miniconda') ||
+    normalizedPath.includes('/anaconda') ||
+    normalizedPath.includes('/conda/envs/') ||
+    normalizedPath.includes('/envs/oc/')
+  )
+}
+
+function assertDistributablePython(command) {
+  const executablePath = resolvePythonExecutable(command)
+
+  if (!isCondaPython(executablePath)) {
+    return executablePath
+  }
+
+  if (getBooleanEnv('OC_ALLOW_CONDA_BACKEND_BUILD')) {
+    console.warn(
+      `[backend-build] 警告：正在使用 Conda Python 打包，发布到其他 Windows 电脑时可能触发 OpenSSL/DLL 兼容问题：${executablePath}`,
+    )
+    return executablePath
+  }
+
+  throw new Error(
+    '检测到后端正在使用 Conda Python 打包，这类构建在其他 Windows 电脑上容易出现 ' +
+      `"OPENSSL_Uplink ... no OPENSSL_Applink" 崩溃。\n` +
+      `当前 Python：${executablePath}\n` +
+      '请先创建项目级 venv：python -m venv .venv，然后用 .venv 安装 backend/requirements.txt。\n' +
+      '如果你确认要强制使用 Conda，可临时设置 OC_ALLOW_CONDA_BACKEND_BUILD=1。',
+  )
+}
+
 /**
  * 决定调用 PyInstaller 时使用哪个 Python，优先级从高到低：
  * 1. 进程环境变量 PYTHON_BIN / OC_BACKEND_PYTHON
- * 2. backend/.env 中同名键（便于本地固定解释器且不提交到 git）
- * 3. 已激活的非 base conda 环境（CONDA_PREFIX）
- * 4. 名为 OC_CONDA_ENV（默认 oc）的 conda 环境
- * 5. 单独的 CONDA_PREFIX（包括 base）
- * 6. 系统 PATH 上的 python.exe / python3
+ * 2. 项目根目录 .venv
+ * 3. backend/.env 中同名键（便于本地固定解释器且不提交到 git）
+ * 4. 已激活的非 base conda 环境（CONDA_PREFIX）
+ * 5. 名为 OC_CONDA_ENV（默认 oc）的 conda 环境
+ * 6. 单独的 CONDA_PREFIX（包括 base）
+ * 7. 系统 PATH 上的 python.exe / python3
  *
- * 为了稳定打包，建议在 backend/.env 或环境变量中设置 PYTHON_BIN，指向项目 venv。
+ * 为了稳定打包，建议使用项目根目录的 .venv。
  *
  * @returns {string}
  */
@@ -151,6 +209,10 @@ function resolvePythonCommand() {
 
   if (process.env.OC_BACKEND_PYTHON) {
     return process.env.OC_BACKEND_PYTHON
+  }
+
+  if (fs.existsSync(projectVenvPythonPath)) {
+    return projectVenvPythonPath
   }
 
   if (backendEnv.PYTHON_BIN) {
@@ -210,7 +272,8 @@ function run(command, args, name) {
 }
 
 const pythonCommand = resolvePythonCommand()
-console.log(`[backend-build] 使用 Python：${pythonCommand}`)
+const pythonExecutable = assertDistributablePython(pythonCommand)
+console.log(`[backend-build] 使用 Python：${pythonExecutable}`)
 
 const pyinstallerArgs = [
   '-m',

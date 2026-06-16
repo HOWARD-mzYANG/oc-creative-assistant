@@ -216,6 +216,85 @@ function resolveBundledBackendDataDir() {
   return app.getPath('userData')
 }
 
+function resolveLogFilePath(fileName) {
+  const logDir = path.join(app.getPath('userData'), 'logs')
+  fs.mkdirSync(logDir, { recursive: true })
+  return path.join(logDir, fileName)
+}
+
+function formatErrorForLog(error) {
+  if (error instanceof Error) {
+    return error.stack ?? error.message
+  }
+
+  return String(error)
+}
+
+function appendStartupLog(message) {
+  try {
+    const logFilePath = resolveLogFilePath('startup.log')
+    fs.appendFileSync(
+      logFilePath,
+      `${new Date().toISOString()} ${message}\n`,
+      'utf8',
+    )
+    return logFilePath
+  } catch (error) {
+    console.error('[electron] Failed to write startup log', error)
+    return null
+  }
+}
+
+function createBackendLogSink() {
+  let stream = null
+  let logFilePath = null
+
+  try {
+    logFilePath = resolveLogFilePath('backend.log')
+    stream = fs.createWriteStream(logFilePath, { flags: 'a' })
+    stream.on('error', (error) => {
+      console.error('[electron] Failed to write backend log', error)
+    })
+    stream.write(`\n${new Date().toISOString()} packaged backend startup\n`)
+  } catch (error) {
+    console.error('[electron] Failed to create backend log', error)
+  }
+
+  return {
+    get logFilePath() {
+      return logFilePath
+    },
+    line(message) {
+      if (!stream) {
+        return
+      }
+
+      stream.write(`${new Date().toISOString()} ${message}\n`)
+    },
+    chunk(prefix, data) {
+      if (!stream) {
+        return
+      }
+
+      const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data)
+      stream.write(`${new Date().toISOString()} ${prefix} ${text}`)
+    },
+    close() {
+      if (!stream) {
+        return
+      }
+
+      const currentStream = stream
+      stream = null
+      currentStream.end()
+    },
+  }
+}
+
+function formatBackendExitReason(code, signal) {
+  return signal ? `signal ${signal}` : `exit code ${code ?? 0}`
+}
+
 // 应用退出时停止已启动的后端进程。
 function stopBundledBackend() {
   if (!backendProcess || backendProcess.killed) {
@@ -238,9 +317,19 @@ async function startBundledBackend() {
   const backendHealthUrl = buildHealthUrl(backendUrl)
   const executablePath = getBundledBackendExecutable()
   const backendDataDir = resolveBundledBackendDataDir()
+  const backendLogSink = createBackendLogSink()
+
+  backendLogSink.line(`executable=${executablePath}`)
+  backendLogSink.line(`dataDir=${backendDataDir}`)
+  backendLogSink.line(`healthUrl=${backendHealthUrl}`)
 
   if (!fs.existsSync(executablePath)) {
-    throw new Error(`未在 ${executablePath} 找到打包后的后端可执行文件`)
+    backendLogSink.line(`missing executable: ${executablePath}`)
+    backendLogSink.close()
+    throw new Error(
+      `Bundled backend executable was not found at ${executablePath}. ` +
+        `Backend log: ${backendLogSink.logFilePath ?? 'unavailable'}`,
+    )
   }
 
   // 如果端口被占用，后端实际端口可能会变化；最终 URL 会通过 preload 注入前端。
@@ -249,7 +338,7 @@ async function startBundledBackend() {
     executablePath,
     ['--host', backendHost, '--port', String(selectedBackendPort)],
     {
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       env: {
         ...process.env,
@@ -258,18 +347,67 @@ async function startBundledBackend() {
     },
   )
 
-  backendProcess.on('exit', (code, signal) => {
-    backendProcess = null
-
-    if (app.isQuitting) {
-      return
-    }
-
-    const reason = signal ? `信号 ${signal}` : `退出码 ${code ?? 0}`
-    console.error(`[electron] 打包后端意外退出（${reason}）`)
+  backendProcess.stdout?.on('data', (data) => {
+    backendLogSink.chunk('[stdout]', data)
   })
 
-  await waitForUrl(backendHealthUrl)
+  backendProcess.stderr?.on('data', (data) => {
+    backendLogSink.chunk('[stderr]', data)
+  })
+
+  let backendReady = false
+  const backendExitPromise = new Promise((_, reject) => {
+    backendProcess.once('error', (error) => {
+      backendLogSink.line(`spawn error: ${formatErrorForLog(error)}`)
+      backendLogSink.close()
+      backendProcess = null
+      reject(
+        new Error(
+          `Bundled backend failed to start: ${error.message}. ` +
+            `Backend log: ${backendLogSink.logFilePath ?? 'unavailable'}`,
+        ),
+      )
+    })
+
+    backendProcess.once('exit', (code, signal) => {
+      const reason = formatBackendExitReason(code, signal)
+      backendLogSink.line(`backend exited (${reason})`)
+      backendLogSink.close()
+      backendProcess = null
+
+      if (app.isQuitting) {
+        return
+      }
+
+      if (backendReady) {
+        console.error(`[electron] Packaged backend exited unexpectedly (${reason})`)
+        return
+      }
+
+      console.error(`[electron] Packaged backend exited before startup (${reason})`)
+      reject(
+        new Error(
+          `Bundled backend exited before it became ready (${reason}). ` +
+            `Backend log: ${backendLogSink.logFilePath ?? 'unavailable'}`,
+        ),
+      )
+    })
+  })
+
+  try {
+    await Promise.race([waitForUrl(backendHealthUrl), backendExitPromise])
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const backendLogHint = backendLogSink.logFilePath && !errorMessage.includes(backendLogSink.logFilePath)
+      ? ` Backend log: ${backendLogSink.logFilePath}`
+      : ''
+    backendLogSink.line(`backend readiness failed: ${formatErrorForLog(error)}`)
+    stopBundledBackend()
+    throw new Error(`Bundled backend did not become ready: ${errorMessage}.${backendLogHint}`)
+  }
+
+  backendReady = true
+  backendLogSink.line('backend health check passed')
 
   return backendUrl
 }
@@ -530,8 +668,19 @@ ipcMain.handle(PDF_EXPORT_CHANNEL, async (event, payload) => {
   return exportHtmlToPdf(parentWindow, payload)
 })
 
-// 应用就绪后初始化运行时配置并打开第一个窗口。
-app.whenReady().then(async () => {
+function showStartupFailure(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  const logPath = appendStartupLog(`startup failed:\n${formatErrorForLog(error)}`)
+  const logHint = logPath ? `\n\nStartup log: ${logPath}` : ''
+
+  dialog.showErrorBox(
+    'OC Creative Assistant failed to start',
+    `${message}${logHint}`,
+  )
+  app.quit()
+}
+
+async function bootstrapApplication() {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.occreativeassistant.app')
   }
@@ -543,10 +692,17 @@ app.whenReady().then(async () => {
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow(runtimeConfig)
+      try {
+        await createWindow(runtimeConfig)
+      } catch (error) {
+        showStartupFailure(error)
+      }
     }
   })
-})
+}
+
+// 应用就绪后初始化运行时配置并打开第一个窗口。
+app.whenReady().then(bootstrapApplication).catch(showStartupFailure)
 
 // 在非 macOS 平台上，所有窗口关闭后退出应用。
 app.on('window-all-closed', () => {
