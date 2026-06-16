@@ -8,6 +8,7 @@ upsert/delete/query。Embedding 计算和 provider 选择由
 from __future__ import annotations
 
 import logging
+import hashlib
 from typing import Any
 
 from app.db.models import NodeORM
