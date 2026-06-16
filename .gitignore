@@ -209,6 +209,7 @@ __marimo__/
 
 .idea/
 node_modules/
+.npm-cache/
 electron/node_modules/
 frontend/dist/
 backend/build/
