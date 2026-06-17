@@ -27,6 +27,7 @@ $env:OC_ROLE_FINETUNE_BASE_URL="http://127.0.0.1:9100"
 - `ROLE_LLAMAFACTORY_DIR`：可选，LLaMA-Factory 仓库目录，会作为训练命令的工作目录。
 - `ROLE_BASE_MODEL`：基础模型，默认是 `Qwen/Qwen2.5-1.5B-Instruct`。
 - `ROLE_SAMPLE_COUNT`：默认训练样本数，默认 240；代码会保证至少生成 200 条。
+- `ROLE_QUANTIZATION_BIT`：QLoRA 量化位数，默认 `4`；4-bit 训练需要安装 `bitsandbytes`。设为 `0` 可关闭量化，改用普通 LoRA。
 - `ROLE_TRAINING_FP16`：是否使用 fp16，默认 `true`，适合多数 AutoDL 显卡。
 - `ROLE_TRAINING_BF16`：是否使用 bf16，默认 `false`；只有确认显卡和 PyTorch CUDA 环境支持 bf16 时再开启。
 - `ROLE_MODEL_API_BASE_URL`：可选，已加载 adapter 的 OpenAI-compatible 模型服务地址，例如 `llamafactory-cli api`。
