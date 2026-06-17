@@ -39,6 +39,8 @@ interface StudioMessage {
   warning?: string
 }
 
+type StudioMode = 'chat' | 'workflow'
+
 const DATASET_PAGE_SIZE = 10
 
 const route = useRoute()
@@ -56,6 +58,7 @@ const chatLog = ref<HTMLElement | null>(null)
 const action = ref<ActionName>('')
 const error = ref('')
 const notice = ref('')
+const studioMode = ref<StudioMode | null>(null)
 const datasetDirty = ref(false)
 const chatSending = ref(false)
 const isRefreshing = ref(false)
@@ -95,6 +98,8 @@ const hardware = computed(() => state.value?.hardware ?? null)
 const downloadJob = computed(() => state.value?.download ?? emptyJob())
 const trainingJob = computed(() => state.value?.training ?? emptyJob())
 const isBusy = computed(() => Boolean(action.value) || chatSending.value)
+const hasReadyRoleModel = computed(() => Boolean(state.value?.adapter_ready))
+const isChatMode = computed(() => studioMode.value === 'chat' && hasReadyRoleModel.value)
 const enabledSampleCount = computed(() => dataset.value.samples.filter((sample) => sample.enabled).length)
 const datasetPageCount = computed(() =>
   Math.max(1, Math.ceil(dataset.value.samples.length / DATASET_PAGE_SIZE)),
@@ -123,6 +128,18 @@ const modelModeLabel = computed(() => {
   if (trainingJob.value.status === 'running') return 'LoRA 训练中'
   return 'API 风格兜底'
 })
+const modeDescription = computed(() =>
+  isChatMode.value
+    ? '已经检测到本地微调模型，当前页面默认进入角色模型聊天。需要重做数据或训练时，可以切回训练流程。'
+    : '把项目角色设定整理成可编辑训练样本，再把小模型微调成专属口吻。',
+)
+const readyModelName = computed(
+  () =>
+    trainingJob.value.model_id ||
+    downloadJob.value.model_id ||
+    recommendation.value?.model_id ||
+    '已训练角色模型',
+)
 const selectedModelId = computed(() => preferredModelId.value.trim() || recommendation.value?.model_id || '')
 const modelScopeUrl = computed(() => {
   const modelId = selectedModelId.value
@@ -166,6 +183,28 @@ function statusLabel(status: string): string {
     blocked: '已阻止',
   }
   return labels[status] ?? status
+}
+
+function applyInitialStudioMode(nextState: RoleModelState): void {
+  if (studioMode.value === null) {
+    studioMode.value = nextState.adapter_ready ? 'chat' : 'workflow'
+    return
+  }
+  if (studioMode.value === 'chat' && !nextState.adapter_ready) {
+    studioMode.value = 'workflow'
+  }
+}
+
+function openTrainingWorkflow(): void {
+  studioMode.value = 'workflow'
+  notice.value = '已切换到新训练流程'
+}
+
+function openChatMode(): void {
+  if (!hasReadyRoleModel.value) return
+  studioMode.value = 'chat'
+  notice.value = ''
+  scrollChat()
 }
 
 function formatTime(value: string | null | undefined): string {
@@ -255,6 +294,7 @@ async function refreshState(): Promise<void> {
   try {
     const next = await getRoleModelState(projectId.value)
     state.value = next
+    applyInitialStudioMode(next)
     applyRecommendation(next.recommendation)
     if (!preferredModelId.value.trim()) {
       syncRecommendedModelInput(next.recommendation)
@@ -281,6 +321,7 @@ async function loadAll(): Promise<void> {
       getRoleModelChatHistory(projectId.value),
     ])
     state.value = nextState
+    applyInitialStudioMode(nextState)
     dataset.value = nextDataset
     chatMessages.value = nextChatHistory.map(historyItemToStudioMessage)
     datasetPage.value = 1
@@ -489,6 +530,7 @@ watch(
   () => projectId.value,
   () => {
     stopPolling()
+    studioMode.value = null
     void loadAll()
   },
 )
@@ -511,20 +553,40 @@ onBeforeUnmount(() => {
     <header class="role-model__header">
       <div class="role-model__title-block">
         <span class="eyebrow">Local Role Model</span>
-        <h2>角色模型工作台</h2>
-        <p>把项目角色设定整理成可编辑训练样本，再把小模型微调成专属口吻。</p>
+        <h2>{{ isChatMode ? '角色模型聊天' : '角色模型工作台' }}</h2>
+        <p>{{ modeDescription }}</p>
       </div>
-      <div class="role-model__mode" :class="{ 'is-ready': state?.adapter_ready }">
-        <span class="role-model__mode-dot" />
-        <span>{{ modelModeLabel }}</span>
+      <div class="role-model__header-actions">
+        <button
+          v-if="hasReadyRoleModel && !isChatMode"
+          type="button"
+          class="role-model__button"
+          :disabled="isBusy"
+          @click="openChatMode"
+        >
+          回到聊天
+        </button>
+        <button
+          v-if="hasReadyRoleModel && isChatMode"
+          type="button"
+          class="role-model__button"
+          :disabled="isBusy"
+          @click="openTrainingWorkflow"
+        >
+          新训练模型
+        </button>
+        <div class="role-model__mode" :class="{ 'is-ready': state?.adapter_ready }">
+          <span class="role-model__mode-dot" />
+          <span>{{ modelModeLabel }}</span>
+        </div>
       </div>
     </header>
 
     <p v-if="error" class="role-model__alert">{{ error }}</p>
     <p v-if="notice" class="role-model__notice">{{ notice }}</p>
 
-    <div class="role-model__layout">
-      <div class="role-model__rail">
+    <div class="role-model__layout" :class="{ 'role-model__layout--chat-first': isChatMode }">
+      <div v-if="!isChatMode" class="role-model__rail">
         <section class="role-model__panel">
           <div class="role-model__panel-head">
             <div>
@@ -682,7 +744,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="role-model__work">
-        <section class="role-model__panel role-model__dataset">
+        <section v-if="!isChatMode" class="role-model__panel role-model__dataset">
           <div class="role-model__panel-head">
             <div>
               <span class="role-model__kicker">Step 2</span>
@@ -789,10 +851,10 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <section class="role-model__panel role-model__chat">
+        <section class="role-model__panel role-model__chat" :class="{ 'role-model__chat--primary': isChatMode }">
           <div class="role-model__panel-head">
             <div>
-              <span class="role-model__kicker">Step 4</span>
+              <span class="role-model__kicker">{{ isChatMode ? 'Ready' : 'Step 4' }}</span>
               <h3>角色模型聊天</h3>
             </div>
             <button
@@ -845,6 +907,37 @@ onBeforeUnmount(() => {
           </form>
         </section>
       </div>
+
+      <aside v-if="isChatMode" class="role-model__panel role-model__ready-summary">
+        <span class="role-model__kicker">Model Status</span>
+        <h3>已加载上次训练结果</h3>
+        <dl>
+          <div>
+            <dt>模型</dt>
+            <dd>{{ readyModelName }}</dd>
+          </div>
+          <div>
+            <dt>样本</dt>
+            <dd>{{ state?.dataset_count ?? dataset.samples.length }} 条</dd>
+          </div>
+          <div>
+            <dt>Adapter</dt>
+            <dd>本地 LoRA 可用</dd>
+          </div>
+          <div>
+            <dt>聊天记录</dt>
+            <dd>{{ chatMessages.length }} 条</dd>
+          </div>
+        </dl>
+        <button
+          type="button"
+          class="role-model__button role-model__button--primary"
+          :disabled="isBusy"
+          @click="openTrainingWorkflow"
+        >
+          新训练模型
+        </button>
+      </aside>
     </div>
   </section>
 </template>
@@ -889,6 +982,14 @@ onBeforeUnmount(() => {
   color: var(--text-soft);
   line-height: 1.55;
   font-size: 0.92rem;
+}
+
+.role-model__header-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .role-model__mode {
@@ -946,6 +1047,10 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+}
+
+.role-model__layout--chat-first {
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 340px);
 }
 
 .role-model__rail,
@@ -1373,6 +1478,10 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 
+.role-model__chat--primary {
+  min-height: min(72vh, 760px);
+}
+
 .role-model__chat-controls {
   align-items: flex-end;
   margin-bottom: 10px;
@@ -1414,6 +1523,11 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: #fbfbfa;
+}
+
+.role-model__chat--primary .role-model__chat-log {
+  min-height: 420px;
+  max-height: min(58vh, 620px);
 }
 
 .role-model__message {
@@ -1466,9 +1580,64 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
+.role-model__ready-summary {
+  position: sticky;
+  top: 0;
+}
+
+.role-model__ready-summary h3 {
+  margin: 4px 0 12px;
+  font-size: 1.02rem;
+}
+
+.role-model__ready-summary dl {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.role-model__ready-summary div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fbfbfa;
+}
+
+.role-model__ready-summary dt,
+.role-model__ready-summary dd {
+  margin: 0;
+}
+
+.role-model__ready-summary dt {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.role-model__ready-summary dd {
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.role-model__ready-summary .role-model__button {
+  width: 100%;
+  justify-content: center;
+}
+
 @media (max-width: 1100px) {
   .role-model__layout {
     grid-template-columns: 1fr;
+  }
+
+  .role-model__ready-summary {
+    position: static;
   }
 }
 
@@ -1478,6 +1647,7 @@ onBeforeUnmount(() => {
   }
 
   .role-model__header,
+  .role-model__header-actions,
   .role-model__panel-head,
   .role-model__actions,
   .role-model__chat-controls,
