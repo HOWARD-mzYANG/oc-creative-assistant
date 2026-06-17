@@ -63,10 +63,28 @@ class RoleModelSnapshot(BaseModel):
     project_seed: str = ""
 
 
+class RoleMaterialBrief(BaseModel):
+    """资料 agent 整理后的角色训练档案。
+
+    原始快照保留事实证据，这个 brief 负责把事实加工成训练更容易使用的维度：
+    身份、性格、说话方式、关系线、世界观约束和边界策略。
+    """
+
+    identity: str = ""
+    personality: str = ""
+    voice_style: str = ""
+    known_facts: list[str] = Field(default_factory=list)
+    relationships: list[str] = Field(default_factory=list)
+    world_context: list[str] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    sample_plan: list[str] = Field(default_factory=list)
+
+
 class CreateJobRequest(BaseModel):
     """创建训练任务的请求体。"""
 
     snapshot: RoleModelSnapshot
+    material_brief: RoleMaterialBrief | None = None
     sample_count: int | None = None
 
 
@@ -86,6 +104,7 @@ class RoleModelJob(BaseModel):
     dataset_info_path: str = ""
     train_config_path: str = ""
     adapter_path: str = ""
+    material_brief_path: str = ""
     log_tail: str = ""
     error: str | None = None
     created_at: datetime
@@ -97,6 +116,14 @@ class RoleChatMessage(BaseModel):
 
     role: Literal["user", "assistant", "system"]
     content: str
+
+
+class RoleChatLogItem(BaseModel):
+    """训练服务持久化的一条角色聊天消息。"""
+
+    role: Literal["user", "assistant", "system"]
+    content: str
+    created_at: datetime
 
 
 class RoleChatRequest(BaseModel):

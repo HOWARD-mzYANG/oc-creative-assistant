@@ -9,8 +9,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.dataset import role_system_prompt, snapshot_context
-from app.jobs import create_job, get_job, list_jobs
-from app.schemas import CreateJobRequest, HealthResponse, RoleChatRequest, RoleModelJob
+from app.jobs import append_chat_turn, create_job, get_job, get_material_brief, list_jobs, read_chat_history
+from app.schemas import CreateJobRequest, HealthResponse, RoleChatLogItem, RoleChatRequest, RoleModelJob
 from app.settings import get_settings
 
 
@@ -46,8 +46,8 @@ async def health() -> HealthResponse:
 async def create_training_job(payload: CreateJobRequest) -> RoleModelJob:
     """创建单角色 LoRA 训练任务。
 
-    接口只接收主后端整理好的角色快照；训练服务不直接读桌面端数据库，从而保持
-    GPU 服务独立部署，也避免把桌面 app 的存储细节泄露到训练环境。
+    接口接收主后端整理好的角色快照和资料 agent brief；训练服务不直接读桌面端
+    数据库，从而保持 GPU 服务独立部署，也避免把桌面 app 的存储细节泄露到训练环境。
     """
     return create_job(payload)
 
@@ -71,23 +71,38 @@ async def read_job(job_id: str) -> RoleModelJob:
     return job
 
 
-async def _stream_demo_reply(payload: RoleChatRequest) -> AsyncIterator[str]:
-    """没有真实模型 API 时的中文演示回复。
+@app.get("/api/jobs/{job_id}/chat/history", response_model=list[RoleChatLogItem])
+async def read_job_chat_history(
+    job_id: str,
+    limit: int = Query(default=80, ge=1, le=200),
+) -> list[RoleChatLogItem]:
+    """读取某个已训练角色模型对应的远程聊天记录。"""
+    if get_job(job_id) is None:
+        raise HTTPException(status_code=404, detail="训练任务不存在")
+    return read_chat_history(job_id, limit=limit)
+
+
+def _demo_reply_text(payload: RoleChatRequest, job_id: str | None = None) -> str:
+    """没有真实模型 API 时的中文演示回复文本。
 
     干跑演示会把任务状态标成 succeeded（成功），但不一定真的启动 LLaMA-Factory API。
     这个兜底只用于证明前后端链路、SSE 流式输出和边界行为都能跑通。
     """
     snapshot = payload.fallback_snapshot
     name = snapshot.character_name if snapshot else "这个角色"
-    context = snapshot_context(snapshot) if snapshot else ""
+    brief = get_material_brief(job_id) if job_id else None
+    context = snapshot_context(snapshot, brief) if snapshot else ""
     lowered = payload.message.lower()
     if any(word in lowered for word in ("system", "prompt", "系统", "提示词", "隐藏指令")):
-        reply = f"我是{name}。我可以继续保持角色对话，但不会透露系统提示或隐藏指令。"
+        return f"我是{name}。我可以继续保持角色对话，但不会透露系统提示或隐藏指令。"
     elif any(word in lowered for word in ("unknown", "weather", "price", "president", "real world", "天气", "价格", "总统", "现实", "不知道")):
-        reply = f"我是{name}。这部分不在我的角色资料里，所以我不能假装知道。"
-    else:
-        hint = context.splitlines()[2] if len(context.splitlines()) > 2 else ""
-        reply = f"我是{name}。{hint}我会依据已经写下的资料回答，而不是临时编造。"
+        return f"我是{name}。这部分不在我的角色资料里，所以我不能假装知道。"
+    hint = context.splitlines()[2] if len(context.splitlines()) > 2 else ""
+    return f"我是{name}。{hint}我会依据已经写下的资料回答，而不是临时编造。"
+
+
+async def _stream_text(reply: str) -> AsyncIterator[str]:
+    """把完整回复拆成前端可消费的 SSE token 流。"""
     for token in reply:
         yield _sse({"type": "token", "text": token})
         await asyncio.sleep(0.005)
@@ -109,9 +124,13 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
     if job.status != "succeeded":
         yield _sse({"type": "error", "message": f"训练任务状态为 {job.status}，还不能用于对话"})
         return
+    material_brief = get_material_brief(job_id)
     if not settings.model_api_base_url:
-        async for item in _stream_demo_reply(payload):
+        reply = _demo_reply_text(payload, job_id)
+        async for item in _stream_text(reply):
             yield item
+        if reply.strip():
+            append_chat_turn(job_id, payload.message, reply)
         return
 
     snapshot = payload.fallback_snapshot
@@ -119,9 +138,16 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
     if snapshot is not None:
         # 第一个 system 负责角色边界，第二个 system 放当前资料快照。
         # 这样即使 adapter 已训练，推理时仍能拿到最新角色卡和关系信息。
-        messages.append({"role": "system", "content": role_system_prompt(snapshot)})
-        messages.append({"role": "system", "content": snapshot_context(snapshot)})
-    messages.extend(message.model_dump() for message in payload.history[-12:])
+        messages.append({"role": "system", "content": role_system_prompt(snapshot, material_brief)})
+        messages.append({"role": "system", "content": snapshot_context(snapshot, material_brief)})
+    history = payload.history[-12:]
+    if not history:
+        history = [
+            item
+            for item in read_chat_history(job_id, limit=12)
+            if item.role in {"user", "assistant", "system"}
+        ]
+    messages.extend({"role": message.role, "content": message.content} for message in history)
     messages.append({"role": "user", "content": payload.message})
 
     url = settings.model_api_base_url.rstrip("/") + "/v1/chat/completions"
@@ -135,6 +161,7 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
         "temperature": 0.7,
     }
 
+    collected: list[str] = []
     try:
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", url, json=body, headers=headers) as response:
@@ -152,10 +179,14 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
                     except Exception:
                         text = ""
                     if text:
+                        collected.append(text)
                         yield _sse({"type": "token", "text": text})
     except Exception as exc:  # noqa: BLE001
         yield _sse({"type": "error", "message": str(exc)})
         return
+    reply = "".join(collected)
+    if reply.strip():
+        append_chat_turn(job_id, payload.message, reply)
     yield _sse({"type": "done"})
 
 

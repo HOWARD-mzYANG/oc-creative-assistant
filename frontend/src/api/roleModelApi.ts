@@ -44,6 +44,17 @@ export interface RoleModelSnapshotDto {
   project_seed: string
 }
 
+export interface RoleMaterialBriefDto {
+  identity: string
+  personality: string
+  voice_style: string
+  known_facts: string[]
+  relationships: string[]
+  world_context: string[]
+  boundaries: string[]
+  sample_plan: string[]
+}
+
 export interface RoleModelJobDto {
   id: string
   project_id: string
@@ -55,6 +66,7 @@ export interface RoleModelJobDto {
   dataset_info_path: string
   train_config_path: string
   adapter_path: string
+  material_brief_path: string
   log_tail: string
   error?: string | null
   created_at: string
@@ -66,12 +78,18 @@ export interface RoleModelOverviewDto {
   service_online: boolean
   service_error?: string | null
   snapshot: RoleModelSnapshotDto
+  material_brief?: RoleMaterialBriefDto | null
+  jobs: RoleModelJobDto[]
   latest_job?: RoleModelJobDto | null
 }
 
 export interface RoleChatMessageDto {
   role: 'user' | 'assistant' | 'system'
   content: string
+}
+
+export interface RoleChatLogItemDto extends RoleChatMessageDto {
+  created_at: string
 }
 
 export type RoleChatStreamEvent =
@@ -109,6 +127,16 @@ export async function getRoleModelJob(
 ): Promise<RoleModelJobDto> {
   return requestJson<RoleModelJobDto>(
     `/api/projects/${projectId}/characters/${characterId}/role-model/jobs/${jobId}`,
+  )
+}
+
+export async function getRoleChatHistory(
+  projectId: string,
+  characterId: string,
+  jobId: string,
+): Promise<RoleChatLogItemDto[]> {
+  return requestJson<RoleChatLogItemDto[]>(
+    `/api/projects/${projectId}/characters/${characterId}/role-model/jobs/${jobId}/chat-history`,
   )
 }
 

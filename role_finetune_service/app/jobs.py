@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 
 from app.dataset import write_dataset
-from app.schemas import CreateJobRequest, RoleModelJob, RoleModelSnapshot
+from app.schemas import CreateJobRequest, RoleChatLogItem, RoleMaterialBrief, RoleModelJob, RoleModelSnapshot
 from app.settings import ServiceSettings, get_settings
 
 
@@ -51,8 +51,16 @@ def _snapshot_file(job_id: str, settings: ServiceSettings | None = None) -> Path
     return _job_dir(job_id, settings) / "snapshot.json"
 
 
+def _material_brief_file(job_id: str, settings: ServiceSettings | None = None) -> Path:
+    return _job_dir(job_id, settings) / "material_brief.json"
+
+
 def _log_file(job_id: str, settings: ServiceSettings | None = None) -> Path:
     return _job_dir(job_id, settings) / "train.log"
+
+
+def _chat_file(job_id: str, settings: ServiceSettings | None = None) -> Path:
+    return _job_dir(job_id, settings) / "chat_history.jsonl"
 
 
 def _read_log_tail(job_id: str, limit: int = 5000) -> str:
@@ -89,6 +97,51 @@ def get_job(job_id: str) -> RoleModelJob | None:
     if job is None:
         return None
     return job.model_copy(update={"log_tail": _read_log_tail(job_id)})
+
+
+def get_material_brief(job_id: str) -> RoleMaterialBrief | None:
+    """读取训练任务保存的资料整理稿。"""
+    path = _material_brief_file(job_id)
+    if not path.exists():
+        return None
+    try:
+        return RoleMaterialBrief.model_validate_json(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def append_chat_turn(job_id: str, user_message: str, assistant_message: str) -> None:
+    """把一次用户-角色对话追加到远程聊天记录。
+
+    记录保存在 job 目录里，跟 adapter 和训练数据放在一起。这样用户下次选择同一个
+    已训练角色模型时，可以继续查看这套模型对应的历史对话。
+    """
+    path = _chat_file(job_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    now = _now().isoformat()
+    rows = [
+        {"role": "user", "content": user_message, "created_at": now},
+        {"role": "assistant", "content": assistant_message, "created_at": now},
+    ]
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_chat_history(job_id: str, limit: int = 80) -> list[RoleChatLogItem]:
+    """读取远程聊天记录，默认返回最后若干条。"""
+    path = _chat_file(job_id)
+    if not path.exists():
+        return []
+    items: list[RoleChatLogItem] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            items.append(RoleChatLogItem.model_validate_json(line))
+        except Exception:
+            continue
+    return items[-limit:]
 
 
 def list_jobs(
@@ -209,12 +262,20 @@ def create_job(payload: CreateJobRequest) -> RoleModelJob:
         snapshot.model_dump_json(indent=2),
         encoding="utf-8",
     )
+    material_brief_path = ""
+    if payload.material_brief is not None:
+        material_brief_path = str(_material_brief_file(job_id, settings))
+        _material_brief_file(job_id, settings).write_text(
+            payload.material_brief.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
     job = RoleModelJob(
         id=job_id,
         project_id=snapshot.project_id,
         character_id=snapshot.character_id,
         character_name=snapshot.character_name,
         status="queued",
+        material_brief_path=material_brief_path,
         created_at=_now(),
         updated_at=_now(),
     )
@@ -241,14 +302,16 @@ def _run_job(job_id: str, sample_count: int) -> None:
         snapshot = RoleModelSnapshot.model_validate_json(
             _snapshot_file(job_id, settings).read_text(encoding="utf-8")
         )
+        material_brief = get_material_brief(job_id)
         _append_log(job_id, f"[角色微调] 任务 {job_id} 已启动，角色：{snapshot.character_name}")
 
-        # 先把角色快照变成 LLaMA-Factory 可读的数据集。生成失败时不会启动训练，
+        # 先把角色快照和资料整理稿变成 LLaMA-Factory 可读的数据集。生成失败时不会启动训练，
         # 这样能更快定位是资料问题还是训练环境问题。
         dataset_path, dataset_info_path, actual_count, dataset_name = write_dataset(
             _job_dir(job_id, settings),
             snapshot,
             sample_count,
+            material_brief,
         )
         adapter_dir = _job_dir(job_id, settings) / "adapter"
 

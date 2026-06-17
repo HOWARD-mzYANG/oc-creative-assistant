@@ -19,6 +19,7 @@ from app.schemas import (
     ProjectSummaryPayload,
     ProjectUpdateRequest,
     RoleChatRequest,
+    RoleChatLogItem,
     RoleModelJobPayload,
     RoleModelOverviewPayload,
     RoleModelTrainRequest,
@@ -39,6 +40,7 @@ from app.services.project_service import (
 )
 from app.services.project_io import export_project_oc, import_project_oc
 from app.services.role_model_service import (
+    get_role_chat_history,
     get_role_model_overview,
     get_role_training_job,
     start_role_training,
@@ -160,6 +162,19 @@ async def read_character_role_model_job(
 ) -> RoleModelJobPayload:
     """Read the latest status for a role LoRA training job."""
     return get_role_training_job(project_id, character_id, job_id)
+
+
+@router.get(
+    "/{project_id}/characters/{character_id}/role-model/jobs/{job_id}/chat-history",
+    response_model=list[RoleChatLogItem],
+)
+async def read_character_role_chat_history(
+    project_id: str,
+    character_id: str,
+    job_id: str,
+) -> list[RoleChatLogItem]:
+    """读取远程训练服务保存的角色聊天历史。"""
+    return get_role_chat_history(project_id, character_id, job_id)
 
 
 @router.post("/{project_id}/characters/{character_id}/role-chat/stream")

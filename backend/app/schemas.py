@@ -524,6 +524,19 @@ class RoleModelSnapshotPayload(BaseModel):
     project_seed: str = ""
 
 
+class RoleMaterialBriefPayload(BaseModel):
+    """资料 agent 整理后的角色训练档案。"""
+
+    identity: str = ""
+    personality: str = ""
+    voice_style: str = ""
+    known_facts: list[str] = Field(default_factory=list)
+    relationships: list[str] = Field(default_factory=list)
+    world_context: list[str] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    sample_plan: list[str] = Field(default_factory=list)
+
+
 class RoleModelJobPayload(BaseModel):
     """Training job status mirrored from role_finetune_service."""
 
@@ -537,6 +550,7 @@ class RoleModelJobPayload(BaseModel):
     dataset_info_path: str = ""
     train_config_path: str = ""
     adapter_path: str = ""
+    material_brief_path: str = ""
     log_tail: str = ""
     error: str | None = None
     created_at: datetime
@@ -550,6 +564,8 @@ class RoleModelOverviewPayload(BaseModel):
     service_online: bool
     service_error: str | None = None
     snapshot: RoleModelSnapshotPayload
+    material_brief: RoleMaterialBriefPayload | None = None
+    jobs: list[RoleModelJobPayload] = Field(default_factory=list)
     latest_job: RoleModelJobPayload | None = None
 
 
@@ -562,6 +578,14 @@ class RoleModelTrainRequest(BaseModel):
 class RoleChatHistoryItem(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
+
+
+class RoleChatLogItem(BaseModel):
+    """训练服务持久化的一条角色聊天消息。"""
+
+    role: Literal["user", "assistant", "system"]
+    content: str
+    created_at: datetime
 
 
 class RoleChatRequest(BaseModel):

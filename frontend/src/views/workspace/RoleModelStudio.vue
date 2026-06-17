@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  getRoleChatHistory,
   getRoleModelJob,
   getRoleModelOverview,
   startRoleModelTraining,
@@ -19,8 +20,10 @@ const projectId = computed(() => String(route.params.projectId))
 
 const overview = ref<RoleModelOverviewDto | null>(null)
 const job = ref<RoleModelJobDto | null>(null)
+const selectedJobId = ref('')
 const isLoading = ref(false)
 const isTraining = ref(false)
+const isHistoryLoading = ref(false)
 const error = ref('')
 const draft = ref('')
 const chatMessages = ref<RoleChatMessageDto[]>([])
@@ -30,7 +33,19 @@ const isChatting = ref(false)
 let pollTimer: ReturnType<typeof window.setInterval> | null = null
 
 const snapshot = computed(() => overview.value?.snapshot ?? null)
-const activeJob = computed(() => job.value ?? overview.value?.latest_job ?? null)
+const materialBrief = computed(() => overview.value?.material_brief ?? null)
+const jobs = computed(() => {
+  const seen = new Set<string>()
+  const items: RoleModelJobDto[] = []
+  for (const item of [job.value, ...(overview.value?.jobs ?? [])]) {
+    if (!item || seen.has(item.id)) continue
+    seen.add(item.id)
+    items.push(item)
+  }
+  return items
+})
+const selectedJob = computed(() => jobs.value.find((item) => item.id === selectedJobId.value) ?? null)
+const activeJob = computed(() => selectedJob.value ?? job.value ?? overview.value?.latest_job ?? null)
 const canTrain = computed(() => Boolean(overview.value?.service_online) && !isTraining.value)
 const canUseAdapter = computed(() => activeJob.value?.status === 'succeeded')
 const serviceLabel = computed(() => {
@@ -50,6 +65,17 @@ const jobLabel = computed(() => {
   }
   return labels[status] ?? status
 })
+
+function labelForJob(item: RoleModelJobDto) {
+  const labels: Record<string, string> = {
+    queued: '排队中',
+    running: '训练中',
+    succeeded: '已完成',
+    failed: '失败',
+  }
+  const time = new Date(item.created_at).toLocaleString()
+  return `${labels[item.status] ?? item.status} · ${item.sample_count || '准备中'} 条 · ${time}`
+}
 
 function stopPolling() {
   if (pollTimer) {
@@ -77,6 +103,15 @@ async function loadOverview() {
     const data = await getRoleModelOverview(projectId.value, props.charId)
     overview.value = data
     job.value = data.latest_job ?? null
+    const currentStillExists = selectedJobId.value && data.jobs.some((item) => item.id === selectedJobId.value)
+    if (!currentStillExists) {
+      selectedJobId.value =
+        data.latest_job?.id ??
+        data.jobs.find((item) => item.status === 'succeeded')?.id ??
+        data.jobs[0]?.id ??
+        ''
+    }
+    await loadSelectedHistory()
     startPolling()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '角色模型信息加载失败'
@@ -90,7 +125,10 @@ async function refreshJob() {
   if (!current) return
   try {
     job.value = await getRoleModelJob(projectId.value, props.charId, current.id)
-    if (!shouldPoll(job.value)) stopPolling()
+    if (!shouldPoll(job.value)) {
+      stopPolling()
+      await loadOverview()
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '训练任务刷新失败'
     stopPolling()
@@ -103,11 +141,32 @@ async function handleTrain() {
   error.value = ''
   try {
     job.value = await startRoleModelTraining(projectId.value, props.charId)
+    selectedJobId.value = job.value.id
+    chatMessages.value = []
     startPolling()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '训练任务启动失败'
   } finally {
     isTraining.value = false
+  }
+}
+
+async function loadSelectedHistory() {
+  const current = selectedJob.value
+  if (!current || current.status !== 'succeeded' || !overview.value?.service_online) {
+    chatMessages.value = []
+    return
+  }
+  isHistoryLoading.value = true
+  try {
+    const history = await getRoleChatHistory(projectId.value, props.charId, current.id)
+    chatMessages.value = history
+      .filter((item) => item.role === 'user' || item.role === 'assistant')
+      .map((item) => ({ role: item.role, content: item.content }))
+  } catch {
+    chatMessages.value = []
+  } finally {
+    isHistoryLoading.value = false
   }
 }
 
@@ -155,10 +214,17 @@ function backToCharacter() {
 watch(
   () => props.charId,
   () => {
+    selectedJobId.value = ''
     chatMessages.value = []
     void loadOverview()
   },
 )
+
+watch(selectedJobId, () => {
+  streamingReply.value = ''
+  void loadSelectedHistory()
+  startPolling()
+})
 
 onMounted(() => {
   void loadOverview()
@@ -201,6 +267,14 @@ onBeforeUnmount(stopPolling)
           <span>跨引用 {{ snapshot?.cross_references.length ?? 0 }}</span>
           <span>相关节点 {{ snapshot?.related_nodes.length ?? 0 }}</span>
         </div>
+        <div v-if="materialBrief" class="role-model__brief">
+          <strong>资料整理稿</strong>
+          <span>{{ materialBrief.identity }}</span>
+          <span v-if="materialBrief.voice_style">语气：{{ materialBrief.voice_style }}</span>
+          <span v-if="materialBrief.known_facts.length">
+            事实：{{ materialBrief.known_facts.slice(0, 3).join('；') }}
+          </span>
+        </div>
         <p v-if="overview && !overview.service_online" class="role-model__hint">
           训练服务不可用时仍可用 API + 当前角色资料进行兜底对话。
         </p>
@@ -210,9 +284,18 @@ onBeforeUnmount(stopPolling)
         <header class="role-model__panel-head">
           <h2>LoRA 训练</h2>
           <button type="button" class="role-model__primary" :disabled="!canTrain" @click="handleTrain">
-            {{ isTraining ? '启动中' : '生成数据并训练' }}
+            {{ isTraining ? '启动中' : '重新整理并训练' }}
           </button>
         </header>
+        <label class="role-model__select">
+          <span>已有模型</span>
+          <select v-model="selectedJobId" :disabled="!jobs.length">
+            <option value="">暂无可选模型</option>
+            <option v-for="item in jobs" :key="item.id" :value="item.id">
+              {{ labelForJob(item) }}
+            </option>
+          </select>
+        </label>
         <div class="role-model__job">
           <span class="role-model__job-status">{{ jobLabel }}</span>
           <span v-if="activeJob">样本 {{ activeJob.sample_count || '准备中' }}</span>
@@ -231,8 +314,9 @@ onBeforeUnmount(stopPolling)
           <span class="role-model__mode">{{ canUseAdapter ? '微调模型优先' : '资料兜底' }}</span>
         </header>
         <div class="role-model__chat">
+          <p v-if="isHistoryLoading" class="role-model__hint">正在读取远程聊天记录...</p>
           <p v-if="!chatMessages.length && !streamingReply" class="role-model__hint">
-            这里会优先使用已完成的角色 LoRA；没有可用 adapter 时会用现有 API + 快照资料兜底。
+            请选择已完成的角色 LoRA 对话；没有可用模型时会用现有 API + 快照资料兜底。
           </p>
           <article
             v-for="(message, index) in chatMessages"
@@ -382,7 +466,8 @@ onBeforeUnmount(stopPolling)
 
 .role-model__facts,
 .role-model__metric-row,
-.role-model__job {
+.role-model__job,
+.role-model__brief {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -409,6 +494,42 @@ onBeforeUnmount(stopPolling)
 .role-model__job {
   flex-direction: column;
   align-items: flex-start;
+}
+
+.role-model__brief {
+  margin-top: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.role-model__brief strong {
+  font-size: 12px;
+}
+
+.role-model__brief span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.role-model__select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.role-model__select select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
 }
 
 .role-model__log {

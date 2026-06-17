@@ -36,10 +36,21 @@ $env:OC_ROLE_FINETUNE_BASE_URL="http://127.0.0.1:9100"
 每个训练任务都会写入独立目录：
 
 - `snapshot.json`：主后端导出的角色快照。
+- `material_brief.json`：主后端资料 agent 整理后的角色训练档案。
 - `dataset/*.json`：中文 Alpaca SFT 训练数据。
 - `dataset/dataset_info.json`：LLaMA-Factory 自定义数据集索引。
 - `train.yaml`：LLaMA-Factory 训练配置。
 - `train.log`：训练日志。
 - `adapter/`：LoRA adapter 输出目录。
+- `chat_history.jsonl`：用户选择该模型对话时的远程聊天记录。
 
 `workspace/` 已加入根目录 `.gitignore`，不会被提交，也不会进入 Electron 打包。
+
+## 角色模型选择和聊天记录
+
+主后端进入角色模型页时会先调用训练服务的任务列表接口，查询当前项目和角色是否
+已经存在训练完成的模型。前端会默认选择最近一个已完成任务；如果没有完成任务，
+则显示最近的排队/训练/失败任务，并允许用户重新整理资料并训练。
+
+角色对话会绑定到当前选择的训练任务。训练服务会把每轮用户消息和角色回复追加到
+该任务目录下的 `chat_history.jsonl`，前端再次选择同一个模型时会读取并展示历史。
