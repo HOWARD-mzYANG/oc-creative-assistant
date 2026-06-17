@@ -31,13 +31,11 @@ import CreativeBezierEdge from './edges/CreativeBezierEdge.vue'
 const FLOW_ID = 'oc-main-flow'
 
 /**
- * Creative canvas component.
+ * 创意画布组件。
  *
- * This component handles Vue Flow runtime interactions, node rendering, and
- * synchronization between external props (graphVersion / createNodeRequest /
- * highlightedXxxIds) and the local nodes/edges; the core operations for
- * adding/removing/editing graph content live in useCanvasGraph, while pure
- * functions like relation types / node clone live in utils/canvasRelations.
+ * 负责 Vue Flow 运行时交互、节点渲染，以及外部 props（graphVersion / createNodeRequest /
+ * highlightedXxxIds）与本地节点 / 边状态的同步；增删改图谱内容的核心操作放在
+ * useCanvasGraph，关系类型、节点克隆等纯函数放在 utils/canvasRelations。
  */
 const props = defineProps<{
   selectedNodeId: string
@@ -47,10 +45,10 @@ const props = defineProps<{
   graphVersion: number
   createNodeRequest: { type: CreativeNodeType; nonce: number } | null
   focusNodeRequest?: { id: string; nonce: number } | null
-  /* IDs that "just appeared", computed by AppShell as a diff after staging is accepted; cleared once the animation finishes */
+  /* 刚出现的 ID：AppShell 在暂存项接受后通过 diff 计算，动画结束后清空。 */
   highlightedNodeIds: string[]
   highlightedEdgeIds: string[]
-  /* Node types that can be created on right-clicking blank space; SubgraphCanvas passes them per sub-graph, defaults to all types if not provided */
+  /* 空白处右键可创建的节点类型；SubgraphCanvas 按子图传入，未提供时默认允许全部类型。 */
   createTypes?: CreativeNodeType[]
 }>()
 
@@ -121,7 +119,7 @@ const edges = ref<CreativeFlowEdge[]>(
   props.initialEdges.map((edge) => normalizeEdge(edge, new Set(props.highlightedEdgeIds))),
 )
 
-/* A fixed flow id ensures toolbar actions bind to the current canvas instance, instead of being hijacked by other Vue Flow instances on the page */
+/* 固定 flow id，确保工具栏操作绑定到当前画布实例，不被页面上的其他 Vue Flow 实例接管。 */
 const {
   fitView,
   getViewport,
@@ -212,7 +210,7 @@ function pointerFromEvent(event: MouseEvent | TouchEvent): { x: number; y: numbe
   return { x: touch?.clientX ?? 0, y: touch?.clientY ?? 0 }
 }
 
-/** Keep the menu on-screen; coordinates are viewport-based (Teleport to body). */
+/** 保证菜单停留在屏幕内；坐标基于视口（Teleport 到 body）。 */
 function clampMenuPosition(x: number, y: number): { x: number; y: number } {
   const pad = 8
   const maxW = 200
@@ -265,7 +263,7 @@ onSelectionContextMenu(({ event, nodes }) => {
   openContextMenu(event, 'node', { nodeId: target.id })
 })
 
-// Double-click a node -> open node details (center NodeDetailView), carrying the current data snapshot.
+// 双击节点：打开中央 NodeDetailView，并带上当前数据快照。
 onNodeDoubleClick(({ node }) => {
   centerStage.openDetail(node.id, {
     id: node.id,
@@ -310,7 +308,7 @@ function handleMenuDuplicate() {
     const created = nodes.value[nodes.value.length - 1]
     if (created) {
       updateNodeData(created.id, {
-        title: `${src.data.title} copy`,
+        title: `${src.data.title} 副本`,
         content: src.data.content,
       })
     }
@@ -370,7 +368,7 @@ function handleMenuQuote() {
   closeContextMenu()
 }
 
-/** Ctrl/Cmd+C: copy the currently multi-selected nodes as reference cards into the bottom composer. */
+/** Ctrl/Cmd+C：把当前多选节点复制为引用卡片，放入底部输入框。 */
 function handleCopyKey(event: KeyboardEvent) {
   if (!((event.ctrlKey || event.metaKey) && event.key === 'c')) return
   const selected = getSelectedNodes.value
@@ -386,17 +384,16 @@ function handleCopyKey(event: KeyboardEvent) {
 }
 
 /**
- * Update the selected state of canvas nodes, and focus the viewport as needed.
+ * 更新画布节点选中状态，并按需移动视口焦点。
  *
- * The visual selection marker is maintained by this component; the business-side
- * "current selection" is pushed back by AppShell via props.selectedNodeId,
- * forming a one-way data flow.
+ * 视觉选中标记由该组件维护；业务侧的“当前选中项”通过 AppShell 的 props.selectedNodeId
+ * 回推进来，形成单向数据流。
  *
- * Args:
- *   nodeId: ID of the node to select.
- *   shouldFocus: whether to move the viewport near that node.
+ * 参数：
+ *   nodeId: 要选中的节点 ID。
+ *   shouldFocus: 是否把视口移动到该节点附近。
  */
- function selectNode(nodeId: string, shouldFocus = false) {
+function selectNode(nodeId: string, shouldFocus = false) {
   for (const node of nodes.value) {
     if (node.data.isActive !== (node.id === nodeId)) {
       node.data.isActive = node.id === nodeId
@@ -415,13 +412,13 @@ function handleCopyKey(event: KeyboardEvent) {
   })
 }
 
-/** Bubble Vue Flow node click events up to AppShell to maintain the global selection. */
+/** 将 Vue Flow 节点点击事件上抛给 AppShell，以维护全局选中状态。 */
 function handleNodeClick(event: NodeMouseEvent) {
   skipNextFocus.value = true
   emit('nodeSelected', event.node.id)
 }
 
-/** Sync primary selection after box-select; keep isActive aligned with Vue Flow selection. */
+/** 框选后同步主选中项，并保持 isActive 与 Vue Flow 选中状态一致。 */
 function handleSelectionChange(params: { nodes: { id: string }[] }) {
   const selectedIds = new Set(params.nodes.map((node) => node.id))
   for (const node of nodes.value) {
@@ -446,14 +443,14 @@ function syncEdgePresentation(highlighted = new Set(props.highlightedEdgeIds)) {
   )
 }
 
-/** Bubble Vue Flow edge click events up to AppShell to maintain the global selection. */
+/** 将 Vue Flow 边点击事件上抛给 AppShell，以维护全局选中状态。 */
 function handleEdgeClick(event: { edge: Edge }) {
   skipNextFocus.value = true
   emit('edgeSelected', event.edge.id)
   syncEdgePresentation()
 }
 
-/** Fit the viewport to the full graph extent, making it easier to regain the overall structure as nodes grow. */
+/** 视口适配完整图谱范围，节点变多后更容易找回整体结构。 */
 function handleFitView() {
   void fitView({ padding: 0.2, duration: 260 })
 }
@@ -490,7 +487,7 @@ watch(
 watch(
   () => props.graphVersion,
   () => {
-    /* After detail edits on the right or a backend restore, AppShell pushes the new authoritative snapshot back to the canvas */
+    /* 右侧详情编辑或后端恢复后，AppShell 会把新的权威快照推回画布。 */
     nodes.value = props.initialNodes.map((node) =>
       cloneNode(node, props.selectedNodeId, new Set(props.highlightedNodeIds)),
     )
@@ -548,7 +545,7 @@ watch(
 
 <template>
   <section class="canvas-workspace">
-    <!-- Canvas toolbar -->
+    <!-- 画布工具栏 -->
     <header class="canvas-toolbar">
       <div class="toolbar-group toolbar-group--create">
         <slot name="toolbar-leading" />
@@ -576,7 +573,7 @@ watch(
       class="flow-shell"
       :class="{ 'is-middle-pan-ready': isMiddleMouseDown }"
     >
-      <!-- v-model binds local refs; after drag, connect, and label restore, events bubble a savable snapshot up to AppShell. -->
+      <!-- v-model 绑定本地 refs；拖拽、连线、标签恢复后，会向 AppShell 上抛可保存快照。 -->
       <VueFlow
         :id="FLOW_ID"
         v-model:nodes="nodes"
@@ -634,7 +631,7 @@ watch(
         </template>
       </VueFlow>
 
-      <!-- Interaction hint, lightly penciled into the bottom-left corner of the canvas -->
+      <!-- 交互提示，轻量放在画布左下角。 -->
       <ul class="canvas-hint" aria-hidden="true">
         <li><span class="canvas-hint__key">选择</span><span>左键点击</span></li>
         <li><span class="canvas-hint__key">连线</span><span>点击 / 右键</span></li>

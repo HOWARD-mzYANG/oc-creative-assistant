@@ -1,6 +1,5 @@
-"""Reserved module for RAG text chunking.
+"""RAG 文本分块的预留模块。
 
-The current PoC retrieves at node granularity directly, without any extra chunking
-logic. This module is kept so that there is a clear place to extend later when
-integrating long documents, material libraries, or chapter text.
+当前 PoC 直接以节点粒度检索，不额外做分块。保留这个模块，是为了以后接入长文档、素材库或章节
+正文时，有一个清晰的扩展位置。
 """

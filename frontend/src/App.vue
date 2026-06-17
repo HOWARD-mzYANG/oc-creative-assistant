@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * Vue root component.
+ * Vue 根组件。
  *
- * After the multi-page refactor, the root component only renders the router
- * outlet; the actual pages (home / chat / library / workspace) are decided by
- * the router, and business state is managed by each page and the Pinia stores.
+ * 多页面重构后，根组件只渲染路由出口；实际页面（首页 / 聊天 / 项目库 / 工作区）由路由决定，
+ * 业务状态由各页面和 Pinia store 管理。
  */
 </script>
 

@@ -7,12 +7,10 @@ import App from './App.vue'
 import { router } from './router'
 
 /**
- * Frontend application entry point.
+ * 前端应用入口。
  *
- * After the multi-page refactor, the root component only mounts <router-view>;
- * cross-route shared state goes through Pinia, while fine-grained operations
- * within a single canvas remain the responsibility of individual composables
- * (see first_revision decision 6).
+ * 多页面重构后，根组件只挂载 <router-view>；跨路由共享状态通过 Pinia 管理，单个画布内的细粒度操作
+ * 仍由各 composable 负责（见 first_revision 决策 6）。
  */
 const scrollHideTimers = new WeakMap<EventTarget, ReturnType<typeof setTimeout>>()
 

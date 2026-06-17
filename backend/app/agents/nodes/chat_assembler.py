@@ -120,7 +120,7 @@ def _build_reply_messages(
             f"[Agent 结构化输出]\n{output.model_dump_json()}"
             f"{warning_block}"
             f"{_hint_block(state)}\n\n"
-            "请直接输出面向用户的最终回复正文；注意不要重复 [Recent conversation] 中已经说过的内容，"
+            "请直接输出面向用户的最终回复正文；注意不要重复【最近对话】中已经说过的内容，"
             "让回复保持连续。"
         ),
     ]

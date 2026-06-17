@@ -1,4 +1,4 @@
-"""Heuristics and prefetch helpers for external (web) research questions."""
+"""外部联网研究问题的启发式判断与预取辅助函数。"""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ class WebPrefetchResult:
 
 
 def resolve_web_search_enabled(message: str, mode: str) -> bool:
-    """Combine user toggle (auto/on/off) with the auto-detection heuristic."""
+    """结合用户开关（auto/on/off）和自动检测启发式判断是否启用联网搜索。"""
     normalized = (mode or "auto").strip().lower()
     if normalized == "on":
         return True
@@ -102,7 +102,7 @@ def web_search_mode_label(mode: str) -> str:
 
 
 def looks_like_web_query(message: str) -> bool:
-    """True when the user likely wants Tavily / web_search, not only project RAG."""
+    """当用户明显需要 Tavily / web_search，而不只是项目 RAG 时返回 True。"""
     raw = message.strip()
     if not raw:
         return False
@@ -159,7 +159,7 @@ def merge_web_sources(*groups: list[WebSourceItem], limit: int = MAX_WEB_SOURCE_
 
 
 def prefetch_web_search(query: str, *, top_k: int = 5) -> WebPrefetchResult | None:
-    """Call Tavily once; return prompt block, fallback answer, and link cards."""
+    """调用一次 Tavily；返回 prompt 块、兜底答案和链接卡片。"""
     try:
         response = search_web(query, top_k=top_k)
     except WebSearchUnavailable as exc:
@@ -171,7 +171,7 @@ def prefetch_web_search(query: str, *, top_k: int = 5) -> WebPrefetchResult | No
 
     answer = (response.answer or "").strip()
     sources = hits_to_sources(response.hits)
-    lines = [f"answer: {answer or '(no synthesized answer)'}"]
+    lines = [f"answer: {answer or '(没有综合答案)'}"]
     for index, item in enumerate(sources, start=1):
         lines.append(f"{index}. {item.title} — {item.snippet[:240]}")
     block = "\n".join(lines)
@@ -184,7 +184,7 @@ def extract_web_sources_from_tool_history(
     *,
     limit: int = MAX_WEB_SOURCE_CARDS,
 ) -> list[WebSourceItem]:
-    """Parse web_search tool JSON returns from a ReAct history."""
+    """从 ReAct 历史中解析 web_search 工具返回的 JSON 来源。"""
     sources: list[WebSourceItem] = []
     seen: set[str] = set()
 

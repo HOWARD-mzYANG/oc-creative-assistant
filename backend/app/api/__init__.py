@@ -1,1 +1,1 @@
-"""HTTP API layer package."""
+"""HTTP API 层包。"""

@@ -389,8 +389,8 @@ class OpenAICompatibleProvider:
             if err:
                 errors.append(err)
 
-        detail = "; ".join(errors) if errors else "no structured methods were available"
-        raise ValueError(f"structured output failed for {schema.__name__}: {detail}")
+        detail = "; ".join(errors) if errors else "没有可用的结构化输出方法"
+        raise ValueError(f"{schema.__name__} 结构化输出失败：{detail}")
 
     def _messages_for_json_mode(self, messages: list[BaseMessage]) -> list[BaseMessage]:
         """确保 json_mode 请求满足 OpenAI 兼容服务的 JSON 关键词要求。"""
@@ -415,7 +415,7 @@ class OpenAICompatibleProvider:
 
         if not isinstance(result, dict):
             if result is None:
-                return None, f"{method}: parsed is None"
+                return None, f"{method}: parsed 为空"
             return result, None
 
         parsed = result.get("parsed")
@@ -424,13 +424,13 @@ class OpenAICompatibleProvider:
 
         parsing_error = result.get("parsing_error")
         raw_snippet = _raw_message_snippet(result.get("raw"))
-        err_parts = [f"{method}: parsed is None"]
+        err_parts = [f"{method}: parsed 为空"]
         if parsing_error is not None:
             err_parts.append(f"parsing_error={parsing_error}")
         if raw_snippet:
             err_parts.append(f"raw={raw_snippet}")
         err = "; ".join(err_parts)
-        logger.warning("%s structured call returned None (%s)", schema.__name__, err)
+        logger.warning("%s 结构化调用返回 None（%s）", schema.__name__, err)
         return None, err
 
     def _structured_via_plain_json(
@@ -465,8 +465,8 @@ class OpenAICompatibleProvider:
             if not _is_tool_choice_unsupported_error(exc):
                 raise
             logger.warning(
-                "Tool calling is unsupported by this model; falling back to plain chat. "
-                "For thinking models, this skips active tool use in the current turn: %s",
+                "当前模型不支持工具调用，回退到普通 chat。"
+                "对于 thinking 模型，这会跳过本轮主动工具使用：%s",
                 exc,
             )
             return AIMessage(content=self.chat(messages))
@@ -478,14 +478,14 @@ _MOCK_SAMPLES: dict[str, dict[str, Any]] = {
     "IntentClassification": {
         "primary": "inspiration",
         "confidence": 0.85,
-        "reasoning": "The user wants to explore creative directions, matching the inspiration intent.",
+        "reasoning": "用户想探索创作方向，匹配 inspiration 意图。",
     },
     "InspirationOutput": {
-        "reasoning": "Add background conflict around the existing dwarven-blacksmith setting to make the character more three-dimensional.",
+        "reasoning": "围绕既有矮人工匠设定补充背景冲突，让角色更立体。",
         "suggestions": [
-            "Design a past for the blacksmith in which she was exiled by the clan chief",
-            "Introduce a young apprentice who challenges her craft",
-            "Have her hold an artifact that reveals an ancestral secret",
+            "设计一段工匠曾被氏族首领放逐的过去。",
+            "引入一位挑战她技艺的年轻学徒。",
+            "让她持有一件能揭开祖先秘密的遗物。",
         ],
         "referenced_node_ids": [],
         "proposed_changes": [
@@ -495,53 +495,53 @@ _MOCK_SAMPLES: dict[str, dict[str, Any]] = {
                 "pending_id": "pending-1",
                 "payload": {
                     "title": "Duskstone",
-                    "content": "A young dwarven apprentice, studying under the protagonist, secretly suspicious of her master's past",
+                    "content": "一位年轻矮人学徒，跟随主角学习，却暗中怀疑师父的过去。",
                     "node_type": "character",
                 },
-                "reason": "Introduce a conflict line for the protagonist",
+                "reason": "为主角引入一条冲突线。",
             }
         ],
     },
     "ResearchOutput": {
-        "reasoning": "Summarize related characters and worldbuilding fragments by theme within the existing graph.",
-        "summary": "[mock] This character has historical entanglements with the existing clan; the core conflict stems from identity.",
+        "reasoning": "按主题总结既有图谱中的相关角色与世界观片段。",
+        "summary": "[mock] 这个角色与既有氏族有历史纠葛，核心冲突来自身份认同。",
         "referenced_node_ids": [],
         "proposed_changes": [],
     },
     "StructureOutput": {
-        "reasoning": "The character the user selected isn't yet connected to the plot; add an interaction line.",
-        "summary": "Recommend adding an opposing interaction line between the character and the clan chief.",
+        "reasoning": "用户选中的角色尚未连接到剧情，可补一条互动线。",
+        "summary": "建议添加角色与氏族首领之间的对立互动线。",
         "proposed_changes": [],
     },
     "SimulationOutput": {
-        "reasoning": "Lay out multiple directions for the user's hypothesis and assess the impact on existing nodes.",
+        "reasoning": "为用户的假设列出多个方向，并评估对既有节点的影响。",
         "branches": [
             {
-                "scenario": "She accepts the mission but leaves herself a way out",
+                "scenario": "她接受任务，但给自己留下退路。",
                 "likelihood": "high",
-                "downstream_impacts": ["The clan reconciles for now", "The apprentice's identity becomes a mystery"],
+                "downstream_impacts": ["氏族暂时和解。", "学徒身份变成新的谜团。"],
                 "affected_node_ids": [],
             }
         ],
     },
     "ChatAssemblerOutput": {
-        "reply_text": "[mock] For the blacksmith's story, here are a few directions: an exiled past, a young apprentice, an ancestral artifact.",
+        "reply_text": "[mock] 关于这位工匠的故事，可以从几个方向展开：被放逐的过去、年轻学徒、祖先遗物。",
         "cited_node_ids": [],
-        "staging_summary": "I'm ready to add 1 item for you, pending your confirmation.",
+        "staging_summary": "我已经准备好添加 1 项，等待你确认。",
     },
     "ChatMetadataOutput": {
         "cited_node_ids": [],
-        "staging_summary": "I'm ready to add 1 item for you, pending your confirmation.",
+        "staging_summary": "我已经准备好添加 1 项，等待你确认。",
     },
         "SummaryOutput": {
-        "summary": "[mock] The user and the agent had several rounds of discussion about the protagonist's past and the clan conflict, reaching basic consensus on the main direction.",
+        "summary": "[mock] 用户和 agent 围绕主角过去与氏族冲突进行了多轮讨论，并基本确定了主要方向。",
         "key_facts": [
-            "The protagonist is a dwarven blacksmith with a questionable origin",
-            "The user leans toward having the conflict come from within the clan",
+            "主角是一位身世可疑的矮人工匠。",
+            "用户倾向于让冲突来自氏族内部。",
         ],
     },
     "StructuredExtractionOutput": {
-        "reasoning": "[mock] Extracted one character and one worldbuilding setting from the conversation.",
+        "reasoning": "[mock] 从对话中抽取出一个角色和一个世界观设定。",
         "entities": [
             {"type": "character", "name": "Duskstone", "attributes": {"role": "dwarven blacksmith"}},
             {"type": "world", "name": "Ironforge Clan", "attributes": {}},
@@ -552,20 +552,20 @@ _MOCK_SAMPLES: dict[str, dict[str, Any]] = {
         "deferred_fields": [{"entity": "Duskstone", "field": "appearance"}],
     },
     "QuestionPlannerOutput": {
-        "reasoning": "[mock] The character has an identity but lacks motivation; ask about motivation.",
-        "next_question": "Why did Duskstone leave the Ironforge Clan?",
+        "reasoning": "[mock] 角色已有身份但缺少动机，适合追问动机。",
+        "next_question": "Duskstone 为什么离开 Ironforge Clan？",
         "target_field": "motivation",
     },
     "SeedOutput": {
-        "worldview_summary": "[mock] A fantasy world centered on a clan of dwarven blacksmiths.",
+        "worldview_summary": "[mock] 这是一个围绕矮人工匠氏族展开的奇幻世界。",
         "main_characters": ["Duskstone"],
-        "plot_outline": "[mock] The protagonist comes into conflict with the clan over the mystery of her origin.",
-        "style_notes": "A weighty, introspective low-fantasy tone.",
+        "plot_outline": "[mock] 主角因为身世之谜与氏族发生冲突。",
+        "style_notes": "厚重、内省的低魔奇幻语气。",
     },
     "WorkspaceInspirationOutput": {
-        "reasoning": "[mock] The user is sharing an idea; give positive feedback.",
+        "reasoning": "[mock] 用户正在分享想法，给予正反馈。",
         "type": "feedback",
-        "content": "[mock] This direction is really interesting — especially with the conflict coming from within, the tension will be strong.",
+        "content": "[mock] 这个方向很有意思，尤其是冲突来自内部时，张力会更强。",
     },
 }
 

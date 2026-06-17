@@ -1,16 +1,16 @@
 import { backendBaseUrl } from './http'
 
-/** SSE events for the workspace bottom dialog box (second_revision change B / W5). */
+/** 工作区底部对话框的 SSE 事件（second_revision 变更 B / W5）。 */
 export type WorkspaceChatEvent =
   | { type: 'output'; output_type: 'search' | 'rag' | 'question' | 'feedback'; content: string }
   | { type: 'error'; message: string }
   | { type: 'done' }
 
 /**
- * SSE stream of the workspace's passive inspiration agent.
+ * 工作区被动灵感智能体的 SSE 流。
  *
- * Isomorphic to chat's streamChat: fetch + ReadableStream parsing; onEvent is called
- * once per complete data line. Passive response—only produces output when the user sends a message.
+ * 与 chat 的 streamChat 同构：fetch + ReadableStream 解析；每收到一条完整 data 行就调用一次
+ * onEvent。它是被动响应，只有用户发送消息时才产生输出。
  */
 export async function streamWorkspaceChat(
   projectId: string,
@@ -25,7 +25,7 @@ export async function streamWorkspaceChat(
   })
 
   if (!response.ok || !response.body) {
-    throw new Error(`workspace_chat failed: HTTP ${response.status}`)
+    throw new Error(`工作区对话请求失败：HTTP ${response.status}`)
   }
 
   const reader = response.body.getReader()
@@ -44,7 +44,7 @@ export async function streamWorkspaceChat(
       try {
         onEvent(JSON.parse(line.slice(6)) as WorkspaceChatEvent)
       } catch {
-        /* skip the corrupted chunk */
+        /* 跳过损坏的分片。 */
       }
     }
   }

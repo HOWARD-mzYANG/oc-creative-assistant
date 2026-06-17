@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import WorldNotesWorkspace from '../../components/workspace/world/WorldNotesWorkspace.vue'
 
 /**
- * 世界观 view: folder notes by default, optional tree canvas derived from hierarchy.
+ * 世界观视图：默认是文件夹式笔记，也可切换为由层级关系推导出的树状画布。
  */
 const { worldGraphId } = storeToRefs(useProjectStore())
 </script>

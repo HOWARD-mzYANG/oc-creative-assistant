@@ -3,10 +3,10 @@ import type { AgentStagingBatchDto } from '../../api/chatApi'
 import StagingItemCard from './StagingItemCard.vue'
 
 /**
- * Staging batch list.
+ * 暂存批次列表。
  *
- * Changes produced in the same Agent turn are grouped into one batch, offering
- * "accept all" and "reject all" shortcuts; it also lets the user handle individual items more granularly.
+ * 同一轮智能体生成的变更会合并成一个批次，提供“全部接受”和“全部拒绝”快捷操作；
+ * 同时也支持逐条处理。
  */
 defineProps<{
   batches: AgentStagingBatchDto[]

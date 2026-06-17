@@ -4,8 +4,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   background: var(--canvas-bg);
-  /* Make the toolbar respond to the canvas's own width (which changes when the
-     side panels collapse/expand), not to the viewport width. */
+  /* 让工具栏响应画布自身宽度（侧边栏折叠 / 展开时会变化），而不是视口宽度。 */
   container-type: inline-size;
   container-name: canvas;
 }
@@ -80,7 +79,7 @@
   margin-left: auto;
 }
 
-/* Penciled interaction hint anchored to the bottom-left corner of the canvas. */
+/* 铅笔感交互提示，固定在画布左下角。 */
 .canvas-hint {
   position: absolute;
   left: 14px;
@@ -163,7 +162,7 @@
   color: #b42318;
 }
 
-/* Custom select (matches the right sidebar) */
+/* 自定义选择框（与右侧栏保持一致）。 */
 .custom-select-container {
   position: relative;
   width: 120px;
@@ -381,8 +380,7 @@
   }
 }
 
-/* Container queries key off the canvas's own width, so the toolbar reflows when
-   the side panels collapse/expand even though the viewport width is unchanged. */
+/* 容器查询基于画布自身宽度，因此即使视口宽度不变，侧边栏折叠 / 展开时工具栏也会重排。 */
 @container canvas (max-width: 720px) {
   .canvas-toolbar {
     gap: 6px;

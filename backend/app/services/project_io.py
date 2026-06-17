@@ -1,4 +1,4 @@
-"""Project import/export as lossless .oc snapshots (story + characters + world)."""
+"""项目导入/导出：无损 .oc 快照（故事 + 角色 + 世界观）。"""
 from __future__ import annotations
 
 import uuid
@@ -12,13 +12,13 @@ OC_FORMAT_VERSION = 1
 
 
 def export_project_oc(project_id: str) -> dict:
-    """Lossless snapshot of all three sub-graphs, for backup / migration."""
+    """导出三个子图的无损快照，用于备份 / 迁移。"""
     from app.services.graph_repository import read_ordered_edges, read_ordered_nodes
 
     with SessionLocal() as db:
         project = db.get(ProjectORM, project_id)
         if project is None:
-            raise ValueError("Project not found")
+            raise ValueError("未找到项目")
         nodes = read_ordered_nodes(db, project_id)
         edges = read_ordered_edges(db, project_id)
         return {
@@ -53,20 +53,20 @@ def export_project_oc(project_id: str) -> dict:
 
 
 def import_project_oc(data: dict) -> str:
-    """Restore a .oc snapshot into a NEW project, regenerating ids to avoid collisions.
+    """把 .oc 快照恢复成一个新项目，并重新生成 ID 以避免冲突。
 
-    Returns the new project_id. Edges whose endpoints are missing are skipped.
+    返回新的 project_id。端点缺失的边会被跳过。
     """
     from app.schemas import ProjectCreateRequest
     from app.services.project_service import create_project
 
     if not isinstance(data, dict) or data.get("format") != "oc":
-        raise ValueError("Not a valid .oc file")
+        raise ValueError("不是有效的 .oc 文件")
 
     meta = data.get("project") or {}
     detail = create_project(
         ProjectCreateRequest(
-            name=str(meta.get("name") or "Imported project"),
+            name=str(meta.get("name") or "导入项目"),
             description=str(meta.get("description") or ""),
         )
     )
@@ -87,7 +87,7 @@ def import_project_oc(data: dict) -> str:
                     project_id=project_id,
                     graph_id=_resolve_graph_id(db, project_id, node_type),
                     node_type=node_type,
-                    title=str(n.get("title") or "Untitled"),
+                    title=str(n.get("title") or "未命名"),
                     content=str(n.get("content") or ""),
                     meta=n.get("meta") or {"tags": [], "status": "synced"},
                     position_x=float(n.get("position_x") or 0.0),

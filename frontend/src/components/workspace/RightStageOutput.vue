@@ -43,7 +43,7 @@ function goToNode(node: { id: string; title: string; node_type: string }) {
     router.push(`/workspace/${pid}/characters/${node.id}`)
     return
   }
-  // plot / worldbuilding: jump to the board and focus the node on its canvas
+  // plot / worldbuilding：跳到对应看板，并在画布上聚焦该节点。
   nodeNav.request(node.id)
   router.push(
     node.node_type === 'worldbuilding'
@@ -60,7 +60,7 @@ const AGENT_LABELS: Record<string, string> = {
   small_talk: '闲聊',
 }
 
-/* ---- chat auto-scroll ---- */
+/* ---- 聊天自动滚动 ---- */
 const streamRef = ref<HTMLElement | null>(null)
 async function scrollToBottom() {
   await nextTick()
@@ -76,11 +76,11 @@ watch(
 <template>
   <aside class="right-stage">
     <header class="right-stage__head">
-      <span class="right-stage__title">Agent</span>
+      <span class="right-stage__title">智能体</span>
       <PanelToggleButton
         direction="right"
         expanded
-        label="收起 Agent 面板"
+        label="收起智能体面板"
         @click="$emit('collapse')"
       />
     </header>
@@ -88,7 +88,7 @@ watch(
     <div class="right-stage__body">
       <div ref="streamRef" class="right-stage__chat">
         <p v-if="messages.length === 0 && !streamingReply && !isStreaming" class="right-stage__empty">
-          在下方输入框提问。Agent 可以协助引导、抽取实体并提出结构建议。
+          在下方输入框提问。智能体可以协助引导、抽取实体并提出结构建议。
         </p>
 
         <div
@@ -226,7 +226,7 @@ watch(
   gap: 10px;
 }
 
-/* messages */
+/* 消息 */
 .right-stage__empty {
   margin: 0;
   color: var(--muted, #888);

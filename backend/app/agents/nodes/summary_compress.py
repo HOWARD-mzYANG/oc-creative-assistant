@@ -1,17 +1,13 @@
-"""Conversation summary compression node.
+"""对话摘要压缩节点。
 
-Runs after persistence_hub, feeding the "old messages" beyond keep_recent + the
-existing summary to the LLM, and writes a new version of
-``conversation_summary`` back to ChatSessionORM.
+在 persistence_hub 之后运行：把 keep_recent 之外的“旧消息”和已有摘要交给 LLM，并把新版
+``conversation_summary`` 写回 ChatSessionORM。
 
-The throttling strategy is based on the high-water mark
-``summary_message_count``: it compresses again only when the newly accumulated
-old messages exceed ``summary_compress_every``, avoiding triggering the LLM
-every turn.
+节流策略基于高水位 ``summary_message_count``：只有新增旧消息数量超过
+``summary_compress_every`` 时才再次压缩，避免每轮都触发 LLM。
 
-When the LLM fails it does not block the main path: after catching the
-exception it keeps the old summary as is, so a reply the user has already
-received is not rolled back due to a failed post-hoc summary.
+LLM 失败时不会阻塞主路径：捕获异常后保留旧摘要，因此用户已经收到的回复不会因为事后摘要失败而
+回滚。
 """
 
 from __future__ import annotations
@@ -43,7 +39,7 @@ def _format_messages_for_prompt(messages: list[ChatMessageORM]) -> str:
     for record in messages:
         content = (record.content or "").strip()
         lines.append(f"- {record.role}: {content}")
-    return "\n".join(lines) or "(none)"
+    return "\n".join(lines) or "（无）"
 
 
 def summary_compress_node(state: AgentState) -> dict[str, Any]:
@@ -79,16 +75,16 @@ def summary_compress_node(state: AgentState) -> dict[str, Any]:
         old_messages = ordered_messages[session.summary_message_count : new_high_water]
 
     user_block = (
-        f"[Existing summary (may be empty)]\n{previous_summary or '(empty)'}\n\n"
-        f"[Conversation segments to merge into the summary this time]\n{_format_messages_for_prompt(old_messages)}\n\n"
-        "Output the updated summary and key_facts."
+        f"[已有摘要（可能为空）]\n{previous_summary or '（空）'}\n\n"
+        f"[本次需要合并进摘要的对话片段]\n{_format_messages_for_prompt(old_messages)}\n\n"
+        "输出更新后的 summary 和 key_facts。"
     )
     messages_for_llm = [SystemMessage(_SYSTEM_PROMPT), HumanMessage(user_block)]
 
     try:
         output = get_llm_provider().structured(messages_for_llm, SummaryOutput)
     except Exception as error:  # noqa: BLE001
-        logger.warning("summary_compress LLM call failed, keeping the old summary: %s", error)
+        logger.warning("summary_compress LLM 调用失败，保留旧摘要：%s", error)
         return {}
 
     with SessionLocal.begin() as db:

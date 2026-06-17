@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 
 export type WebSearchMode = 'auto' | 'on' | 'off'
 
-/** A node quoted in the bottom dialog box (second_revision change C). */
+/** 底部对话框中引用的节点（second_revision 变更 C）。 */
 export interface QuotedNodeRef {
   id: string
   type: string // 'character' | 'plot' | 'world' ...
@@ -10,16 +10,16 @@ export interface QuotedNodeRef {
 }
 
 /**
- * Bottom Composer state: quoted node cards + input box text.
+ * 底部输入器状态：引用节点卡片 + 输入框文本。
  *
- * Select a node → copy it to the dialog box → show it as a dismissible small card above the input box.
+ * 选中节点 -> 复制到对话框 -> 在输入框上方显示为可移除的小卡片。
  */
 export const useComposerStore = defineStore('composer', {
   state: () => ({
     references: [] as QuotedNodeRef[],
     input: '',
     collapsed: false,
-    /** auto = heuristic; on = force web search; off = disable web search */
+    /** auto = 启发式判断；on = 强制联网搜索；off = 禁用联网搜索。 */
     webSearchMode: 'auto' as WebSearchMode,
   }),
   actions: {

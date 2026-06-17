@@ -8,9 +8,9 @@ export interface WorldTreeNode {
   children: WorldTreeNode[]
 }
 
-/** Card is 236px wide in global styles; leave a little air between siblings. */
+/** 全局样式中的卡片宽度为 236px；兄弟节点之间留出一点呼吸空间。 */
 const NODE_X_GAP = 260
-/** Top-left spacing must clear the full card height (~172px) plus a visible gap. */
+/** 左上间距需要避开完整卡片高度（约 172px）并保留可见间隔。 */
 const WORLD_NODE_HEIGHT = 172
 const WORLD_NODE_Y_MARGIN = 56
 const NODE_Y_GAP = WORLD_NODE_HEIGHT + WORLD_NODE_Y_MARGIN
@@ -27,7 +27,7 @@ function siblingSort(a: CreativeFlowNode, b: CreativeFlowNode): number {
   return (a.data.sortOrder ?? 0) - (b.data.sortOrder ?? 0)
 }
 
-/** Build a forest from flat world nodes using parentId. Invalid parents become roots. */
+/** 根据 parentId 从扁平世界观节点构建森林；无效父级会变成根节点。 */
 export function buildWorldForest(nodes: CreativeFlowNode[]): WorldTreeNode[] {
   const nodeById = new Map(nodes.map((node) => [node.id, node]))
   const childrenByParent = new Map<string | null, CreativeFlowNode[]>()
@@ -54,7 +54,7 @@ export function buildWorldForest(nodes: CreativeFlowNode[]): WorldTreeNode[] {
   return roots.map(toTree)
 }
 
-/** Assign top-down tree positions; each root starts a separate tree along the x axis. */
+/** 分配自上而下的树状位置；每个根节点沿 x 轴开启一棵独立树。 */
 export function layoutWorldForest(forest: WorldTreeNode[]): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>()
   let forestCursor = 0
@@ -104,7 +104,7 @@ function placeTree(
   return cursor
 }
 
-/** Derive hierarchy-only edges for persistence and tree canvas (child → parent, belongs to). */
+/** 为持久化和树状画布推导纯层级边（子节点 → 父节点，归属）。 */
 export function hierarchyToEdges(nodes: CreativeFlowNode[]): CreativeFlowEdge[] {
   const edges: CreativeFlowEdge[] = []
 
@@ -117,12 +117,12 @@ export function hierarchyToEdges(nodes: CreativeFlowNode[]): CreativeFlowEdge[] 
         id: `world-hier-${node.id}-${parentId}`,
         source: node.id,
         target: parentId,
-        label: 'belongs to',
+        label: '归属',
         sourceHandle: 'top',
         targetHandle: 'bottom',
         type: 'bezier',
         data: {
-          label: 'belongs to',
+          label: '归属',
           relationType: 'belongs_to',
         },
       }),
@@ -132,7 +132,7 @@ export function hierarchyToEdges(nodes: CreativeFlowNode[]): CreativeFlowEdge[] 
   return edges
 }
 
-/** Tree canvas edges: parent above child, top-down bezier with no label clutter. */
+/** 树状画布边：父节点在上、子节点在下，使用无标签的自上而下贝塞尔线。 */
 export function hierarchyToTreeCanvasEdges(nodes: CreativeFlowNode[]): CreativeFlowEdge[] {
   const nodeIds = new Set(nodes.map((node) => node.id))
 
@@ -161,7 +161,7 @@ export function applyTreeLayout(nodes: CreativeFlowNode[]): CreativeFlowNode[] {
   const forest = buildWorldForest(nodes)
   const positions = layoutWorldForest(forest)
 
-  // Nodes in cycles or with broken parent chains still need a position.
+  // 处于循环或父级链断裂中的节点也需要一个位置。
   let orphanUnit = 0
   if (positions.size > 0) {
     const maxX = Math.max(...[...positions.values()].map((position) => position.x))
@@ -242,7 +242,7 @@ function renumberSiblingSortOrders(
   })
 }
 
-/** Reparent or reorder a world note; returns null when the move would create a cycle. */
+/** 调整世界观笔记的父级或排序；如果移动会产生循环则返回 null。 */
 export function moveWorldNode(
   nodes: CreativeFlowNode[],
   draggedId: string,
@@ -303,7 +303,7 @@ export function moveWorldNode(
   return updated
 }
 
-/** One-time helper: treat legacy belongs_to edges as folder hierarchy when parentId is absent. */
+/** 一次性兼容辅助：parentId 缺失时，把旧版 belongs_to 边视作文件夹层级。 */
 export function inferWorldHierarchyFromEdges(snapshot: CreativeGraphSnapshot): CreativeGraphSnapshot {
   const hasHierarchy = snapshot.nodes.some((node) => node.data.parentId)
   if (hasHierarchy) return snapshot
@@ -314,7 +314,7 @@ export function inferWorldHierarchyFromEdges(snapshot: CreativeGraphSnapshot): C
   for (const edge of snapshot.edges) {
     if (edge.data?.relationType !== 'belongs_to') continue
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue
-    // child belongs_to parent => source is child, target is parent
+    // child belongs_to parent => source 是子节点，target 是父节点。
     parentByChild.set(edge.source, edge.target)
   }
 

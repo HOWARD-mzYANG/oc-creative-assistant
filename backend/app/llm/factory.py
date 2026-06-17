@@ -1,9 +1,8 @@
-"""LLM provider singleton factory.
+"""LLM provider 单例工厂。
 
-The provider is not constructed at import time; the caller triggers it on demand,
-so a missing .env at startup won't fail-fast and take down the whole backend.
-``lru_cache`` ensures it's constructed only once per process, and test code can
-call ``get_llm_provider.cache_clear()`` to reset it.
+provider 不会在 import 时构建，而是由调用方按需触发；这样启动时即使缺少 .env，也不会快速失败并拖垮
+整个后端。``lru_cache`` 保证每个进程只构建一次，测试代码可以调用
+``get_llm_provider.cache_clear()`` 来重置。
 """
 
 from __future__ import annotations
@@ -28,7 +27,7 @@ def _build_provider(settings: LlmSettings) -> LlmProvider:
         return OpenAICompatibleProvider(settings)
 
     raise ValueError(
-        f"Unrecognized LLM provider: {settings.provider!r}; only 'openai' | 'mock' are supported"
+        f"无法识别的 LLM provider：{settings.provider!r}；仅支持 'openai' | 'mock'"
     )
 
 

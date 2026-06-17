@@ -115,32 +115,32 @@ def ensure_default_project() -> ProjectPayload:
 
 
 def get_project(project_id: str) -> ProjectPayload:
-    """Read the basic information of a project.
+    """读取项目基础信息。
 
-    Args:
-        project_id: The project ID.
+    参数：
+        project_id: 项目 ID。
 
-    Returns:
-        The project DTO.
+    返回：
+        项目 DTO。
 
-    Raises:
-        HTTPException: Raises 404 when the project does not exist.
+    抛出：
+        HTTPException: 项目不存在时抛 404。
     """
     with SessionLocal() as session:
         return project_to_payload(require_project(session, project_id))
 
 
 def get_project_graph(project_id: str, indexing: IndexingStatusPayload | None = None) -> GraphPayload:
-    """Read the project graph and convert it into a frontend DTO.
+    """读取项目图谱并转换为前端 DTO。
 
-    Args:
-        project_id: The project ID.
+    参数：
+        project_id: 项目 ID。
 
-    Returns:
-        A complete snapshot of the project, nodes, and edges.
+    返回：
+        项目、节点和边的完整快照。
 
-    Raises:
-        HTTPException: Raises 404 when the project does not exist.
+    抛出：
+        HTTPException: 项目不存在时抛 404。
     """
     with SessionLocal() as session:
         project = require_project(session, project_id)
@@ -156,18 +156,17 @@ def get_project_graph(project_id: str, indexing: IndexingStatusPayload | None = 
 
 
 def save_project_graph(project_id: str, payload: SaveGraphRequest) -> GraphPayload:
-    """Replace the entire project graph and incrementally sync the vector index after the transaction commits.
+    """整体替换项目图谱，并在事务提交后增量同步向量索引。
 
-    Args:
-        project_id: The project ID.
-        payload: The frontend's current complete nodes/edges snapshot.
+    参数：
+        project_id: 项目 ID。
+        payload: 前端当前完整的节点 / 边快照。
 
-    Returns:
-        The graph snapshot after the final database save.
+    返回：
+        最终保存到数据库后的图谱快照。
 
-    Raises:
-        HTTPException: Raised when the project does not exist or an edge references
-            an invalid node.
+    抛出：
+        HTTPException: 项目不存在或边引用无效节点时抛出。
     """
     old_nodes = read_project_nodes(project_id)
 
@@ -206,15 +205,12 @@ def get_subgraph(graph_id: str, indexing: IndexingStatusPayload | None = None) -
 
 
 def save_subgraph(graph_id: str, payload: SaveGraphRequest) -> GraphPayload:
-    """Replace the nodes and intra-graph edges of a single sub-graph as a whole, and incrementally sync the index after the transaction commits.
+    """整体替换单个子图的节点和子图内部边，并在事务提交后增量同步索引。
 
-    The index is still incrementally synced at the project level (ChromaDB
-    collections are project-scoped), keeping it consistent with single-canvas
-    saving.
+    索引仍按项目级增量同步（ChromaDB collection 以项目为作用域），以保持和单画布保存一致。
 
-    Raises:
-        HTTPException: Raised when the sub-graph does not exist or an edge
-            references an invalid node.
+    抛出：
+        HTTPException: 子图不存在或边引用无效节点时抛出。
     """
     with SessionLocal() as session:
         graph = require_graph(session, graph_id)
@@ -233,17 +229,17 @@ def save_subgraph(graph_id: str, payload: SaveGraphRequest) -> GraphPayload:
 
 
 def create_node(project_id: str, node: NodePayload) -> NodePayload:
-    """Create or overwrite a single node, and sync the vector index after commit.
+    """创建或覆盖单个节点，并在提交后同步向量索引。
 
-    Args:
-        project_id: The ID of the project the node belongs to.
-        node: The node DTO submitted by the frontend.
+    参数：
+        project_id: 节点所属项目 ID。
+        node: 前端提交的节点 DTO。
 
-    Returns:
-        The saved node DTO.
+    返回：
+        已保存的节点 DTO。
 
-    Raises:
-        HTTPException: Raised when the project does not exist.
+    抛出：
+        HTTPException: 项目不存在时抛出。
     """
     with SessionLocal.begin() as session:
         project = require_project(session, project_id)
@@ -265,25 +261,25 @@ def create_node(project_id: str, node: NodePayload) -> NodePayload:
 
 
 def update_node(project_id: str, node_id: str, payload: UpdateNodeRequest) -> NodePayload:
-    """Update a node's basic content or position, and sync the vector index when the retrieval document changes.
+    """更新节点基础内容或位置；当检索文档变化时同步向量索引。
 
-    Args:
-        project_id: The ID of the project the node belongs to.
-        node_id: The ID of the node to update.
-        payload: Partial update fields; a field of None means no modification.
+    参数：
+        project_id: 节点所属项目 ID。
+        node_id: 要更新的节点 ID。
+        payload: 局部更新字段；字段为 None 表示不修改。
 
-    Returns:
-        The updated node DTO.
+    返回：
+        更新后的节点 DTO。
 
-    Raises:
-        HTTPException: Raised when the project or node does not exist.
+    抛出：
+        HTTPException: 项目或节点不存在时抛出。
     """
     with SessionLocal.begin() as session:
         project = require_project(session, project_id)
         node = session.get(NodeORM, node_id)
 
         if node is None or node.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Node not found")
+            raise HTTPException(status_code=404, detail="未找到节点")
 
         old_fingerprint = build_node_fingerprint(node)
 

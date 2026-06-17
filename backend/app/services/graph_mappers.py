@@ -1,4 +1,4 @@
-"""Graph DTO <-> ORM 转换。
+"""图谱 DTO <-> ORM 转换。
 
 本模块是服务层的数据映射边界，负责在 API payload 与 SQLAlchemy ORM 之间转换，
 并维护节点 meta JSON 的兼容规则。它不访问数据库，也不触发索引同步。

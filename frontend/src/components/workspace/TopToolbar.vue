@@ -2,11 +2,10 @@
 import logoUrl from '../../assets/logo.png'
 
 /**
- * Top toolbar.
+ * 顶部工具栏。
  *
- * Only displays the project name and global action entry points; currently only the
- * save action is wired to business logic, while the other buttons remain as entry
- * points for future import, export, and settings capabilities.
+ * 只展示项目名称和全局操作入口；目前只有保存操作接入了业务逻辑，
+ * 其他按钮保留为未来导入、导出和设置能力的入口。
  */
 defineProps<{
   projectName: string
@@ -37,7 +36,7 @@ function handleActionClick(actionId: string) {
 </script>
 
 <template>
-  <!-- Top bar: global project actions -->
+  <!-- 顶栏：全局项目操作。 -->
   <header class="top-toolbar">
     <div class="title-block">
       <div class="brand">

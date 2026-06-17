@@ -179,7 +179,7 @@ def _summarize_title(user_message: str) -> str:
         title = (reply or "").strip().strip('"').strip().splitlines()[0].strip()
         return title[:14] or text[:10]
     except Exception as error:  # noqa: BLE001
-        logger.warning("session title generation failed, falling back: %s", error)
+        logger.warning("会话标题生成失败，回退到截断文本：%s", error)
         return text[:10]
 
 

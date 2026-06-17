@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-/** Cross-page "jump to node" intent: a chip in chat sets it, the target board consumes it after load. */
+/** 跨页面“跳转到节点”意图：聊天里的引用芯片写入它，目标画布加载后消费它。 */
 export const useNodeNavStore = defineStore('nodeNav', {
   state: () => ({ pendingNodeId: '' }),
   actions: {

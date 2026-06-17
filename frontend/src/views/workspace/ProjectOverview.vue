@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { updateProject } from '../../api/projectApi'
 
 /**
- * 概览: wallpaper cover, world-doc style fields, debounced auto-save.
+ * 概览页：封面墙纸、世界文档式字段，以及防抖自动保存。
  */
 const projectStore = useProjectStore()
 const { detail } = storeToRefs(projectStore)
@@ -43,10 +43,10 @@ watch(
 function fileToScaledDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Could not read the image file'))
+    reader.onerror = () => reject(new Error('无法读取图片文件'))
     reader.onload = () => {
       const img = new Image()
-      img.onerror = () => reject(new Error('Could not decode the image'))
+      img.onerror = () => reject(new Error('无法解析图片'))
       img.onload = () => {
         const scale = Math.min(1, MAX_COVER_EDGE / Math.max(img.width, img.height))
         const width = Math.max(1, Math.round(img.width * scale))
@@ -56,7 +56,7 @@ function fileToScaledDataUrl(file: File): Promise<string> {
         canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error('Canvas is not available'))
+          reject(new Error('当前环境不支持 Canvas'))
           return
         }
         ctx.drawImage(img, 0, 0, width, height)

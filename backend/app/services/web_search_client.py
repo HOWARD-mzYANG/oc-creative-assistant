@@ -1,16 +1,12 @@
-"""Web Search client (Tavily).
+"""Web Search 客户端（Tavily）。
 
-Design notes:
-- Uses Tavily's ``include_answer=advanced`` mode: a single HTTP call returns a
-  "model-friendly short answer + source list", with no need for a second LLM
-  synthesis, saving a lot of tokens.
-- When the api_key is not configured it does not error, but returns
-  ``WebSearchUnavailable``, letting the upper-layer tool take the fallback path
-  (telling the LLM "web is temporarily unavailable, please answer with existing
-  information").
-- Error classification: network / authentication / quota are all normalized into
-  ``WebSearchError`` subclasses, so the upper layer only decides whether to keep
-  retrying based on "whether it is retriable".
+设计说明：
+- 使用 Tavily 的 ``include_answer=advanced`` 模式：一次 HTTP 调用即可返回
+  “适合模型使用的短答案 + 来源列表”，不需要再调用第二个 LLM 做综合，节省大量 token。
+- api_key 未配置时不直接崩溃，而是抛出 ``WebSearchUnavailable``，让上层工具走降级路径
+  （提示 LLM“联网暂时不可用，请基于已有信息回答”）。
+- 错误分类：网络 / 鉴权 / 配额问题都会归一化为 ``WebSearchError`` 子类，上层只需要根据
+  “是否值得重试”决定后续处理。
 """
 
 from __future__ import annotations
@@ -28,7 +24,7 @@ _TAVILY_ENDPOINT = "https://api.tavily.com/search"
 
 @dataclass(frozen=True)
 class WebSearchHit:
-    """A single search result; fields align with the search_nodes style to keep the LLM's habits consistent."""
+    """单条搜索结果；字段风格与 search_nodes 对齐，保持 LLM 使用习惯一致。"""
 
     title: str
     url: str
@@ -38,35 +34,34 @@ class WebSearchHit:
 
 @dataclass(frozen=True)
 class WebSearchResponse:
-    """Successful response: ``answer`` is the short answer synthesized directly by Tavily, ``hits`` are the raw matches."""
+    """成功响应：``answer`` 是 Tavily 直接综合的短答案，``hits`` 是原始命中结果。"""
 
     answer: str
     hits: list[WebSearchHit]
 
 
 class WebSearchError(RuntimeError):
-    """Base class for all recoverable web errors; the message is shown directly to the LLM."""
+    """所有可恢复联网错误的基类；错误消息会直接展示给 LLM。"""
 
 
 class WebSearchUnavailable(WebSearchError):
-    """The API key is not configured or the service is entirely unavailable; on receiving this the LLM should wrap up immediately and stop retrying."""
+    """API key 未配置或服务整体不可用；收到后 LLM 应立即收束并停止重试。"""
 
 
 def search_web(query: str, top_k: int = 5) -> WebSearchResponse:
-    """Call Tavily once and return the normalized results.
+    """调用一次 Tavily 并返回归一化结果。
 
     参数：
-        query: Search keywords or a natural-language question.
-        top_k: Maximum number of results to return, automatically clamped to
-            [1, 10].
+        query: 搜索关键词或自然语言问题。
+        top_k: 最多返回多少条结果，会自动限制到 [1, 10]。
 
     抛出：
-        WebSearchUnavailable: api_key not configured / Tavily returns 401 or 429.
-        WebSearchError: Other network or parsing errors.
+        WebSearchUnavailable: api_key 未配置，或 Tavily 返回 401 / 429。
+        WebSearchError: 其他网络或解析错误。
     """
     settings = get_web_search_settings()
     if not settings.is_configured:
-        raise WebSearchUnavailable("web_search has no API key configured and is temporarily unavailable")
+        raise WebSearchUnavailable("web_search 未配置 API key，暂时不可用")
 
     bounded_top_k = max(1, min(int(top_k), 10))
     payload = {
@@ -81,19 +76,19 @@ def search_web(query: str, top_k: int = 5) -> WebSearchResponse:
         with httpx.Client(timeout=settings.timeout_seconds) as client:
             response = client.post(_TAVILY_ENDPOINT, json=payload)
     except httpx.HTTPError as exc:
-        raise WebSearchError(f"web_search network error: {exc}") from exc
+        raise WebSearchError(f"web_search 网络错误：{exc}") from exc
 
     if response.status_code in (401, 403):
-        raise WebSearchUnavailable("web_search authentication failed, check OC_WEB_SEARCH_API_KEY")
+        raise WebSearchUnavailable("web_search 鉴权失败，请检查 OC_WEB_SEARCH_API_KEY")
     if response.status_code == 429:
-        raise WebSearchUnavailable("web_search hit a quota limit, please answer with existing information this round")
+        raise WebSearchUnavailable("web_search 触发配额限制，本轮请基于已有信息回答")
     if response.status_code >= 400:
         raise WebSearchError(f"web_search HTTP {response.status_code}: {response.text[:200]}")
 
     try:
         data = response.json()
     except json.JSONDecodeError as exc:
-        raise WebSearchError("web_search returned invalid JSON") from exc
+        raise WebSearchError("web_search 返回了无效 JSON") from exc
 
     hits = [
         WebSearchHit(

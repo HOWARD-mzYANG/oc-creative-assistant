@@ -17,21 +17,20 @@ import type { CreativeNodeType } from '../../types/node'
 import CanvasWorkspace from '../canvas/CanvasWorkspace.vue'
 import NodeDetailView from './NodeDetailView.vue'
 
-// After a workspace save, debounce 30s before triggering a seed rebuild (one of the first_revision phase 5 triggers).
+// 工作区保存后，防抖 30 秒再触发 seed 重建（first_revision 第 5 阶段触发条件之一）。
 const SEED_REBUILD_DEBOUNCE_MS = 30000
 const HIGHLIGHT_DURATION_MS = 2600
 
 /**
- * Single sub-graph canvas (first_revision phase 3).
+ * 单个子图画布（first_revision 第 3 阶段）。
  *
- * Reuses the existing CanvasWorkspace (Vue Flow) + AgentSidebar (node/edge detail
- * editing) + useGraphPersistence/useGraphMutations, only injecting load/save at the
- * sub-graph level. It does not change the internal logic of these
- * components/composables, just composes them and binds to graphId.
+ * 复用现有 CanvasWorkspace（Vue Flow）+ 详情编辑 + useGraphPersistence/useGraphMutations，
+ * 只在子图层注入 load/save。这里不改变这些组件 / composable 的内部逻辑，
+ * 只负责组合它们并绑定 graphId。
  */
 const props = defineProps<{
   graphId: string
-  /** Node types this view allows creating (the story view only creates plot, worldbuilding only creates worldbuilding). */
+  /** 当前视图允许创建的节点类型（故事视图只创建 plot，世界观视图只创建 worldbuilding）。 */
   createTypes: CreativeNodeType[]
 }>()
 
@@ -45,7 +44,7 @@ const graphRefresh = injectWorkspaceGraphRefresh()
 let seedTimer: ReturnType<typeof setTimeout> | null = null
 let highlightClearTimer: ReturnType<typeof setTimeout> | null = null
 
-/** Schedule one seed rebuild after a successful save; consecutive saves keep only the last. */
+/** 成功保存后安排一次 seed 重建；连续保存时只保留最后一次。 */
 function scheduleSeedRebuild() {
   const projectId = projectStore.detail?.id
   if (!projectId) return
@@ -98,9 +97,9 @@ function tryFocusPending() {
 const highlightedNodeIds = ref<string[]>([])
 const highlightedEdgeIds = ref<string[]>([])
 
-// Detail editing has moved out of the right column (second_revision change B): the right
-// column is now the AI output area, node detail goes through the center NodeDetailView (W3),
-// and title/summary use inline edit (W2). Only keyboard deletion is kept here.
+// 详情编辑已移出右栏（second_revision 变更 B）：右栏现在是 AI 输出区，
+// 节点详情通过中央 NodeDetailView（W3）处理，标题 / 摘要使用行内编辑（W2）。
+// 这里仅保留键盘删除。
 const { handleGlobalKeydown } = useGraphMutations({
   graphSnapshot,
   selectedNodeId,
@@ -116,7 +115,7 @@ const TYPE_LABEL_EN: Record<string, string> = {
   character: '角色',
   worldbuilding: '世界观',
   plot: '故事节点',
-  idea: 'Idea',
+  idea: '想法',
   research: '资料',
   structure: '结构',
 }
@@ -189,11 +188,11 @@ watch(() => nodeNav.pendingNodeId, () => tryFocusPending())
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown, true)
   graphRefresh?.register(handleGraphRefreshNeeded)
-  centerStage.returnToCanvas() // Reset when entering the canvas view, to avoid leftover detail state from the previous view
+  centerStage.returnToCanvas() // 进入画布视图时重置，避免上一个视图遗留详情状态。
   void reload()
 })
 
-// Reload when returning from node detail to the canvas, to ensure detail-page edits are reflected on the canvas.
+// 从节点详情返回画布时重新加载，确保详情页编辑能反映到画布。
 watch(
   () => centerStage.mode,
   (mode, old) => {
@@ -209,7 +208,7 @@ onBeforeUnmount(() => {
   if (highlightClearTimer) clearTimeout(highlightClearTimer)
 })
 
-// When switching plot↔world within the same WorkspaceShell, graphId changes and a reload is needed.
+// 在同一个 WorkspaceShell 内切换 plot↔world 时 graphId 会变化，需要重新加载。
 watch(
   () => props.graphId,
   () => {
@@ -251,14 +250,14 @@ watch(
             class="toolbar-create-btn"
             @click="requestCreateNode(button.type)"
           >
-            + New {{ button.label }}
+            + 新建 {{ button.label }}
           </button>
         </template>
         <template #toolbar-trailing>
           <span class="toolbar-save-status">
             <span
               class="toolbar-save-dot"
-              :class="{ 'is-saving': isSaving, 'is-error': saveState.includes('failed') }"
+              :class="{ 'is-saving': isSaving, 'is-error': saveState.includes('保存失败') || saveState.includes('failed') }"
             ></span>
             {{ isSaving ? '保存中…' : saveState }}
           </span>

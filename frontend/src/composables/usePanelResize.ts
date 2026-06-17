@@ -3,15 +3,15 @@ import { onBeforeUnmount, ref } from 'vue'
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
 /**
- * Horizontal drag-resize for workspace side panels.
- * Attaches document-level listeners on mousedown and cleans up on mouseup.
+ * 工作区侧边栏的横向拖拽缩放。
+ * mousedown 时挂载 document 级监听，并在 mouseup 时清理。
  */
 export function usePanelResize(options: {
   min: number
   max: number
   getWidth: () => number
   setWidth: (width: number) => void
-  /** +1 when dragging right increases width; -1 when dragging right decreases width. */
+  /** 向右拖动会增宽时为 +1；向右拖动会变窄时为 -1。 */
   direction: 1 | -1
 }) {
   const isDragging = ref(false)

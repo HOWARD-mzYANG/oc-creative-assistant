@@ -3,10 +3,10 @@ import { computed } from 'vue'
 import type { AgentStagingItemDto } from '../../api/chatApi'
 
 /**
- * Single staging item card.
+ * 单个暂存项卡片。
  *
- * Shows a canvas change proposed by the Agent; the user chooses accept / reject to advance the state machine.
- * The payload rendering logic only covers create_node, the most common type, and falls back to JSON for other types.
+ * 展示智能体提出的画布变更；用户选择接受 / 拒绝后推进状态机。
+ * payload 渲染逻辑重点覆盖最常见的 create_node，其他类型按简要信息展示。
  */
 const props = defineProps<{
   item: AgentStagingItemDto

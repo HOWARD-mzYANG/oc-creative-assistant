@@ -8,7 +8,7 @@ import {
 } from '../../types/node'
 
 /**
- * Edge detail panel.
+ * 边详情面板。
  *
  * 提供方向反转、关系类型切换和标签编辑；节点查找只用于展示源/目标标题。
  * 实际边数据持久化由父组件在收到 emit('edge-updated') 后处理。
@@ -49,7 +49,7 @@ const targetNodeTitle = computed(
 )
 
 function getRelationLabel(relationType: CreativeRelationType) {
-  return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? 'Related'
+  return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? '相关'
 }
 
 function updateEdge(partial: Partial<CreativeFlowEdge['data']>) {

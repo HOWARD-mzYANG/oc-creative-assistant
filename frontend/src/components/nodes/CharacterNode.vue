@@ -6,10 +6,10 @@ import NodeHandles from './NodeHandles.vue'
 import InlineEditableText from '../canvas/InlineEditableText.vue'
 
 /**
- * 角色 node card.
+ * 角色节点卡片。
  *
- * Title and summary support inline edit; on save, the value is written back via
- * the updateNodeData provided by CanvasWorkspace and triggers auto-save, without switching to the right panel.
+ * 标题和摘要支持行内编辑；保存时会通过 CanvasWorkspace 提供的 updateNodeData 写回，
+ * 并触发自动保存，无需切换到右侧面板。
  */
 const props = defineProps<NodeProps<CreativeNodeData>>()
 const updateNodeData = inject<(id: string, patch: { title?: string; content?: string }) => void>(

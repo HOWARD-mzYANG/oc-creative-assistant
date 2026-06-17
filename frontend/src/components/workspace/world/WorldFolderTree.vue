@@ -71,7 +71,7 @@ function onDragStart(id: string, event: DragEvent) {
   dropHint.value = null
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
-    // Required for drop to fire in Chromium / Electron.
+    // Chromium / Electron 中需要设置数据，drop 事件才会触发。
     event.dataTransfer.setData('text/plain', id)
     event.dataTransfer.setData('application/x-world-node-id', id)
   }

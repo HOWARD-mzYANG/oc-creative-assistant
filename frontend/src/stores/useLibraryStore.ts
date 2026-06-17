@@ -8,16 +8,16 @@ import {
 } from '../api/projectApi'
 
 /**
- * Project library store (first_revision decision 6).
+ * 项目库状态仓库（first_revision 决策 6）。
  *
- * Handles the cross-route shared project list and CRUD. Fine-grained operations within a single canvas are still handled by composables.
+ * 处理跨路由共享的项目列表和 CRUD。单个画布内的细粒度操作仍由 composables 负责。
  */
 export const useLibraryStore = defineStore('library', () => {
   const projects = ref<ProjectSummary[]>([])
   const isLoading = ref(false)
   const error = ref('')
 
-  /** Fetch all projects from the backend. */
+  /** 从后端获取所有项目。 */
   async function fetchProjects(): Promise<void> {
     isLoading.value = true
     error.value = ''
@@ -31,14 +31,14 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  /** Create a project (the backend auto-creates three sub-graphs), then refresh the list on success. */
+  /** 创建项目（后端会自动创建三个子图），成功后刷新列表。 */
   async function createProject(payload: ProjectCreatePayload): Promise<ProjectDetail> {
     const detail = await apiCreateProject(payload)
     await fetchProjects()
     return detail
   }
 
-  /** Delete a project, then refresh the list on success. */
+  /** 删除项目，成功后刷新列表。 */
   async function removeProject(projectId: string): Promise<void> {
     await apiDeleteProject(projectId)
     await fetchProjects()

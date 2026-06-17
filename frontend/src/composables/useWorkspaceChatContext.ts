@@ -23,7 +23,7 @@ export const WORKSPACE_GRAPH_REFRESH_KEY: InjectionKey<GraphRefreshRegistry> = S
   'workspaceGraphRefresh',
 )
 
-/** Provided by WorkspaceShell: canvas views publish focus; BottomComposer merges into agent context. */
+/** 由 WorkspaceShell 提供：画布视图发布焦点，BottomComposer 合并进智能体上下文。 */
 export function provideWorkspaceChatContext() {
   const selectedNodeIds = ref<string[]>([])
   const canvasFocusRefs = ref<CanvasFocusRef[]>([])

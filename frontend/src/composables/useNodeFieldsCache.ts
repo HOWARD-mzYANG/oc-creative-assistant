@@ -49,7 +49,7 @@ export function useNodeFieldsCache() {
             set(projectId, nodeId, rowsFromFields(result.fields))
           }
         } catch {
-          /* ignore prefetch failures */
+          /* 预取失败不影响主流程。 */
         }
       }),
     )

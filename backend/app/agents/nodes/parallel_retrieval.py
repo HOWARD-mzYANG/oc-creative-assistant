@@ -1,8 +1,7 @@
-"""Parallel vector retrieval node.
+"""并行检索节点。
 
-Reuses the retrieval module's project-level retrieval capability, merging top-k
-hits across ChromaDB's three collections. When current nodes exist, it also runs
-graph-relation retrieval and merges/deduplicates with the vector results.
+复用 retrieval 模块的项目级检索能力，将 ChromaDB 三个集合中的 top-k 命中合并起来。
+当存在当前引用节点时，还会执行图关系检索，并与向量结果合并、去重。
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ DEFAULT_TOP_K = 5
 
 
 def parallel_retrieval_node(state: AgentState) -> dict[str, Any]:
-    """Fetch graph-relation context + vector context in one go and write back the merged view for downstream nodes."""
+    """一次性获取图关系上下文和向量上下文，并把合并视图写回给下游节点。"""
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "").strip()
     current_nodes = state.get("current_nodes") or []

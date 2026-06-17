@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Small chevron button for collapsing / expanding workspace side panels. */
+/** 用于折叠 / 展开工作区侧边栏的小箭头按钮。 */
 defineProps<{
   direction: 'left' | 'right'
   expanded: boolean
@@ -26,12 +26,12 @@ defineEmits<{ click: [] }>()
       stroke-linejoin="round"
       aria-hidden="true"
     >
-      <!-- Collapse left panel -->
+      <!-- 折叠左侧面板。 -->
       <template v-if="direction === 'left'">
         <polyline v-if="expanded" points="15 18 9 12 15 6" />
         <polyline v-else points="9 18 15 12 9 6" />
       </template>
-      <!-- Collapse right panel -->
+      <!-- 折叠右侧面板。 -->
       <template v-else>
         <polyline v-if="expanded" points="9 18 15 12 9 6" />
         <polyline v-else points="15 18 9 12 15 6" />

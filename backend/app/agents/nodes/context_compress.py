@@ -1,18 +1,11 @@
-"""Retrieval context token compression node.
-
-Prevents long projects from blowing past the LLM's window: uses tiktoken to
-accumulate the token count of merged_context, and once it exceeds
-``context_token_cap``, truncates in the current order, keeping the earlier,
-more relevant items. Even if a single item is over the limit, at least the
-first item is kept to avoid trimming everything to empty.
-"""
+"""Token-budget compression for retrieved context."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from app.agents.token_budget import count_tokens
 from app.agents.state import AgentState
+from app.agents.token_budget import count_tokens
 from app.core.settings import get_agent_settings
 from app.schemas import RagMergedContextItem
 
