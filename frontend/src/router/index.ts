@@ -56,6 +56,12 @@ export const router = createRouter({
           component: () => import('../views/workspace/CharacterCardList.vue'),
         },
         {
+          path: 'characters/:charId/model',
+          name: 'workspace-character-model',
+          component: () => import('../views/workspace/RoleModelStudio.vue'),
+          props: true,
+        },
+        {
           path: 'characters/:charId',
           name: 'workspace-character-detail',
           component: () => import('../views/workspace/CharacterCardDetail.vue'),

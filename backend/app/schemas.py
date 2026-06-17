@@ -472,3 +472,101 @@ class ChatResponse(BaseModel):
     batch_id: str | None
     staging_count: int
     staging_summary: str = ""
+
+
+class RoleModelRelationPayload(BaseModel):
+    """A role's direct graph relation used by the external LoRA service."""
+
+    other_node_id: str
+    other_title: str
+    other_type: str = ""
+    relation_label: str = ""
+    relation_type: str = ""
+    direction: Literal["outgoing", "incoming"]
+    content: str = ""
+
+
+class RoleModelCrossReferencePayload(BaseModel):
+    """A cross-section reference for the selected role."""
+
+    other_node_id: str
+    other_title: str
+    other_section: str
+    relation_label: str = ""
+    relation_type: str = ""
+    direction: Literal["outgoing", "incoming"]
+    content: str = ""
+
+
+class RoleModelRelatedNodePayload(BaseModel):
+    """Compact node context sent to the training service."""
+
+    id: str
+    title: str
+    node_type: str
+    content: str = ""
+    relation_label: str = ""
+
+
+class RoleModelSnapshotPayload(BaseModel):
+    """Current role snapshot exported from the creative graph."""
+
+    project_id: str
+    project_name: str = ""
+    character_id: str
+    character_name: str
+    character_summary: str = ""
+    fields: dict[str, str] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    relations: list[RoleModelRelationPayload] = Field(default_factory=list)
+    cross_references: list[RoleModelCrossReferencePayload] = Field(default_factory=list)
+    related_nodes: list[RoleModelRelatedNodePayload] = Field(default_factory=list)
+    project_seed: str = ""
+
+
+class RoleModelJobPayload(BaseModel):
+    """Training job status mirrored from role_finetune_service."""
+
+    id: str
+    project_id: str
+    character_id: str
+    character_name: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    sample_count: int = 0
+    dataset_path: str = ""
+    dataset_info_path: str = ""
+    train_config_path: str = ""
+    adapter_path: str = ""
+    log_tail: str = ""
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RoleModelOverviewPayload(BaseModel):
+    """Role model studio bootstrap payload."""
+
+    service_configured: bool
+    service_online: bool
+    service_error: str | None = None
+    snapshot: RoleModelSnapshotPayload
+    latest_job: RoleModelJobPayload | None = None
+
+
+class RoleModelTrainRequest(BaseModel):
+    """Start a role LoRA training job."""
+
+    sample_count: int | None = None
+
+
+class RoleChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class RoleChatRequest(BaseModel):
+    """Role chat request for either trained adapter or API/RAG fallback."""
+
+    message: str
+    job_id: str | None = None
+    history: list[RoleChatHistoryItem] = Field(default_factory=list)
