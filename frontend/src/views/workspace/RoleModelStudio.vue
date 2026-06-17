@@ -35,6 +35,8 @@ interface StudioMessage {
   warning?: string
 }
 
+const DATASET_PAGE_SIZE = 10
+
 const route = useRoute()
 const projectId = computed(() => String(route.params.projectId ?? ''))
 
@@ -54,6 +56,7 @@ const datasetDirty = ref(false)
 const chatSending = ref(false)
 const isRefreshing = ref(false)
 const appliedRecommendationKey = ref('')
+const datasetPage = ref(1)
 
 const trainForm = ref({
   epochs: 1,
@@ -85,6 +88,22 @@ const downloadJob = computed(() => state.value?.download ?? emptyJob())
 const trainingJob = computed(() => state.value?.training ?? emptyJob())
 const isBusy = computed(() => Boolean(action.value) || chatSending.value)
 const enabledSampleCount = computed(() => dataset.value.samples.filter((sample) => sample.enabled).length)
+const datasetPageCount = computed(() =>
+  Math.max(1, Math.ceil(dataset.value.samples.length / DATASET_PAGE_SIZE)),
+)
+const visibleDatasetSamples = computed(() => {
+  const start = (datasetPage.value - 1) * DATASET_PAGE_SIZE
+  return dataset.value.samples.slice(start, start + DATASET_PAGE_SIZE).map((sample, offset) => ({
+    sample,
+    index: start + offset,
+  }))
+})
+const datasetRangeLabel = computed(() => {
+  if (!dataset.value.samples.length) return '0 / 0'
+  const start = (datasetPage.value - 1) * DATASET_PAGE_SIZE + 1
+  const end = Math.min(dataset.value.samples.length, start + DATASET_PAGE_SIZE - 1)
+  return `${start}-${end} / ${dataset.value.samples.length}`
+})
 const characterOptions = computed(() => {
   const names = dataset.value.samples
     .map((sample) => sample.character_name.trim())
@@ -96,7 +115,13 @@ const modelModeLabel = computed(() => {
   if (trainingJob.value.status === 'running') return 'LoRA 训练中'
   return 'API 风格兜底'
 })
-const canDownload = computed(() => Boolean(recommendation.value?.model_id) && !isActiveJob(downloadJob.value))
+const selectedModelId = computed(() => preferredModelId.value.trim() || recommendation.value?.model_id || '')
+const modelScopeUrl = computed(() => {
+  const modelId = selectedModelId.value
+  if (modelId.includes('/')) return `https://modelscope.cn/models/${modelId}/summary`
+  return recommendation.value?.download_url || ''
+})
+const canDownload = computed(() => Boolean(selectedModelId.value) && !isActiveJob(downloadJob.value))
 const canTrain = computed(
   () =>
     enabledSampleCount.value > 0 &&
@@ -171,6 +196,11 @@ function applyRecommendation(next: RoleModelRecommendation | null): void {
   }
 }
 
+function syncRecommendedModelInput(next: RoleModelRecommendation | null): void {
+  if (!next) return
+  preferredModelId.value = next.model_id
+}
+
 async function runAction(name: ActionName, task: () => Promise<void>): Promise<void> {
   if (action.value) return
   action.value = name
@@ -192,6 +222,9 @@ async function refreshState(): Promise<void> {
     const next = await getRoleModelState(projectId.value)
     state.value = next
     applyRecommendation(next.recommendation)
+    if (!preferredModelId.value.trim()) {
+      syncRecommendedModelInput(next.recommendation)
+    }
   } catch (caught) {
     error.value = parseError(caught)
   } finally {
@@ -207,8 +240,12 @@ async function loadAll(): Promise<void> {
     ])
     state.value = nextState
     dataset.value = nextDataset
+    datasetPage.value = 1
     datasetDirty.value = false
     applyRecommendation(nextState.recommendation)
+    if (!preferredModelId.value.trim()) {
+      syncRecommendedModelInput(nextState.recommendation)
+    }
   })
 }
 
@@ -228,6 +265,7 @@ async function recommendModel(): Promise<void> {
       preferred_model_id: preferredModelId.value.trim() || null,
       target_character: targetCharacter.value.trim() || null,
     })
+    syncRecommendedModelInput(result)
     applyRecommendation(result)
     await refreshState()
     notice.value = '已生成模型和训练参数建议'
@@ -237,6 +275,7 @@ async function recommendModel(): Promise<void> {
 async function generateDataset(): Promise<void> {
   await runAction('generate', async () => {
     dataset.value = await generateRoleModelDataset(projectId.value)
+    datasetPage.value = 1
     datasetDirty.value = false
     await refreshState()
     notice.value = `已生成 ${dataset.value.samples.length} 条可编辑样本`
@@ -253,12 +292,16 @@ async function saveDataset(): Promise<void> {
 
 async function saveDatasetToServer(): Promise<void> {
   dataset.value = await saveRoleModelDataset(projectId.value, dataset.value.samples)
+  datasetPage.value = Math.min(datasetPage.value, datasetPageCount.value)
   datasetDirty.value = false
 }
 
 async function downloadModel(): Promise<void> {
   await runAction('download', async () => {
-    const job = await startRoleModelDownload(projectId.value, recommendation.value?.model_id ?? null)
+    const job = await startRoleModelDownload(
+      projectId.value,
+      preferredModelId.value.trim() || recommendation.value?.model_id || null,
+    )
     if (state.value) state.value = { ...state.value, download: job }
     notice.value = '下载任务已启动'
   })
@@ -270,7 +313,7 @@ async function trainModel(): Promise<void> {
       await saveDatasetToServer()
     }
     const job = await startRoleModelTraining(projectId.value, {
-      model_id: recommendation.value?.model_id ?? null,
+      model_id: selectedModelId.value || null,
       epochs: Number(trainForm.value.epochs || 1),
       batch_size: nullableNumber(trainForm.value.batch_size),
       gradient_accumulation_steps: nullableNumber(trainForm.value.gradient_accumulation_steps),
@@ -304,12 +347,22 @@ function addSample(): void {
     source_node_ids: [],
     enabled: true,
   })
+  datasetPage.value = 1
   datasetDirty.value = true
 }
 
 function removeSample(index: number): void {
   dataset.value.samples.splice(index, 1)
+  datasetPage.value = Math.min(datasetPage.value, datasetPageCount.value)
   datasetDirty.value = true
+}
+
+function previousDatasetPage(): void {
+  datasetPage.value = Math.max(1, datasetPage.value - 1)
+}
+
+function nextDatasetPage(): void {
+  datasetPage.value = Math.min(datasetPageCount.value, datasetPage.value + 1)
 }
 
 async function sendChat(): Promise<void> {
@@ -386,6 +439,10 @@ watch(
   },
 )
 
+watch(datasetPageCount, (count) => {
+  datasetPage.value = Math.min(datasetPage.value, count)
+})
+
 onMounted(() => {
   void loadAll()
 })
@@ -456,8 +513,8 @@ onBeforeUnmount(() => {
           </ul>
 
           <label class="role-model__field">
-            <span>偏好 ModelScope ID</span>
-            <input v-model.trim="preferredModelId" type="text" placeholder="Qwen/Qwen3-1.7B" />
+            <span>ModelScope 模型 ID</span>
+            <input v-model.trim="preferredModelId" type="text" placeholder="推荐后会自动填入，例如 Qwen/Qwen3-1.7B" />
           </label>
           <label class="role-model__field">
             <span>目标角色</span>
@@ -473,11 +530,6 @@ onBeforeUnmount(() => {
           </button>
 
           <div v-if="recommendation" class="role-model__recommendation">
-            <div>
-              <span>推荐模型</span>
-              <strong>{{ recommendation.display_name }}</strong>
-              <code>{{ recommendation.model_id }}</code>
-            </div>
             <p>{{ recommendation.reason }}</p>
             <dl>
               <div>
@@ -496,7 +548,7 @@ onBeforeUnmount(() => {
             <ul v-if="recommendation.warnings.length" class="role-model__notes">
               <li v-for="warning in recommendation.warnings" :key="warning">{{ warning }}</li>
             </ul>
-            <a :href="recommendation.download_url" target="_blank" rel="noreferrer">打开 ModelScope</a>
+            <a v-if="modelScopeUrl" :href="modelScopeUrl" target="_blank" rel="noreferrer">打开 ModelScope</a>
           </div>
         </section>
 
@@ -602,15 +654,31 @@ onBeforeUnmount(() => {
 
           <div class="role-model__dataset-meta">
             <span>{{ enabledSampleCount }} / {{ dataset.samples.length }} 条启用</span>
+            <span>当前 {{ datasetRangeLabel }}</span>
             <span>更新于 {{ formatTime(dataset.updated_at) }}</span>
             <span v-if="datasetDirty" class="is-dirty">有未保存修改</span>
+          </div>
+
+          <div v-if="dataset.samples.length > DATASET_PAGE_SIZE" class="role-model__pager">
+            <button type="button" class="role-model__button" :disabled="datasetPage <= 1" @click="previousDatasetPage">
+              上一页
+            </button>
+            <span>第 {{ datasetPage }} / {{ datasetPageCount }} 页</span>
+            <button
+              type="button"
+              class="role-model__button"
+              :disabled="datasetPage >= datasetPageCount"
+              @click="nextDatasetPage"
+            >
+              下一页
+            </button>
           </div>
 
           <div v-if="!dataset.samples.length" class="role-model__empty">
             还没有训练样本。
           </div>
           <div v-else class="role-model__samples">
-            <article v-for="(sample, index) in dataset.samples" :key="sample.id" class="role-model__sample">
+            <article v-for="{ sample, index } in visibleDatasetSamples" :key="sample.id" class="role-model__sample">
               <div class="role-model__sample-head">
                 <label class="role-model__sample-toggle">
                   <input v-model="sample.enabled" type="checkbox" @change="markDirty" />
@@ -1128,6 +1196,17 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
 }
 
+.role-model__pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .role-model__dataset-meta .is-dirty {
   color: #92400e;
   font-weight: 800;
@@ -1142,13 +1221,21 @@ onBeforeUnmount(() => {
 }
 
 .role-model__samples {
+  max-height: min(66vh, 760px);
+  overflow: auto;
   display: flex;
   flex-direction: column;
+  padding-right: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .role-model__sample {
   padding: 14px 0;
   border-top: 1px solid var(--border);
+}
+
+.role-model__sample:first-child {
+  border-top: none;
 }
 
 .role-model__sample-head {

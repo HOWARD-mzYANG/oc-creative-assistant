@@ -55,6 +55,7 @@ from app.services.graph_repository import require_project
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _ROLE_MODEL_ROOT = DATA_DIR / "role_models"
+_DATASET_MAX_GENERATED_SAMPLES = 120
 _THREAD_LOCK = threading.Lock()
 _RUNNING_THREADS: dict[tuple[str, str], threading.Thread] = {}
 _LOCAL_RUNTIME_CACHE: dict[str, Any] = {}
@@ -274,13 +275,16 @@ def inspect_hardware(project_id: str) -> RoleModelHardwarePayload:
         ram_total, ram_available = _memory_posix()
 
     disk = shutil.disk_usage(project_dir)
-    gpus, has_cuda = _detect_torch_gpus()
+    gpus, has_torch_cuda = _detect_torch_gpus()
     if not gpus:
         gpus = _detect_nvidia_smi_gpus()
     best_vram = max((gpu.memory_gb for gpu in gpus), default=0.0)
-    has_cuda = has_cuda or any(gpu.backend in {"cuda", "nvidia-smi"} for gpu in gpus)
+    has_nvidia_gpu = any(gpu.backend in {"cuda", "nvidia-smi"} for gpu in gpus)
+    has_cuda = has_torch_cuda or has_nvidia_gpu
 
     notes: list[str] = []
+    if has_nvidia_gpu and not has_torch_cuda:
+        notes.append("检测到 NVIDIA GPU，但当前 PyTorch 未启用 CUDA；本地 LoRA 训练需要安装匹配 CUDA 的 torch。")
     if not has_cuda:
         notes.append("未检测到可用 CUDA GPU；可编辑数据集和使用 API 兜底聊天，但本地 LoRA 训练通常不可行。")
     if best_vram and best_vram < 6:
@@ -291,7 +295,7 @@ def inspect_hardware(project_id: str) -> RoleModelHardwarePayload:
     if disk_free_gb < 12:
         notes.append("磁盘剩余空间不足 12GB，可能无法下载基础模型或保存 LoRA 权重。")
 
-    can_train = has_cuda and best_vram >= 6 and disk_free_gb >= 12
+    can_train = has_torch_cuda and best_vram >= 6 and disk_free_gb >= 12
     hardware = RoleModelHardwarePayload(
         os=f"{platform.system()} {platform.release()}",
         python=platform.python_version(),
@@ -547,6 +551,7 @@ def _fallback_samples(project_id: str) -> list[RoleModelDatasetSamplePayload]:
 def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
     """Generate editable SFT samples from current OC character profiles."""
     profiles, context = _character_profiles(project_id)
+    max_samples = min(_DATASET_MAX_GENERATED_SAMPLES, max(24, len(profiles) * 8))
     if not profiles:
         samples = _fallback_samples(project_id)
     else:
@@ -559,6 +564,7 @@ def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
             f"[角色卡]\n{json.dumps(profiles, ensure_ascii=False)}\n\n"
             f"[项目世界/剧情摘要]\n{json.dumps(context, ensure_ascii=False)}\n\n"
             "请为每个角色生成 4 到 8 条中文或用户原语言的 instruction/input/output 样本。"
+            f"总样本数不要超过 {max_samples} 条。"
             "id 可以先留空或自拟；source_node_ids 使用角色 id。"
         )
         try:
@@ -574,7 +580,7 @@ def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
             samples = _fallback_samples(project_id)
 
     normalized: list[RoleModelDatasetSamplePayload] = []
-    for sample in samples[:300]:
+    for sample in samples[:max_samples]:
         instruction = sample.instruction.strip()
         output = sample.output.strip()
         if not instruction or not output:
@@ -698,6 +704,24 @@ def _thread_key(project_id: str, kind: str) -> tuple[str, str]:
     return (project_id, kind)
 
 
+def _job_thread_alive(project_id: str, kind: str) -> bool:
+    thread = _RUNNING_THREADS.get(_thread_key(project_id, kind))
+    return bool(thread and thread.is_alive())
+
+
+def _read_live_job(project_id: str, kind: str) -> RoleModelJobPayload:
+    job = _read_job(project_id, kind)
+    if job.status == "running" and not _job_thread_alive(project_id, kind):
+        message = "任务已中断：后端服务重启或任务线程不存在，请重新启动任务。"
+        job.status = "failed"
+        job.message = message
+        job.progress = 1.0
+        job.finished_at = _now()
+        job.log = [*job.log[-80:], f"{_now()} {message}"]
+        _write_job(project_id, kind, job)
+    return job
+
+
 def _start_thread(project_id: str, kind: str, target) -> RoleModelJobPayload:
     key = _thread_key(project_id, kind)
     with _THREAD_LOCK:
@@ -757,7 +781,7 @@ def start_model_download(project_id: str, payload: RoleModelDownloadRequest) -> 
 
 
 def get_download_status(project_id: str) -> RoleModelJobPayload:
-    return _read_job(project_id, "download")
+    return _read_live_job(project_id, "download")
 
 
 def _training_params(
@@ -936,7 +960,7 @@ def start_training(project_id: str, request: RoleModelTrainRequest) -> RoleModel
 
 
 def get_training_status(project_id: str) -> RoleModelJobPayload:
-    return _read_job(project_id, "train")
+    return _read_live_job(project_id, "train")
 
 
 def get_role_model_state(project_id: str) -> RoleModelStatePayload:

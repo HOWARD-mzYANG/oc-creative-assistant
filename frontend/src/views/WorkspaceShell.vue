@@ -38,6 +38,7 @@ const rightWidth = ref(RIGHT_DEFAULT)
 const leftPanelWidth = computed(() => (leftOpen.value ? leftWidth.value : COLLAPSED_WIDTH))
 const rightPanelWidth = computed(() => (rightOpen.value ? rightWidth.value : COLLAPSED_WIDTH))
 const showBottomComposer = computed(() => route.name !== 'workspace-role-model')
+const showRightStage = computed(() => route.name !== 'workspace-role-model')
 
 const leftResize = usePanelResize({
   min: LEFT_MIN,
@@ -131,6 +132,7 @@ onBeforeUnmount(() => {
 
       <!-- 右侧面板 -->
       <aside
+        v-if="showRightStage"
         class="side-panel side-panel--right"
         :class="{ 'is-collapsed': !rightOpen }"
         :style="{ width: `${rightPanelWidth}px` }"

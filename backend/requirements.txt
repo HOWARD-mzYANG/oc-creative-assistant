@@ -13,3 +13,11 @@ langgraph-checkpoint-sqlite
 tiktoken
 python-multipart
 pyinstaller
+modelscope
+torch
+transformers
+datasets
+peft
+accelerate
+sentencepiece
+safetensors
