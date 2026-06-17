@@ -58,7 +58,9 @@ from app.services.graph_repository import require_project
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _ROLE_MODEL_ROOT = DATA_DIR / "role_models"
+_DATASET_MIN_TRAINING_SAMPLES = 200
 _DATASET_MAX_GENERATED_SAMPLES = 800
+_DATASET_MAX_SAMPLES_PER_CHARACTER = 240
 _THREAD_LOCK = threading.Lock()
 _RUNNING_THREADS: dict[tuple[str, str], threading.Thread] = {}
 _LOCAL_RUNTIME_CACHE: dict[str, Any] = {}
@@ -713,12 +715,20 @@ def _dataset_generation_targets(
     character_count: int,
 ) -> tuple[int, int]:
     request = payload or RoleModelDatasetGenerateRequest()
-    per_character = max(8, min(int(request.samples_per_character), 80))
-    requested_total = max(24, min(int(request.max_samples), _DATASET_MAX_GENERATED_SAMPLES))
+    per_character = max(8, min(int(request.samples_per_character), _DATASET_MAX_SAMPLES_PER_CHARACTER))
+    requested_total = max(_DATASET_MIN_TRAINING_SAMPLES, min(int(request.max_samples), _DATASET_MAX_GENERATED_SAMPLES))
     if character_count <= 0:
         return per_character, min(requested_total, 24)
-    target_total = min(requested_total, max(24, character_count * per_character))
-    per_character = max(8, min(per_character, max(8, target_total // character_count)))
+    target_total = min(requested_total, character_count * per_character)
+    target_total = max(_DATASET_MIN_TRAINING_SAMPLES, target_total, min(character_count, _DATASET_MAX_GENERATED_SAMPLES))
+    target_total = min(target_total, _DATASET_MAX_GENERATED_SAMPLES)
+    per_character = max(
+        1,
+        min(
+            _DATASET_MAX_SAMPLES_PER_CHARACTER,
+            (target_total + character_count - 1) // character_count,
+        ),
+    )
     return per_character, target_total
 
 
@@ -880,7 +890,8 @@ def _supplemental_samples(
             "那就这样。{nuance}既然没有人能替我承担这个选择，我就自己站到它前面去。",
         ),
     ]
-    moods = ["克制", "更锋利", "更疲惫", "更温柔", "更坚定", "更警惕"]
+    moods = ["克制", "更锋利", "更疲惫", "更温柔", "更坚定", "更警惕", "更冷静", "更脆弱", "更坦率", "更疏离"]
+    focuses = ["自我保护", "关系边界", "过去经历", "当下目标", "世界压力", "信任变化", "行动代价", "隐秘愿望"]
     samples: list[RoleModelDatasetSamplePayload] = []
     for profile in profiles:
         name = profile["name"]
@@ -889,7 +900,8 @@ def _supplemental_samples(
         for index in range(samples_per_character):
             tag, instruction, input_text, output = scene_templates[index % len(scene_templates)]
             mood = moods[(index // len(scene_templates)) % len(moods)]
-            nuance = f"这一次，我的语气会更偏向{mood}。"
+            focus = focuses[(index // (len(scene_templates) * len(moods))) % len(focuses)]
+            nuance = f"这一次，我的语气会更偏向{mood}，重点落在{focus}。"
             rendered_instruction = instruction.format(name=name, world=world_hint, related=related)
             rendered_input = input_text.format(name=name, world=world_hint, related=related)
             rendered_output = output.format(
@@ -906,7 +918,7 @@ def _supplemental_samples(
                     instruction=rendered_instruction,
                     input=rendered_input,
                     output=rendered_output,
-                    tags=[tag, "supplemental"],
+                    tags=[tag, "supplemental", focus],
                     source_node_ids=[profile["id"]],
                 )
             )
@@ -923,6 +935,7 @@ def generate_dataset(
     if not profiles:
         samples = _fallback_samples(project_id)
     else:
+        ai_samples_per_character = min(samples_per_character, 40)
         system = (
             "你是 OC 角色 LoRA 数据集编写器。根据角色卡生成可微调的小样本。"
             "每条样本必须让助手以角色口吻回答，避免现代 AI 客套话，保持角色设定一致。"
@@ -931,7 +944,7 @@ def generate_dataset(
         user = (
             f"[角色卡]\n{json.dumps(profiles, ensure_ascii=False)}\n\n"
             f"[项目世界/剧情摘要]\n{json.dumps(context, ensure_ascii=False)}\n\n"
-            f"请为每个角色生成约 {samples_per_character} 条中文或用户原语言的 instruction/input/output 样本。"
+            f"请为每个角色生成约 {ai_samples_per_character} 条中文或用户原语言的 instruction/input/output 样本。"
             f"总样本数尽量接近但不要超过 {max_samples} 条。"
             "样本需要覆盖自我介绍、关系、冲突、拒绝、安慰、情绪失控、计划、世界观、关键选择、短对白等场景。"
             "id 可以先留空或自拟；source_node_ids 使用角色 id。"
@@ -1060,6 +1073,125 @@ def _write_job(project_id: str, kind: str, job: RoleModelJobPayload) -> None:
     _write_json(_job_path(project_id, kind), job.model_dump())
 
 
+def _is_active_job_status(status: str) -> bool:
+    return status in {"queued", "running", "starting"}
+
+
+def _safe_existing_path(path_value: str) -> Path | None:
+    if not path_value:
+        return None
+    try:
+        path = Path(path_value)
+    except (OSError, ValueError):
+        return None
+    return path if path.exists() else None
+
+
+def _model_path_ready(path: Path | None) -> bool:
+    if path is None or not path.exists() or path.is_file():
+        return False
+    has_config = (path / "config.json").exists()
+    has_weights = (
+        any(path.glob("*.safetensors"))
+        or any(path.glob("pytorch_model*.bin"))
+        or any(path.glob("model*.bin"))
+    )
+    return has_config and has_weights
+
+
+def _default_model_path(project_id: str, model_id: str) -> Path:
+    return _project_dir_checked(project_id) / "models" / Path(*model_id.split("/"))
+
+
+def _default_adapter_path(project_id: str) -> Path:
+    return _project_dir_checked(project_id) / "adapter"
+
+
+def _adapter_path_ready(path: Path | None) -> bool:
+    if path is None or not path.exists():
+        return False
+    if path.is_file():
+        return False
+    return (path / "adapter_config.json").exists() or any(path.glob("adapter_model.*"))
+
+
+def _recover_download_job(project_id: str, job: RoleModelJobPayload) -> RoleModelJobPayload:
+    recommendation = get_recommendation(project_id)
+    model_id = job.model_id or (recommendation.model_id if recommendation else "")
+    path = _safe_existing_path(job.artifact_path)
+    if not _model_path_ready(path):
+        path = None
+    if path is None and model_id:
+        fallback = _default_model_path(project_id, model_id)
+        path = fallback if _model_path_ready(fallback) else None
+    if path is not None and not _is_active_job_status(job.status):
+        job.status = "completed"
+        job.progress = 1.0
+        job.model_id = model_id or job.model_id
+        job.artifact_path = str(path.resolve())
+        job.message = "模型已下载"
+        if not job.finished_at:
+            job.finished_at = _now()
+        _write_job(project_id, "download", job)
+    elif job.status == "completed":
+        job.status = "failed"
+        job.progress = 1.0
+        job.artifact_path = ""
+        job.message = "已记录的模型文件不存在，请重新下载当前基础模型。"
+        job.finished_at = job.finished_at or _now()
+        job.log = [*job.log[-80:], f"{_now()} {job.message}"]
+        _write_job(project_id, "download", job)
+    return job
+
+
+def _recover_training_job(project_id: str, job: RoleModelJobPayload) -> RoleModelJobPayload:
+    path = _safe_existing_path(job.artifact_path)
+    if path is None:
+        fallback = _default_adapter_path(project_id)
+        path = fallback if _adapter_path_ready(fallback) else None
+    if path is not None and _adapter_path_ready(path) and not _is_active_job_status(job.status):
+        job.status = "completed"
+        job.progress = 1.0
+        job.artifact_path = str(path.resolve())
+        job.message = "LoRA adapter 已就绪"
+        if not job.finished_at:
+            job.finished_at = _now()
+        _write_job(project_id, "train", job)
+    elif job.status == "completed":
+        job.status = "failed"
+        job.progress = 1.0
+        job.artifact_path = ""
+        job.message = "已记录的 LoRA adapter 不存在，请重新训练角色模型。"
+        job.finished_at = job.finished_at or _now()
+        job.log = [*job.log[-80:], f"{_now()} {job.message}"]
+        _write_job(project_id, "train", job)
+    return job
+
+
+def _local_runtime_status(
+    training: RoleModelJobPayload,
+    download: RoleModelJobPayload,
+) -> tuple[bool, bool, str]:
+    adapter_path = _safe_existing_path(training.artifact_path)
+    model_path = _safe_existing_path(download.artifact_path)
+    adapter_ready = (
+        training.status == "completed"
+        and _adapter_path_ready(adapter_path)
+        and _model_path_ready(model_path)
+    )
+    if not adapter_ready:
+        return False, False, "本地 LoRA adapter 或基础模型尚未就绪。"
+    try:
+        import torch  # type: ignore
+        import peft  # noqa: F401
+        import transformers  # noqa: F401
+    except Exception:
+        return True, False, "已找到训练产物，但当前后端缺少 torch/transformers/peft 推理依赖，将使用 API 兜底。"
+    if not torch.cuda.is_available():
+        return True, False, "已找到训练产物，但当前 PyTorch 未启用 CUDA；为避免 CPU 加载大模型卡死，将使用 API 兜底。"
+    return True, True, ""
+
+
 def _append_job_log(project_id: str, kind: str, message: str, *, status: str | None = None, progress: float | None = None, artifact_path: str | None = None) -> RoleModelJobPayload:
     job = _read_job(project_id, kind)
     if status is not None:
@@ -1087,7 +1219,7 @@ def _job_thread_alive(project_id: str, kind: str) -> bool:
 
 def _read_live_job(project_id: str, kind: str) -> RoleModelJobPayload:
     job = _read_job(project_id, kind)
-    if job.status == "running" and not _job_thread_alive(project_id, kind):
+    if _is_active_job_status(job.status) and not _job_thread_alive(project_id, kind):
         message = "任务已中断：后端服务重启或任务线程不存在，请重新启动任务。"
         job.status = "failed"
         job.message = message
@@ -1114,6 +1246,19 @@ def start_model_download(project_id: str, payload: RoleModelDownloadRequest) -> 
     recommendation = get_recommendation(project_id)
     model_id = payload.model_id or (recommendation.model_id if recommendation else _MODEL_CANDIDATES[0]["model_id"])
     model_id = _validate_model_id(model_id)
+    existing = get_download_status(project_id)
+    if _is_active_job_status(existing.status):
+        return existing
+    existing_path = _safe_existing_path(existing.artifact_path)
+    if (
+        existing.status == "completed"
+        and existing.model_id == model_id
+        and _model_path_ready(existing_path)
+    ):
+        existing.message = "模型已下载，可直接训练。"
+        _write_job(project_id, "download", existing)
+        return existing
+
     job = RoleModelJobPayload(
         status="running",
         message="准备下载模型",
@@ -1157,7 +1302,7 @@ def start_model_download(project_id: str, payload: RoleModelDownloadRequest) -> 
 
 
 def get_download_status(project_id: str) -> RoleModelJobPayload:
-    return _read_live_job(project_id, "download")
+    return _recover_download_job(project_id, _read_live_job(project_id, "download"))
 
 
 def _training_params(
@@ -1185,19 +1330,53 @@ def _training_params(
 
 
 def start_training(project_id: str, request: RoleModelTrainRequest) -> RoleModelJobPayload:
+    existing = get_training_status(project_id)
+    if _is_active_job_status(existing.status):
+        return existing
+
     recommendation = get_recommendation(project_id)
     model_id = _validate_model_id(request.model_id or (recommendation.model_id if recommendation else _MODEL_CANDIDATES[0]["model_id"]))
     dataset = get_dataset(project_id)
     enabled_count = len([sample for sample in dataset.samples if sample.enabled])
-    if enabled_count == 0:
+    if enabled_count < _DATASET_MIN_TRAINING_SAMPLES:
         job = RoleModelJobPayload(
             status="blocked",
-            message="没有可用训练样本，请先生成并确认数据集。",
+            message=f"可用训练样本不足 {_DATASET_MIN_TRAINING_SAMPLES} 条，请先生成并确认更多数据。",
             progress=1.0,
             model_id=model_id,
             started_at=_now(),
             finished_at=_now(),
-            log=[f"{_now()} 没有可用训练样本"],
+            log=[f"{_now()} 可用训练样本不足：{enabled_count}"],
+        )
+        _write_job(project_id, "train", job)
+        return job
+
+    download = get_download_status(project_id)
+    download_path = _safe_existing_path(download.artifact_path)
+    if download.status != "completed" or not _model_path_ready(download_path) or download.model_id != model_id:
+        job = RoleModelJobPayload(
+            status="blocked",
+            message="当前模型尚未下载完成，请先下载与训练参数一致的基础模型。",
+            progress=1.0,
+            model_id=model_id,
+            started_at=_now(),
+            finished_at=_now(),
+            log=[f"{_now()} 模型未就绪：selected={model_id}; downloaded={download.model_id or 'none'}"],
+        )
+        _write_job(project_id, "train", job)
+        return job
+
+    hardware = inspect_hardware(project_id)
+    if not hardware.can_train_lora:
+        reason = "；".join(hardware.notes or ["未检测到可用 CUDA GPU、足够显存或足够磁盘空间"])
+        job = RoleModelJobPayload(
+            status="blocked",
+            message=f"当前硬件不满足本地 LoRA 训练条件：{reason}",
+            progress=1.0,
+            model_id=model_id,
+            started_at=_now(),
+            finished_at=_now(),
+            log=[f"{_now()} 硬件检查未通过：{reason}"],
         )
         _write_job(project_id, "train", job)
         return job
@@ -1241,7 +1420,7 @@ def start_training(project_id: str, request: RoleModelTrainRequest) -> RoleModel
 
             download = get_download_status(project_id)
             model_path = Path(download.artifact_path) if download.artifact_path else None
-            if model_path is None or not model_path.exists():
+            if not _model_path_ready(model_path):
                 raise RuntimeError("未找到已下载的基础模型，请先完成模型下载。")
 
             train_jsonl = _project_dir_checked(project_id) / "train.jsonl"
@@ -1336,24 +1515,27 @@ def start_training(project_id: str, request: RoleModelTrainRequest) -> RoleModel
 
 
 def get_training_status(project_id: str) -> RoleModelJobPayload:
-    return _read_live_job(project_id, "train")
+    return _recover_training_job(project_id, _read_live_job(project_id, "train"))
 
 
 def get_role_model_state(project_id: str) -> RoleModelStatePayload:
     dataset = get_dataset(project_id)
     hardware_data = _read_json(_json_path(project_id, "hardware.json"), None)
     recommendation = get_recommendation(project_id)
+    download = get_download_status(project_id)
     training = get_training_status(project_id)
-    adapter_ready = bool(training.artifact_path and Path(training.artifact_path).exists() and training.status == "completed")
+    adapter_ready, local_runtime_ready, runtime_warning = _local_runtime_status(training, download)
     return RoleModelStatePayload(
         project_id=project_id,
         hardware=RoleModelHardwarePayload.model_validate(hardware_data) if hardware_data else None,
         recommendation=recommendation,
         dataset_count=len(dataset.samples),
         dataset_updated_at=dataset.updated_at,
-        download=get_download_status(project_id),
+        download=download,
         training=training,
         adapter_ready=adapter_ready,
+        local_runtime_ready=local_runtime_ready,
+        runtime_warning=runtime_warning,
     )
 
 
@@ -1449,12 +1631,13 @@ def _try_local_chat(
 ) -> RoleModelChatResponse | None:
     training = get_training_status(project_id)
     download = get_download_status(project_id)
-    if training.status != "completed" or not training.artifact_path or not download.artifact_path:
+    _, local_runtime_ready, _ = _local_runtime_status(training, download)
+    if not local_runtime_ready:
         return None
 
     adapter_path = Path(training.artifact_path)
     model_path = Path(download.artifact_path)
-    if not adapter_path.exists() or not model_path.exists():
+    if not _adapter_path_ready(adapter_path) or not _model_path_ready(model_path):
         return None
 
     cache_key = f"{project_id}:{adapter_path}"
@@ -1464,6 +1647,9 @@ def _try_local_chat(
             import torch  # type: ignore
             from peft import PeftModel  # type: ignore
             from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore
+
+            if not torch.cuda.is_available():
+                return None
 
             tokenizer = AutoTokenizer.from_pretrained(str(model_path), trust_remote_code=True)
             if tokenizer.pad_token is None:
@@ -1521,7 +1707,10 @@ def chat_with_role_model(project_id: str, request: RoleModelChatRequest) -> Role
     if local is not None:
         _persist_role_model_chat_turn(project_id, request, local)
         return local
-    warning = "本地 LoRA 模型尚未就绪或当前设备缺少推理依赖，已使用主 AI API 按训练样本风格兜底。"
+    training = get_training_status(project_id)
+    download = get_download_status(project_id)
+    _, _, runtime_warning = _local_runtime_status(training, download)
+    warning = runtime_warning or "本地 LoRA 模型尚未就绪或当前设备缺少推理依赖，已使用主 AI API 按训练样本风格兜底。"
     fallback = _chat_with_api_fallback(project_id, request_with_history, context, warning)
     _persist_role_model_chat_turn(project_id, request, fallback)
     return fallback

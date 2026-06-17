@@ -42,6 +42,7 @@ interface StudioMessage {
 type StudioMode = 'chat' | 'workflow'
 
 const DATASET_PAGE_SIZE = 10
+const MIN_TRAINING_SAMPLES = 200
 
 const route = useRoute()
 const projectId = computed(() => String(route.params.projectId ?? ''))
@@ -65,8 +66,8 @@ const isRefreshing = ref(false)
 const appliedRecommendationKey = ref('')
 const datasetPage = ref(1)
 const datasetGenerateForm = ref({
-  samples_per_character: 8,
-  max_samples: 24,
+  samples_per_character: 64,
+  max_samples: 500,
 })
 
 const trainForm = ref({
@@ -99,6 +100,8 @@ const downloadJob = computed(() => state.value?.download ?? emptyJob())
 const trainingJob = computed(() => state.value?.training ?? emptyJob())
 const isBusy = computed(() => Boolean(action.value) || chatSending.value)
 const hasReadyRoleModel = computed(() => Boolean(state.value?.adapter_ready))
+const localRuntimeReady = computed(() => Boolean(state.value?.local_runtime_ready))
+const runtimeWarning = computed(() => state.value?.runtime_warning ?? '')
 const isChatMode = computed(() => studioMode.value === 'chat' && hasReadyRoleModel.value)
 const enabledSampleCount = computed(() => dataset.value.samples.filter((sample) => sample.enabled).length)
 const datasetPageCount = computed(() =>
@@ -124,7 +127,8 @@ const characterOptions = computed(() => {
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
 })
 const modelModeLabel = computed(() => {
-  if (state.value?.adapter_ready) return '本地 LoRA 已就绪'
+  if (state.value?.adapter_ready && state.value.local_runtime_ready) return '本地 LoRA 已就绪'
+  if (state.value?.adapter_ready) return '已训练，API 兜底'
   if (trainingJob.value.status === 'running') return 'LoRA 训练中'
   return 'API 风格兜底'
 })
@@ -141,20 +145,45 @@ const readyModelName = computed(
     '已训练角色模型',
 )
 const selectedModelId = computed(() => preferredModelId.value.trim() || recommendation.value?.model_id || '')
+const downloadedSelectedModel = computed(
+  () =>
+    Boolean(selectedModelId.value) &&
+    downloadJob.value.status === 'completed' &&
+    Boolean(downloadJob.value.artifact_path) &&
+    downloadJob.value.model_id === selectedModelId.value,
+)
 const modelScopeUrl = computed(() => {
   const modelId = selectedModelId.value
   if (modelId.includes('/')) return `https://modelscope.cn/models/${modelId}/summary`
   return recommendation.value?.download_url || ''
 })
-const canDownload = computed(() => Boolean(selectedModelId.value) && !isActiveJob(downloadJob.value))
+const canDownload = computed(
+  () => Boolean(selectedModelId.value) && !downloadedSelectedModel.value && !isActiveJob(downloadJob.value),
+)
+const hardwareCanTrain = computed(() => hardware.value?.can_train_lora ?? true)
 const canTrain = computed(
   () =>
-    enabledSampleCount.value > 0 &&
-    downloadJob.value.status === 'completed' &&
-    Boolean(downloadJob.value.artifact_path) &&
+    enabledSampleCount.value >= MIN_TRAINING_SAMPLES &&
+    downloadedSelectedModel.value &&
+    hardwareCanTrain.value &&
     !isActiveJob(trainingJob.value),
 )
 const hasActiveJob = computed(() => isActiveJob(downloadJob.value) || isActiveJob(trainingJob.value))
+const downloadButtonLabel = computed(() => (downloadedSelectedModel.value ? '已下载' : '下载模型'))
+const trainingReadinessMessage = computed(() => {
+  if (isActiveJob(trainingJob.value)) return '训练任务正在进行中。'
+  if (!selectedModelId.value) return '请先生成推荐或填写 ModelScope 模型 ID。'
+  if (enabledSampleCount.value < MIN_TRAINING_SAMPLES) {
+    return `至少需要 ${MIN_TRAINING_SAMPLES} 条启用样本，当前只有 ${enabledSampleCount.value} 条。`
+  }
+  if (!downloadedSelectedModel.value) return '请先下载当前模型 ID 对应的基础模型。'
+  if (!hardwareCanTrain.value) {
+    const notes = hardware.value?.notes?.filter(Boolean).join('；')
+    return notes ? `当前后端机器不能本地训练：${notes}` : '当前后端机器不能本地训练 LoRA。'
+  }
+  return '训练前置条件已满足。'
+})
+const chatBadgeLabel = computed(() => (localRuntimeReady.value ? 'local_lora' : 'api_fallback'))
 
 function isActiveJob(job: RoleModelJob): boolean {
   return ['queued', 'running', 'starting'].includes(job.status)
@@ -234,8 +263,8 @@ function clampInteger(value: number, min: number, max: number, fallback: number)
 }
 
 function datasetGenerationPayload(): { samples_per_character: number; max_samples: number } {
-  const samplesPerCharacter = clampInteger(datasetGenerateForm.value.samples_per_character, 8, 80, 8)
-  const maxSamples = clampInteger(datasetGenerateForm.value.max_samples, 24, 800, 24)
+  const samplesPerCharacter = clampInteger(datasetGenerateForm.value.samples_per_character, 8, 240, 64)
+  const maxSamples = clampInteger(datasetGenerateForm.value.max_samples, MIN_TRAINING_SAMPLES, 800, 500)
   datasetGenerateForm.value.samples_per_character = samplesPerCharacter
   datasetGenerateForm.value.max_samples = maxSamples
   return {
@@ -683,7 +712,7 @@ onBeforeUnmount(() => {
               :disabled="!canDownload || isBusy"
               @click="downloadModel"
             >
-              下载模型
+              {{ downloadButtonLabel }}
             </button>
             <button
               type="button"
@@ -694,6 +723,12 @@ onBeforeUnmount(() => {
               开始训练
             </button>
           </div>
+          <p
+            class="role-model__readiness"
+            :class="{ 'is-ready': canTrain, 'is-blocked': !canTrain }"
+          >
+            {{ trainingReadinessMessage }}
+          </p>
 
           <div class="role-model__train-grid">
             <label>
@@ -775,7 +810,7 @@ onBeforeUnmount(() => {
                 v-model.number="datasetGenerateForm.samples_per_character"
                 type="number"
                 min="8"
-                max="80"
+                max="240"
                 step="4"
               />
             </label>
@@ -784,15 +819,18 @@ onBeforeUnmount(() => {
               <input
                 v-model.number="datasetGenerateForm.max_samples"
                 type="number"
-                min="24"
+                min="200"
                 max="800"
-                step="24"
+                step="50"
               />
             </label>
           </div>
 
           <div class="role-model__dataset-meta">
             <span>{{ enabledSampleCount }} / {{ dataset.samples.length }} 条启用</span>
+            <span :class="{ 'is-dirty': enabledSampleCount < MIN_TRAINING_SAMPLES }">
+              训练门槛 {{ MIN_TRAINING_SAMPLES }} 条
+            </span>
             <span>当前 {{ datasetRangeLabel }}</span>
             <span>更新于 {{ formatTime(dataset.updated_at) }}</span>
             <span v-if="datasetDirty" class="is-dirty">有未保存修改</span>
@@ -875,10 +913,16 @@ onBeforeUnmount(() => {
                 <option v-for="name in characterOptions" :key="name" :value="name" />
               </datalist>
             </label>
-            <div class="role-model__chat-badge" :class="{ 'is-ready': state?.adapter_ready }">
-              {{ state?.adapter_ready ? '本地模型' : 'API 兜底' }}
+            <div
+              class="role-model__chat-badge"
+              :class="{ 'is-ready': localRuntimeReady, 'is-fallback': hasReadyRoleModel && !localRuntimeReady }"
+            >
+              {{ chatBadgeLabel }}
             </div>
           </div>
+          <p v-if="runtimeWarning && hasReadyRoleModel" class="role-model__runtime-warning">
+            {{ runtimeWarning }}
+          </p>
 
           <div ref="chatLog" class="role-model__chat-log">
             <p v-if="!chatMessages.length" class="role-model__empty">对话会在这里开始。</p>
@@ -922,7 +966,11 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <dt>Adapter</dt>
-            <dd>本地 LoRA 可用</dd>
+            <dd>{{ hasReadyRoleModel ? '训练产物已找到' : '尚未训练完成' }}</dd>
+          </div>
+          <div>
+            <dt>运行模式</dt>
+            <dd>{{ chatBadgeLabel }}</dd>
           </div>
           <div>
             <dt>聊天记录</dt>
@@ -1290,6 +1338,28 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.role-model__readiness,
+.role-model__runtime-warning {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.role-model__readiness.is-ready {
+  border: 1px solid var(--role-accent-border);
+  background: var(--role-accent-soft);
+  color: var(--role-accent);
+}
+
+.role-model__readiness.is-blocked,
+.role-model__runtime-warning {
+  border: 1px solid rgba(146, 64, 14, 0.22);
+  background: rgba(255, 251, 235, 0.8);
+  color: #92400e;
+}
+
 .role-model__train-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1510,6 +1580,12 @@ onBeforeUnmount(() => {
   border-color: var(--role-accent-border);
   background: var(--role-accent-soft);
   color: var(--role-accent);
+}
+
+.role-model__chat-badge.is-fallback {
+  border-color: rgba(146, 64, 14, 0.28);
+  background: rgba(255, 251, 235, 0.8);
+  color: #92400e;
 }
 
 .role-model__chat-log {

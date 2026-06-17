@@ -75,6 +75,8 @@ export interface RoleModelState {
   download: RoleModelJob
   training: RoleModelJob
   adapter_ready: boolean
+  local_runtime_ready: boolean
+  runtime_warning: string
 }
 
 export interface RoleModelChatMessage {
