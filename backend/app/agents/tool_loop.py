@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import time
 
-import tiktoken
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -30,6 +29,7 @@ from langchain_core.messages import (
 from langchain_core.tools import BaseTool
 from langgraph.config import get_stream_writer
 
+from app.agents.token_budget import truncate_tokens
 from app.core.settings import get_llm_settings
 from app.llm.provider import LlmProvider, extract_provider_reasoning
 
@@ -44,9 +44,6 @@ MAX_TOTAL_TOOL_CALLS = 10
 _TOOL_RESULT_TOKEN_CAP = 2000
 _MIDDLE_THOUGHT_CHAR_CAP = 400
 _TOOL_TRACE_PREVIEW_CHAR_CAP = 180
-
-# 复用与 context_compress 相同的 encoding；可离线工作，并与主流 OpenAI 兼容模型一致。
-_encoder = tiktoken.get_encoding("cl100k_base")
 
 
 def run_tool_loop(
@@ -240,11 +237,7 @@ def _truncate_chars(text: str, limit: int) -> str:
 
 def _truncate_tokens(text: str, cap: int) -> str:
     """按 token 数截断，尽量保留更完整的 JSON / 长列表工具返回内容。"""
-    stripped = text.strip()
-    tokens = _encoder.encode(stripped)
-    if len(tokens) <= cap:
-        return stripped
-    return _encoder.decode(tokens[:cap]) + "..."
+    return truncate_tokens(text, cap)
 
 
 def compact_history_for_structured(history: list[BaseMessage]) -> list[BaseMessage]:

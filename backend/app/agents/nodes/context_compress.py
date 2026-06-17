@@ -11,21 +11,14 @@ from __future__ import annotations
 
 from typing import Any
 
-import tiktoken
-
+from app.agents.token_budget import count_tokens
 from app.agents.state import AgentState
 from app.core.settings import get_agent_settings
 from app.schemas import RagMergedContextItem
 
 
-# cl100k_base is the de facto standard encoding for mainstream models like
-# GPT-3.5/4 and DeepSeek; using a ready-made encoding directly avoids resolving
-# by model name each time and needs no network download.
-_encoder = tiktoken.get_encoding("cl100k_base")
-
-
 def _count_tokens(text: str) -> int:
-    return len(_encoder.encode(text))
+    return count_tokens(text)
 
 
 def context_compress_node(state: AgentState) -> dict[str, Any]:
