@@ -77,6 +77,7 @@ export interface RoleModelState {
   adapter_ready: boolean
   local_runtime_ready: boolean
   runtime_warning: string
+  chat_characters: string[]
 }
 
 export interface RoleModelChatMessage {
@@ -183,12 +184,21 @@ export async function getRoleModelTraining(projectId: string): Promise<RoleModel
   return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/train`)
 }
 
-export async function getRoleModelChatHistory(projectId: string): Promise<RoleModelChatHistoryItem[]> {
-  return requestJson<RoleModelChatHistoryItem[]>(`/api/projects/${projectId}/role-model/chat`)
+function roleChatQuery(characterName: string): string {
+  return `character_name=${encodeURIComponent(characterName)}`
 }
 
-export async function clearRoleModelChatHistory(projectId: string): Promise<void> {
-  await requestJson<void>(`/api/projects/${projectId}/role-model/chat`, {
+export async function getRoleModelChatHistory(
+  projectId: string,
+  characterName: string,
+): Promise<RoleModelChatHistoryItem[]> {
+  return requestJson<RoleModelChatHistoryItem[]>(
+    `/api/projects/${projectId}/role-model/chat?${roleChatQuery(characterName)}`,
+  )
+}
+
+export async function clearRoleModelChatHistory(projectId: string, characterName: string): Promise<void> {
+  await requestJson<void>(`/api/projects/${projectId}/role-model/chat?${roleChatQuery(characterName)}`, {
     method: 'DELETE',
   })
 }

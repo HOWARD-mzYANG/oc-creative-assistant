@@ -68,7 +68,10 @@ def list_project_sessions(db: Session, project_id: str) -> list[ChatSessionORM]:
     return list(
         db.scalars(
             select(ChatSessionORM)
-            .where(ChatSessionORM.project_id == project_id)
+            .where(
+                ChatSessionORM.project_id == project_id,
+                ~ChatSessionORM.thread_id.like("role-model-chat:%"),
+            )
             .order_by(ChatSessionORM.created_at.desc())
         )
     )

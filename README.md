@@ -157,7 +157,7 @@ npm run build:desktop     # 构建完整桌面端
 
 角色模型聊天有两种运行模式：`local_lora` 表示后端正在使用本地基础模型和 LoRA adapter；`api_fallback` 表示训练产物尚未就绪，或当前机器缺少 CUDA/推理依赖，系统会用主 AI API 结合数据集和知识库做角色风格兜底。
 
-角色模型聊天记录会保存到现有 `chat_sessions` / `chat_messages` 表中，并与普通 AI 聊天隔离。清空按钮会同步删除后端保存的角色模型聊天历史。
+角色模型聊天记录会保存到角色模型自己的项目数据目录中，并按角色分别隔离；它不会写入普通 AI/Agent 聊天的 `chat_sessions` / `chat_messages` 表。清空按钮只会删除当前选中角色的聊天历史，不会影响其他角色窗口。
 
 ## 数据与可移植性
 

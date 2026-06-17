@@ -81,6 +81,7 @@ const trainForm = ref({
 })
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let chatHistoryLoadToken = 0
 
 function emptyJob(): RoleModelJob {
   return {
@@ -121,10 +122,26 @@ const datasetRangeLabel = computed(() => {
   return `${start}-${end} / ${dataset.value.samples.length}`
 })
 const characterOptions = computed(() => {
-  const names = dataset.value.samples
-    .map((sample) => sample.character_name.trim())
+  const names = [
+    ...(state.value?.chat_characters ?? []),
+    ...dataset.value.samples.map((sample) => sample.character_name),
+  ]
+    .map((name) => name.trim())
     .filter(Boolean)
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
+})
+const selectedChatCharacter = computed(() => chatCharacter.value.trim())
+const hasChatCharacter = computed(() => Boolean(selectedChatCharacter.value))
+const canSendChat = computed(() => hasChatCharacter.value && Boolean(chatInput.value.trim()) && !chatSending.value)
+const chatPlaceholder = computed(() => {
+  if (!characterOptions.value.length) return '先生成或保存含角色名的 LoRA 数据集'
+  if (!hasChatCharacter.value) return '先选择一个角色'
+  return `和 ${selectedChatCharacter.value} 聊一句`
+})
+const chatEmptyText = computed(() => {
+  if (!characterOptions.value.length) return '还没有可聊天角色。先生成并保存 LoRA 数据集。'
+  if (!hasChatCharacter.value) return '请选择一个角色。每个角色都会有独立聊天记录。'
+  return `和 ${selectedChatCharacter.value} 的对话会在这里开始。`
 })
 const modelModeLabel = computed(() => {
   if (state.value?.adapter_ready && state.value.local_runtime_ready) return '本地 LoRA 已就绪'
@@ -303,6 +320,17 @@ function syncRecommendedModelInput(next: RoleModelRecommendation | null): void {
   preferredModelId.value = next.model_id
 }
 
+function syncChatCharacterWithOptions(): void {
+  const options = characterOptions.value
+  const current = selectedChatCharacter.value
+  if (current && options.includes(current)) return
+  if (options.length === 1) {
+    chatCharacter.value = options[0]
+    return
+  }
+  if (current) chatCharacter.value = ''
+}
+
 async function runAction(name: ActionName, task: () => Promise<void>): Promise<void> {
   if (action.value) return
   action.value = name
@@ -335,24 +363,30 @@ async function refreshState(): Promise<void> {
   }
 }
 
-async function loadChatHistory(): Promise<void> {
-  if (!projectId.value) return
-  const history = await getRoleModelChatHistory(projectId.value)
+async function loadChatHistory(characterName = selectedChatCharacter.value): Promise<void> {
+  const character = characterName.trim()
+  const token = ++chatHistoryLoadToken
+  if (!projectId.value || !character) {
+    chatMessages.value = []
+    return
+  }
+  const history = await getRoleModelChatHistory(projectId.value, character)
+  if (token !== chatHistoryLoadToken || selectedChatCharacter.value !== character) return
   chatMessages.value = history.map(historyItemToStudioMessage)
   scrollChat()
 }
 
 async function loadAll(): Promise<void> {
   await runAction('load', async () => {
-    const [nextState, nextDataset, nextChatHistory] = await Promise.all([
+    const [nextState, nextDataset] = await Promise.all([
       getRoleModelState(projectId.value),
       getRoleModelDataset(projectId.value),
-      getRoleModelChatHistory(projectId.value),
     ])
     state.value = nextState
     applyInitialStudioMode(nextState)
     dataset.value = nextDataset
-    chatMessages.value = nextChatHistory.map(historyItemToStudioMessage)
+    syncChatCharacterWithOptions()
+    await loadChatHistory()
     datasetPage.value = 1
     datasetDirty.value = false
     applyRecommendation(nextState.recommendation)
@@ -390,6 +424,8 @@ async function generateDataset(): Promise<void> {
   await runAction('generate', async () => {
     const payload = datasetGenerationPayload()
     dataset.value = await generateRoleModelDataset(projectId.value, payload)
+    syncChatCharacterWithOptions()
+    await loadChatHistory()
     datasetPage.value = 1
     datasetDirty.value = false
     await refreshState()
@@ -407,6 +443,8 @@ async function saveDataset(): Promise<void> {
 
 async function saveDatasetToServer(): Promise<void> {
   dataset.value = await saveRoleModelDataset(projectId.value, dataset.value.samples)
+  syncChatCharacterWithOptions()
+  await loadChatHistory()
   datasetPage.value = Math.min(datasetPage.value, datasetPageCount.value)
   datasetDirty.value = false
 }
@@ -482,7 +520,12 @@ function nextDatasetPage(): void {
 
 async function sendChat(): Promise<void> {
   const message = chatInput.value.trim()
+  const character = selectedChatCharacter.value
   if (!message || chatSending.value) return
+  if (!character) {
+    notice.value = '请先选择一个角色，再开始聊天'
+    return
+  }
   const history: RoleModelChatMessage[] = chatMessages.value.map((item) => ({
     role: item.role,
     content: item.content,
@@ -495,7 +538,7 @@ async function sendChat(): Promise<void> {
   try {
     const response = await chatWithRoleModel(projectId.value, {
       message,
-      character_name: chatCharacter.value.trim() || null,
+      character_name: character,
       history,
     })
     chatMessages.value.push({
@@ -505,7 +548,7 @@ async function sendChat(): Promise<void> {
       warning: response.warning,
     })
     try {
-      await loadChatHistory()
+      await loadChatHistory(character)
     } catch (caught) {
       notice.value = `角色模型已回复，但刷新聊天记录失败：${parseError(caught)}`
     }
@@ -522,10 +565,15 @@ async function sendChat(): Promise<void> {
 }
 
 async function clearChat(): Promise<void> {
+  const character = selectedChatCharacter.value
+  if (!character) {
+    notice.value = '请先选择要清空的角色'
+    return
+  }
   await runAction('clear-chat', async () => {
-    await clearRoleModelChatHistory(projectId.value)
+    await clearRoleModelChatHistory(projectId.value, character)
     chatMessages.value = []
-    notice.value = '角色模型聊天记录已清空'
+    notice.value = `已清空 ${character} 的聊天记录`
   })
 }
 
@@ -553,6 +601,14 @@ function stopPolling(): void {
 watch(hasActiveJob, (active) => {
   if (active) startPolling()
   else stopPolling()
+})
+
+watch(selectedChatCharacter, () => {
+  void loadChatHistory()
+})
+
+watch(characterOptions, () => {
+  syncChatCharacterWithOptions()
 })
 
 watch(
@@ -898,20 +954,22 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="role-model__button role-model__button--ghost"
-              :disabled="isBusy || !chatMessages.length"
+              :disabled="isBusy || !hasChatCharacter || !chatMessages.length"
               @click="clearChat"
             >
-              清空
+              清空当前角色
             </button>
           </div>
 
           <div class="role-model__chat-controls">
             <label class="role-model__field">
               <span>当前角色</span>
-              <input v-model.trim="chatCharacter" list="role-model-characters" placeholder="可从数据集角色中选择" />
-              <datalist id="role-model-characters">
-                <option v-for="name in characterOptions" :key="name" :value="name" />
-              </datalist>
+              <select v-model="chatCharacter" :disabled="chatSending || !characterOptions.length">
+                <option value="">选择一个角色</option>
+                <option v-for="name in characterOptions" :key="name" :value="name">
+                  {{ name }}
+                </option>
+              </select>
             </label>
             <div
               class="role-model__chat-badge"
@@ -925,7 +983,7 @@ onBeforeUnmount(() => {
           </p>
 
           <div ref="chatLog" class="role-model__chat-log">
-            <p v-if="!chatMessages.length" class="role-model__empty">对话会在这里开始。</p>
+            <p v-if="!chatMessages.length" class="role-model__empty">{{ chatEmptyText }}</p>
             <article
               v-for="(message, index) in chatMessages"
               :key="`${message.role}-${index}`"
@@ -944,8 +1002,8 @@ onBeforeUnmount(() => {
           </div>
 
           <form class="role-model__composer" @submit.prevent="sendChat">
-            <input v-model="chatInput" type="text" placeholder="和微调角色模型聊一句" />
-            <button type="submit" class="role-model__button role-model__button--primary" :disabled="chatSending || !chatInput.trim()">
+            <input v-model="chatInput" type="text" :placeholder="chatPlaceholder" :disabled="!hasChatCharacter" />
+            <button type="submit" class="role-model__button role-model__button--primary" :disabled="!canSendChat">
               发送
             </button>
           </form>
@@ -971,6 +1029,10 @@ onBeforeUnmount(() => {
           <div>
             <dt>运行模式</dt>
             <dd>{{ chatBadgeLabel }}</dd>
+          </div>
+          <div>
+            <dt>当前角色</dt>
+            <dd>{{ selectedChatCharacter || '未选择' }}</dd>
           </div>
           <div>
             <dt>聊天记录</dt>
@@ -1257,6 +1319,7 @@ onBeforeUnmount(() => {
 }
 
 .role-model__field input,
+.role-model__field select,
 .role-model__train-grid input,
 .role-model__sample-name,
 .role-model__sample-field textarea,
@@ -1270,6 +1333,7 @@ onBeforeUnmount(() => {
 }
 
 .role-model__field input,
+.role-model__field select,
 .role-model__train-grid input,
 .role-model__sample-name,
 .role-model__composer input {

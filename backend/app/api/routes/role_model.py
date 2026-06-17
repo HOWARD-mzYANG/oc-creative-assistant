@@ -1,6 +1,6 @@
 """HTTP routes for project-scoped OC role model workflows."""
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
 from app.schemas import (
@@ -131,15 +131,27 @@ async def read_role_model_training(project_id: str) -> RoleModelJobPayload:
 
 
 @router.get("/chat", response_model=list[RoleModelChatHistoryItemPayload])
-async def read_role_model_chat(project_id: str) -> list[RoleModelChatHistoryItemPayload]:
-    """Read persisted role-model chat history."""
-    return get_role_model_chat_history(project_id)
+async def read_role_model_chat(
+    project_id: str,
+    character_name: str | None = Query(default=None),
+) -> list[RoleModelChatHistoryItemPayload]:
+    """Read persisted role-model chat history for one character."""
+    try:
+        return get_role_model_chat_history(project_id, character_name)
+    except ValueError as error:
+        raise _bad_request(error) from error
 
 
 @router.delete("/chat", status_code=204)
-async def delete_role_model_chat(project_id: str) -> None:
-    """Clear persisted role-model chat history."""
-    clear_role_model_chat_history(project_id)
+async def delete_role_model_chat(
+    project_id: str,
+    character_name: str | None = Query(default=None),
+) -> None:
+    """Clear persisted role-model chat history for one character."""
+    try:
+        clear_role_model_chat_history(project_id, character_name)
+    except ValueError as error:
+        raise _bad_request(error) from error
 
 
 @router.post("/chat", response_model=RoleModelChatResponse)
@@ -148,4 +160,7 @@ async def post_role_model_chat(
     payload: RoleModelChatRequest,
 ) -> RoleModelChatResponse:
     """Chat with the trained role model, falling back to the configured AI API."""
-    return chat_with_role_model(project_id, payload)
+    try:
+        return chat_with_role_model(project_id, payload)
+    except ValueError as error:
+        raise _bad_request(error) from error

@@ -260,6 +260,7 @@ class RoleModelStatePayload(BaseModel):
     adapter_ready: bool = False
     local_runtime_ready: bool = False
     runtime_warning: str = ""
+    chat_characters: list[str] = Field(default_factory=list)
 
 
 class CrossReferenceItem(BaseModel):
