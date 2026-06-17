@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
@@ -118,6 +119,66 @@ async def _stream_text(reply: str) -> AsyncIterator[str]:
     yield _sse({"type": "done"})
 
 
+def _clean_dialogue_history(history: list[Any]) -> list[dict[str, str]]:
+    """把历史消息整理成 LLaMA-Factory 接受的 user/assistant 交替格式。
+
+    LLaMA-Factory 的 OpenAI-style API 会把第一个 system 单独拿出来，剩余 messages
+    必须严格满足 `user/assistant/user/assistant/.../user`。前端历史在异常断流后可能
+    留下“只有 user 没有 assistant”的半轮消息；远程历史也可能因为截断从 assistant 开始。
+    这里先只保留完整的 user->assistant 对，最后由调用方追加本次 user，避免上游抛出
+    `Only supports u/a/u/a/u...` 后直接关闭 chunked 流。
+    """
+    cleaned: list[dict[str, str]] = []
+    for item in history[-16:]:
+        role = getattr(item, "role", "")
+        content = " ".join(str(getattr(item, "content", "")).split())
+        if role not in {"user", "assistant"} or not content:
+            continue
+        if role == "user":
+            if not cleaned or cleaned[-1]["role"] == "assistant":
+                cleaned.append({"role": "user", "content": content})
+            else:
+                # 连续 user 说明上一轮还没拿到 assistant；用最新问题覆盖旧的半轮问题。
+                cleaned[-1] = {"role": "user", "content": content}
+        elif cleaned and cleaned[-1]["role"] == "user":
+            cleaned.append({"role": "assistant", "content": content})
+
+    if cleaned and cleaned[-1]["role"] == "user":
+        cleaned.pop()
+    return cleaned[-12:]
+
+
+def _model_messages(job_id: str, payload: RoleChatRequest, material_brief) -> list[dict[str, str]]:
+    """构造发给 LLaMA-Factory API 的消息数组。
+
+    角色边界和资料快照必须合并到同一个 system 消息里；如果拆成两个 system，当前
+    LLaMA-Factory 会在第二个 system 处判定消息序列非法。历史消息则只传完整对话轮次，
+    最后追加用户当前输入，使最终序列稳定为：
+    `system? -> user -> assistant -> ... -> user`。
+    """
+    snapshot = payload.fallback_snapshot
+    messages: list[dict[str, str]] = []
+    if snapshot is not None:
+        system = "\n\n".join(
+            [
+                role_system_prompt(snapshot, material_brief),
+                snapshot_context(snapshot, material_brief),
+            ]
+        )
+        messages.append({"role": "system", "content": system})
+
+    history: list[Any] = list(payload.history[-12:])
+    if not history:
+        history = [
+            item
+            for item in read_chat_history(job_id, limit=12)
+            if item.role in {"user", "assistant"}
+        ]
+    messages.extend(_clean_dialogue_history(history))
+    messages.append({"role": "user", "content": payload.message})
+    return messages
+
+
 async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterator[str]:
     """把角色聊天请求转发到 OpenAI-style 模型 API。
 
@@ -152,22 +213,7 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
             append_chat_turn(job_id, payload.message, reply)
         return
 
-    snapshot = payload.fallback_snapshot
-    messages = []
-    if snapshot is not None:
-        # 第一个 system 负责角色边界，第二个 system 放当前资料快照。
-        # 这样即使 adapter 已训练，推理时仍能拿到最新角色卡和关系信息。
-        messages.append({"role": "system", "content": role_system_prompt(snapshot, material_brief)})
-        messages.append({"role": "system", "content": snapshot_context(snapshot, material_brief)})
-    history = payload.history[-12:]
-    if not history:
-        history = [
-            item
-            for item in read_chat_history(job_id, limit=12)
-            if item.role in {"user", "assistant", "system"}
-        ]
-    messages.extend({"role": message.role, "content": message.content} for message in history)
-    messages.append({"role": "user", "content": payload.message})
+    messages = _model_messages(job_id, payload, material_brief)
 
     url = model_api_base_url.rstrip("/") + "/v1/chat/completions"
     headers = {"Content-Type": "application/json"}

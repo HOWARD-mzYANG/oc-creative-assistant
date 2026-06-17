@@ -58,7 +58,9 @@ const jobSelectEl = ref<HTMLElement | null>(null)
 let pollTimer: ReturnType<typeof window.setInterval> | null = null
 let materialAbortController: AbortController | null = null
 
-// 角色资料区域直接读取 overview 中的快照和资料整理稿；二者都由主后端从数据库生成。
+// 角色资料区域直接读取 overview 中的快照和已缓存资料整理稿。
+// 页面首次进入时不会自动运行资料 agent；没有缓存时，训练和对话默认使用人物卡片、
+// 关系引用、相关节点和项目 seed 组成的快照兜底。
 const snapshot = computed(() => overview.value?.snapshot ?? null)
 const materialBrief = computed(() => overview.value?.material_brief ?? null)
 const materialTrace = computed(() => overview.value?.material_trace ?? [])
@@ -182,7 +184,7 @@ function stopPolling() {
 /**
  * 停止资料 agent 的 SSE 流。
  *
- * overview 首屏不再等待资料整理；资料 agent 作为独立流运行。切换角色、刷新页面数据或卸载组件时
+ * 资料 agent 只在用户手动点击“整理资料”后运行。切换角色、刷新页面数据或卸载组件时
  * 需要主动 abort，避免旧角色的 trace 回写到新角色页面。
  */
 function stopMaterialStream() {
@@ -196,8 +198,8 @@ function stopMaterialStream() {
 /**
  * 单独流式运行资料 agent，并实时写入思考过程和最终整理稿。
  *
- * 这个请求不参与首屏 loading，也不阻塞已有模型列表、训练日志和角色对话。trace_item 到达时立即
- * 追加到 overview.material_trace；material_brief 到达时再更新资料整理稿。
+ * 这个请求完全由用户手动触发，不参与首屏 loading，也不阻塞已有模型列表、训练日志和角色对话。
+ * trace_item 到达时立即追加到 overview.material_trace；material_brief 到达时再更新资料整理稿。
  */
 async function loadMaterialBriefStream() {
   if (!overview.value) return
@@ -273,8 +275,10 @@ function startPolling() {
 /**
  * 加载角色模型页首屏数据。
  *
- * 后端会返回：服务状态、角色快照、资料 agent 整理稿、当前角色的远程训练任务列表。
+ * 后端会返回：服务状态、角色快照、已缓存的资料 agent 整理稿、当前角色的远程训练任务列表。
  * 加载后会选择一个默认任务：优先 latest_job，其次已完成任务，最后任意最近任务。
+ * 注意：这里刻意不自动调用 loadMaterialBriefStream。默认体验是 RAG/人物卡片兜底，
+ * 只有用户明确点击“整理资料”时才消耗模型调用并展示思考过程。
  */
 async function loadOverview() {
   isLoading.value = true
@@ -293,8 +297,6 @@ async function loadOverview() {
         data.jobs[0]?.id ??
         ''
     }
-
-    void loadMaterialBriefStream()
 
     // 选中任务确定后，读取该任务绑定的远程聊天记录；如果任务不是 succeeded，
     // loadSelectedHistory 会自动清空聊天区。
@@ -481,9 +483,19 @@ onBeforeUnmount(() => {
       <section class="role-model__panel">
         <header class="role-model__panel-head">
           <h2>资料快照</h2>
-          <button type="button" class="role-model__ghost" :disabled="isLoading" @click="loadOverview">
-            刷新
-          </button>
+          <div class="role-model__panel-actions">
+            <button type="button" class="role-model__ghost" :disabled="isLoading" @click="loadOverview">
+              刷新
+            </button>
+            <button
+              type="button"
+              class="role-model__ghost"
+              :disabled="!overview || isMaterialLoading"
+              @click="loadMaterialBriefStream"
+            >
+              {{ isMaterialLoading ? '整理中' : '整理资料' }}
+            </button>
+          </div>
         </header>
         <p class="role-model__summary">{{ snapshot?.character_summary || '暂无摘要' }}</p>
         <div class="role-model__facts">
@@ -506,6 +518,9 @@ onBeforeUnmount(() => {
         </div>
         <p v-if="isMaterialLoading" class="role-model__hint">
           资料 agent 正在整理角色资料，训练任务和角色对话可以先使用。
+        </p>
+        <p v-else-if="!materialBrief" class="role-model__hint">
+          未手动整理时，默认使用人物卡片、关系引用和相关节点作为兜底资料。
         </p>
         <p v-if="materialError" class="role-model__error role-model__error--inline">
           {{ materialError }}
@@ -721,6 +736,13 @@ onBeforeUnmount(() => {
 .role-model__panel-head {
   justify-content: space-between;
   margin-bottom: 14px;
+}
+
+.role-model__panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .role-model__panel-head h2 {
