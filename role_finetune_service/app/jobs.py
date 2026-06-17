@@ -237,7 +237,7 @@ def _write_train_config(
         "per_device_train_batch_size": 1,
         "gradient_accumulation_steps": 8,
         "learning_rate": 2.0e-4,
-        "num_train_epochs": 10.0,
+        "num_train_epochs": 3.0,
         "lr_scheduler_type": "cosine",
         "warmup_ratio": 0.1,
         "fp16": settings.fp16,

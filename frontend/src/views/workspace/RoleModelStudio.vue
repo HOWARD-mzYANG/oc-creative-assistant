@@ -778,6 +778,16 @@ onBeforeUnmount(() => {
 
 .role-model__trace {
   margin-top: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.role-model__trace :deep(.agent-trace__summary) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel, #fafafa);
 }
 
 .role-model__select {
