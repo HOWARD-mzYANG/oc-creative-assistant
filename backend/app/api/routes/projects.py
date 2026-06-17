@@ -45,6 +45,7 @@ from app.services.role_model_service import (
     get_role_training_job,
     start_role_training,
     stream_role_chat,
+    stream_role_material_brief,
 )
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -136,6 +137,19 @@ async def read_character_role_model(
 ) -> RoleModelOverviewPayload:
     """Return role snapshot plus external training-service status."""
     return get_role_model_overview(project_id, character_id)
+
+
+@router.get("/{project_id}/characters/{character_id}/role-model/material/stream")
+async def stream_character_role_material(
+    project_id: str,
+    character_id: str,
+) -> StreamingResponse:
+    """Stream role material-agent trace and final brief."""
+    return StreamingResponse(
+        stream_role_material_brief(project_id, character_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post(

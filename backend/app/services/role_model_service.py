@@ -36,7 +36,11 @@ from app.schemas import (
 )
 from app.services.graph_mappers import db_fields_to_api, db_tags_to_api
 from app.services.graph_repository import require_project
-from app.services.role_material_agent import build_role_material_brief, build_role_material_brief_with_trace
+from app.services.role_material_agent import (
+    build_role_material_brief_fallback,
+    build_role_material_brief_with_trace,
+    get_cached_role_material_brief_with_trace,
+)
 
 
 def _sse(data: dict[str, Any]) -> str:
@@ -215,7 +219,7 @@ def get_role_model_overview(project_id: str, character_id: str) -> RoleModelOver
     这样演示不会因为 GPU 服务器没启动而整页不可用。
     """
     snapshot = build_role_snapshot(project_id, character_id)
-    material_brief, material_trace = build_role_material_brief_with_trace(snapshot)
+    material_brief, material_trace = get_cached_role_material_brief_with_trace(snapshot)
     settings = _settings_or_none()
     if settings is None:
         return RoleModelOverviewPayload(
@@ -256,6 +260,54 @@ def get_role_model_overview(project_id: str, character_id: str) -> RoleModelOver
         )
 
 
+async def stream_role_material_brief(
+    project_id: str,
+    character_id: str,
+) -> AsyncIterator[str]:
+    """流式运行资料 agent，不阻塞角色模型页首屏数据。
+
+    overview 接口只返回快照、训练服务状态和已有 job；本接口单独负责资料整理，并通过 SSE 实时输出
+    trace_item。整理完成后再发送 material_brief，前端据此更新资料稿。
+    """
+    try:
+        snapshot = build_role_snapshot(project_id, character_id)
+    except Exception as exc:  # noqa: BLE001
+        yield _sse({"type": "error", "message": str(exc)})
+        return
+
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def _put(event: dict[str, Any]) -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    def _on_trace(item) -> None:
+        _put(
+            {
+                "type": "trace_item",
+                "node": item.node,
+                "title": item.title,
+                "content": item.content,
+            }
+        )
+
+    def _run_agent() -> None:
+        try:
+            brief, _trace = build_role_material_brief_with_trace(snapshot, on_trace=_on_trace)
+            _put({"type": "material_brief", "brief": brief.model_dump(mode="json")})
+            _put({"type": "done"})
+        except Exception as exc:  # noqa: BLE001
+            _put({"type": "error", "message": str(exc)})
+
+    worker = asyncio.create_task(asyncio.to_thread(_run_agent))
+    while True:
+        event = await queue.get()
+        yield _sse(event)
+        if event.get("type") in {"done", "error"}:
+            break
+    await worker
+
+
 def start_role_training(
     project_id: str,
     character_id: str,
@@ -267,7 +319,9 @@ def start_role_training(
     主后端不保存 adapter，也不执行 GPU 命令。
     """
     snapshot = build_role_snapshot(project_id, character_id)
-    material_brief, _material_trace = build_role_material_brief_with_trace(snapshot)
+    material_brief, _material_trace = get_cached_role_material_brief_with_trace(snapshot)
+    if material_brief is None:
+        material_brief = build_role_material_brief_fallback(snapshot)
     try:
         data = _service_post(
             "/api/jobs",
@@ -396,7 +450,9 @@ async def stream_role_chat(
     主后端资料兜底。这个策略让“训练服务离线”不会阻断角色对话演示。
     """
     snapshot = build_role_snapshot(project_id, character_id)
-    material_brief = build_role_material_brief(snapshot)
+    material_brief, _material_trace = get_cached_role_material_brief_with_trace(snapshot)
+    if material_brief is None:
+        material_brief = build_role_material_brief_fallback(snapshot)
     settings = _settings_or_none()
     if settings is None or not payload.job_id:
         async for item in _fallback_stream(snapshot, payload, material_brief):

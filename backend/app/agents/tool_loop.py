@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 
 from langchain_core.messages import (
     AIMessage,
@@ -50,6 +51,7 @@ def run_tool_loop(
     provider: LlmProvider,
     initial_messages: list[BaseMessage],
     tools: list[BaseTool],
+    trace_callback: Callable[[dict[str, str]], None] | None = None,
 ) -> list[BaseMessage]:
     """运行工具调用循环直到结束，返回包含所有 tool_calls / tool_results 的消息历史。
 
@@ -69,6 +71,7 @@ def run_tool_loop(
             writer,
             "工具规划",
             f"正在判断是否需要调用项目工具（第 {loop_index + 1} 轮）。",
+            trace_callback=trace_callback,
         )
         response = provider.chat_with_tools(history, tools)
         if stream_reasoning:
@@ -77,7 +80,12 @@ def run_tool_loop(
 
         tool_calls = getattr(response, "tool_calls", None) or []
         if not tool_calls:
-            _emit_trace_item(writer, "工具规划", "模型认为已有证据足够，结束工具调用。")
+            _emit_trace_item(
+                writer,
+                "工具规划",
+                "模型认为已有证据足够，结束工具调用。",
+                trace_callback=trace_callback,
+            )
             return history
 
         for idx, call in enumerate(tool_calls):
@@ -87,6 +95,7 @@ def run_tool_loop(
                 writer,
                 "工具调用",
                 f"{tool_name}({_format_tool_args(tool_args)})",
+                trace_callback=trace_callback,
             )
             started = time.perf_counter()
             within_batch = idx < MAX_CALLS_PER_BATCH
@@ -115,6 +124,7 @@ def run_tool_loop(
                     f"{tool_name} 完成，用时 {elapsed_ms}ms。\n"
                     f"{_format_tool_result_preview(content)}"
                 ),
+                trace_callback=trace_callback,
             )
             history.append(ToolMessage(content=str(content), tool_call_id=call["id"]))
 
@@ -145,17 +155,30 @@ def _emit_provider_reasoning(writer, response: AIMessage) -> None:
         pass
 
 
-def _emit_trace_item(writer, title: str, content: str, *, node: str = "tool_loop") -> None:
+def _emit_trace_item(
+    writer,
+    title: str,
+    content: str,
+    *,
+    node: str = "tool_loop",
+    trace_callback: Callable[[dict[str, str]], None] | None = None,
+) -> None:
     """向前端推送工具循环中的实时可观察轨迹。"""
+    payload = {
+        "type": "trace_item",
+        "node": node,
+        "title": title,
+        "content": _truncate_chars(content, 480),
+    }
+    if trace_callback is not None:
+        try:
+            trace_callback(payload)
+        except Exception:
+            pass
     if writer is None:
         return
     try:
-        writer({
-            "type": "trace_item",
-            "node": node,
-            "title": title,
-            "content": _truncate_chars(content, 480),
-        })
+        writer(payload)
     except Exception:
         pass
 

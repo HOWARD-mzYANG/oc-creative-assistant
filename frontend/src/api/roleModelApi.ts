@@ -104,6 +104,12 @@ export type RoleChatStreamEvent =
   | { type: 'done' }
   | { type: 'error'; message: string }
 
+export type RoleMaterialStreamEvent =
+  | ({ type: 'trace_item' } & RoleMaterialTraceItemDto)
+  | { type: 'material_brief'; brief: RoleMaterialBriefDto }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+
 export async function getRoleModelOverview(
   projectId: string,
   characterId: string,
@@ -145,6 +151,43 @@ export async function getRoleChatHistory(
   return requestJson<RoleChatLogItemDto[]>(
     `/api/projects/${projectId}/characters/${characterId}/role-model/jobs/${jobId}/chat-history`,
   )
+}
+
+export async function streamRoleMaterialBrief(
+  projectId: string,
+  characterId: string,
+  onEvent: (event: RoleMaterialStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(
+    `${backendBaseUrl}/api/projects/${projectId}/characters/${characterId}/role-model/material/stream`,
+    { signal },
+  )
+
+  if (!response.ok || !response.body) {
+    throw new Error(`资料 agent 请求失败：HTTP ${response.status}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+    for (const raw of chunks) {
+      const line = raw.trim()
+      if (!line.startsWith('data: ')) continue
+      try {
+        onEvent(JSON.parse(line.slice(6)) as RoleMaterialStreamEvent)
+      } catch {
+        /* Ignore broken SSE fragments. */
+      }
+    }
+  }
 }
 
 export async function streamRoleChat(

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
@@ -57,6 +58,43 @@ def _trace(title: str, content: str) -> RoleMaterialTraceItemPayload:
         title=title,
         content=content,
     )
+
+
+def _record_trace(
+    trace: list[RoleMaterialTraceItemPayload],
+    on_trace: Callable[[RoleMaterialTraceItemPayload], None] | None,
+    title: str,
+    content: str,
+    *,
+    node: str = "role_material_agent",
+) -> None:
+    """把资料 agent 的可观察步骤写入列表，并在流式模式下立即推给调用方。"""
+    item = RoleMaterialTraceItemPayload(node=node, title=title, content=content)
+    trace.append(item)
+    if on_trace is not None:
+        try:
+            on_trace(item)
+        except Exception:
+            pass
+
+
+def get_cached_role_material_brief_with_trace(
+    snapshot: RoleModelSnapshotPayload,
+) -> tuple[RoleMaterialBriefPayload | None, list[RoleMaterialTraceItemPayload]]:
+    """只读取资料 agent 缓存，不触发 LLM 或工具调用。
+
+    角色模型页首屏会使用这个入口，避免页面加载被资料整理 agent 阻塞。
+    """
+    cached = _BRIEF_CACHE.get(_snapshot_fingerprint(snapshot))
+    if cached is None:
+        return None, []
+    brief, trace = cached
+    return brief, list(trace)
+
+
+def build_role_material_brief_fallback(snapshot: RoleModelSnapshotPayload) -> RoleMaterialBriefPayload:
+    """返回确定性资料整理兜底，不调用模型，也不使用工具。"""
+    return _fallback_role_material_brief(snapshot)
 
 
 def _fallback_role_material_brief(snapshot: RoleModelSnapshotPayload) -> RoleMaterialBriefPayload:
@@ -239,6 +277,7 @@ def _append_tool_history_trace(
 def _call_material_agent_with_tools(
     snapshot: RoleModelSnapshotPayload,
     trace: list[RoleMaterialTraceItemPayload],
+    on_trace: Callable[[RoleMaterialTraceItemPayload], None] | None = None,
 ) -> RoleMaterialBriefPayload | None:
     """使用项目工具整理角色资料，并返回结构化训练档案。
 
@@ -253,15 +292,15 @@ def _call_material_agent_with_tools(
     """
     provider = get_llm_provider()
     tools = make_project_tools(snapshot.project_id, include_web_search=False)
-    trace.append(
-        _trace(
-            "启用项目工具",
-            (
-                "已允许资料 agent 使用项目内只读工具："
-                f"{'、'.join(tool.name for tool in tools)}。"
-                "联网搜索本轮关闭，避免把项目外事实写进角色训练集。"
-            ),
-        )
+    _record_trace(
+        trace,
+        on_trace,
+        "启用项目工具",
+        (
+            "已允许资料 agent 使用项目内只读工具："
+            f"{'、'.join(tool.name for tool in tools)}。"
+            "联网搜索本轮关闭，避免把项目外事实写进角色训练集。"
+        ),
     )
     initial_messages = [
         SystemMessage(
@@ -280,13 +319,21 @@ def _call_material_agent_with_tools(
             )
         ),
     ]
-    history = run_tool_loop(provider, initial_messages, tools)
-    _append_tool_history_trace(history, trace)
-    trace.append(
-        _trace(
-            "整理工具证据",
-            f"工具循环结束，内部消息 {len(history)} 条；已压缩为结构化整理可用的证据摘要。",
+    def _tool_trace_callback(payload: dict[str, str]) -> None:
+        _record_trace(
+            trace,
+            on_trace,
+            payload.get("title", "工具轨迹"),
+            payload.get("content", ""),
+            node=payload.get("node", "tool_loop"),
         )
+
+    history = run_tool_loop(provider, initial_messages, tools, trace_callback=_tool_trace_callback)
+    _record_trace(
+        trace,
+        on_trace,
+        "整理工具证据",
+        f"工具循环结束，内部消息 {len(history)} 条；已压缩为结构化整理可用的证据摘要。",
     )
     return call_structured(
         provider,
@@ -298,6 +345,7 @@ def _call_material_agent_with_tools(
 
 def build_role_material_brief_with_trace(
     snapshot: RoleModelSnapshotPayload,
+    on_trace: Callable[[RoleMaterialTraceItemPayload], None] | None = None,
 ) -> tuple[RoleMaterialBriefPayload, list[RoleMaterialTraceItemPayload]]:
     """调用带工具能力的资料 agent，返回训练档案和可视化轨迹。
 
@@ -309,20 +357,27 @@ def build_role_material_brief_with_trace(
     cached = _BRIEF_CACHE.get(fingerprint)
     if cached is not None:
         brief, trace = cached
+        if on_trace is not None:
+            for item in trace:
+                try:
+                    on_trace(item)
+                except Exception:
+                    pass
         return brief, list(trace)
 
-    trace: list[RoleMaterialTraceItemPayload] = [
-        _trace(
-            "读取角色快照",
-            (
-                f"角色：{snapshot.character_name}；关系 {len(snapshot.relations)} 条；"
-                f"跨图引用 {len(snapshot.cross_references)} 条；相关节点 {len(snapshot.related_nodes)} 个。"
-            ),
-        )
-    ]
+    trace: list[RoleMaterialTraceItemPayload] = []
+    _record_trace(
+        trace,
+        on_trace,
+        "读取角色快照",
+        (
+            f"角色：{snapshot.character_name}；关系 {len(snapshot.relations)} 条；"
+            f"跨图引用 {len(snapshot.cross_references)} 条；相关节点 {len(snapshot.related_nodes)} 个。"
+        ),
+    )
     fallback = _fallback_role_material_brief(snapshot)
     try:
-        agent_brief = _call_material_agent_with_tools(snapshot, trace)
+        agent_brief = _call_material_agent_with_tools(snapshot, trace, on_trace)
     except Exception as exc:  # noqa: BLE001
         logger.info(
             "role_material_brief 工具 agent 失败，使用规则兜底：%s/%s %s",
@@ -331,32 +386,32 @@ def build_role_material_brief_with_trace(
             exc,
         )
         agent_brief = None
-        trace.append(
-            _trace(
-                "切换规则兜底",
-                f"资料 agent 或工具循环暂时不可用，已使用本地规则整理。错误：{exc}",
-            )
+        _record_trace(
+            trace,
+            on_trace,
+            "切换规则兜底",
+            f"资料 agent 或工具循环暂时不可用，已使用本地规则整理。错误：{exc}",
         )
 
     if agent_brief is None:
-        trace.append(
-            _trace(
-                "生成整理结果",
-                "结构化输出为空，已保留角色字段、关系、跨图引用和项目 seed 的规则摘要。",
-            )
+        _record_trace(
+            trace,
+            on_trace,
+            "生成整理结果",
+            "结构化输出为空，已保留角色字段、关系、跨图引用和项目 seed 的规则摘要。",
         )
         _BRIEF_CACHE[fingerprint] = (fallback, list(trace))
         return fallback, trace
 
     brief = _merge_with_fallback(agent_brief, fallback)
-    trace.append(
-        _trace(
-            "生成整理结果",
-            (
-                f"已形成训练档案：事实 {len(brief.known_facts)} 条，"
-                f"关系 {len(brief.relationships)} 条，样本规划 {len(brief.sample_plan)} 类。"
-            ),
-        )
+    _record_trace(
+        trace,
+        on_trace,
+        "生成整理结果",
+        (
+            f"已形成训练档案：事实 {len(brief.known_facts)} 条，"
+            f"关系 {len(brief.relationships)} 条，样本规划 {len(brief.sample_plan)} 类。"
+        ),
     )
     _BRIEF_CACHE[fingerprint] = (brief, list(trace))
     return brief, trace

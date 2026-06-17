@@ -6,6 +6,7 @@ import {
   getRoleModelJob,
   getRoleModelOverview,
   startRoleModelTraining,
+  streamRoleMaterialBrief,
   streamRoleChat,
   type RoleChatMessageDto,
   type RoleModelJobDto,
@@ -33,9 +34,11 @@ const selectedJobId = ref('')
 
 // 页面级状态。这里刻意拆开 loading/training/history/chatting，避免一个操作锁住整页。
 const isLoading = ref(false)
+const isMaterialLoading = ref(false)
 const isTraining = ref(false)
 const isHistoryLoading = ref(false)
 const error = ref('')
+const materialError = ref('')
 
 // 角色聊天输入与流式输出状态。streamingReply 只保存正在流式到达的 assistant 文本，
 // 流结束后才落入 chatMessages，避免半条消息被当成正式历史传回后端。
@@ -51,6 +54,7 @@ const jobSelectEl = ref<HTMLElement | null>(null)
 
 // 训练状态轮询定时器。只在 queued/running 状态启用，任务完成或失败后立即清理。
 let pollTimer: ReturnType<typeof window.setInterval> | null = null
+let materialAbortController: AbortController | null = null
 
 // 角色资料区域直接读取 overview 中的快照和资料整理稿；二者都由主后端从数据库生成。
 const snapshot = computed(() => overview.value?.snapshot ?? null)
@@ -174,6 +178,74 @@ function stopPolling() {
 }
 
 /**
+ * 停止资料 agent 的 SSE 流。
+ *
+ * overview 首屏不再等待资料整理；资料 agent 作为独立流运行。切换角色、刷新页面数据或卸载组件时
+ * 需要主动 abort，避免旧角色的 trace 回写到新角色页面。
+ */
+function stopMaterialStream() {
+  if (materialAbortController) {
+    materialAbortController.abort()
+    materialAbortController = null
+  }
+  isMaterialLoading.value = false
+}
+
+/**
+ * 单独流式运行资料 agent，并实时写入思考过程和最终整理稿。
+ *
+ * 这个请求不参与首屏 loading，也不阻塞已有模型列表、训练日志和角色对话。trace_item 到达时立即
+ * 追加到 overview.material_trace；material_brief 到达时再更新资料整理稿。
+ */
+async function loadMaterialBriefStream() {
+  if (!overview.value) return
+  stopMaterialStream()
+  const controller = new AbortController()
+  materialAbortController = controller
+  isMaterialLoading.value = true
+  materialError.value = ''
+  overview.value = {
+    ...overview.value,
+    material_trace: [],
+  }
+
+  try {
+    await streamRoleMaterialBrief(
+      projectId.value,
+      props.charId,
+      (event) => {
+        if (!overview.value) return
+        if (event.type === 'trace_item') {
+          overview.value = {
+            ...overview.value,
+            material_trace: [
+              ...(overview.value.material_trace ?? []),
+              { node: event.node, title: event.title, content: event.content },
+            ],
+          }
+        } else if (event.type === 'material_brief') {
+          overview.value = {
+            ...overview.value,
+            material_brief: event.brief,
+          }
+        } else if (event.type === 'error') {
+          materialError.value = event.message
+        }
+      },
+      controller.signal,
+    )
+  } catch (e) {
+    if (controller.signal.aborted) return
+    materialError.value = e instanceof Error ? e.message : '资料 agent 整理失败'
+  } finally {
+    if (materialAbortController === controller) {
+      materialAbortController = null
+      isMaterialLoading.value = false
+    }
+  }
+}
+
+/**
  * 判断任务是否还需要轮询。
  *
  * 只有 queued/running 会继续变化；succeeded/failed 都是终态，继续轮询只是浪费请求。
@@ -205,6 +277,8 @@ function startPolling() {
 async function loadOverview() {
   isLoading.value = true
   error.value = ''
+  materialError.value = ''
+  stopMaterialStream()
   try {
     const data = await getRoleModelOverview(projectId.value, props.charId)
     overview.value = data
@@ -217,6 +291,8 @@ async function loadOverview() {
         data.jobs[0]?.id ??
         ''
     }
+
+    void loadMaterialBriefStream()
 
     // 选中任务确定后，读取该任务绑定的远程聊天记录；如果任务不是 succeeded，
     // loadSelectedHistory 会自动清空聊天区。
@@ -253,8 +329,8 @@ async function refreshJob() {
 /**
  * 创建新的角色 LoRA 训练任务。
  *
- * 点击后主后端会重新导出角色 snapshot 和 material_brief，再交给远程服务生成数据
- * 和启动训练。返回 job 后立刻选中新任务，并开始轮询。
+ * 点击后主后端会重新导出角色 snapshot，并优先使用已缓存的资料整理稿；如果资料 agent 还没完成，
+ * 则用规则兜底 brief 先启动训练，避免训练按钮被资料整理阻塞。
  */
 async function handleTrain() {
   if (!canTrain.value) return
@@ -352,6 +428,7 @@ function backToCharacter() {
 watch(
   () => props.charId,
   () => {
+    stopMaterialStream()
     selectedJobId.value = ''
     chatMessages.value = []
     void loadOverview()
@@ -373,6 +450,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopPolling()
+  stopMaterialStream()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
 </script>
@@ -419,6 +497,12 @@ onBeforeUnmount(() => {
             事实：{{ materialBrief.known_facts.slice(0, 3).join('；') }}
           </span>
         </div>
+        <p v-if="isMaterialLoading" class="role-model__hint">
+          资料 agent 正在整理角色资料，训练任务和角色对话可以先使用。
+        </p>
+        <p v-if="materialError" class="role-model__error role-model__error--inline">
+          {{ materialError }}
+        </p>
         <AgentTracePanel
           v-if="materialTrace.length"
           class="role-model__trace"
@@ -433,7 +517,7 @@ onBeforeUnmount(() => {
         <header class="role-model__panel-head">
           <h2>LoRA 训练</h2>
           <button type="button" class="role-model__primary" :disabled="!canTrain" @click="handleTrain">
-            {{ isTraining ? '启动中' : '重新整理并训练' }}
+            {{ isTraining ? '启动中' : '开始训练' }}
           </button>
         </header>
         <label class="role-model__select">
@@ -921,6 +1005,11 @@ onBeforeUnmount(() => {
   margin: 0 0 12px;
   color: #dc2626;
   font-size: 13px;
+}
+
+.role-model__error--inline {
+  margin-top: 10px;
+  margin-bottom: 0;
 }
 
 @media (max-width: 860px) {
