@@ -7,10 +7,10 @@ import { graphDtoToSnapshot, snapshotToSaveDto } from '../utils/graphTransform'
 const CANVAS_AUTO_SAVE_DELAY_MS = 1000
 
 /**
- * Injectable load / save strategy (first_revision phase 3).
+ * 可注入的加载 / 保存策略（first_revision 第 3 阶段）。
  *
- * By default it uses the default-project dimension (AppShell's original single-canvas behavior); the three workspace views
- * inject loadSubgraph / saveSubgraph at the sub-graph dimension, thereby reusing this composable's snapshot + debounced save logic.
+ * 默认使用 default-project 维度（AppShell 原本的单画布行为）；三个工作区视图会注入
+ * 子图维度的 loadSubgraph / saveSubgraph，从而复用这里的快照和防抖保存逻辑。
  */
 export interface GraphPersistenceLoaders {
   load: () => Promise<GraphDto>
@@ -18,11 +18,11 @@ export interface GraphPersistenceLoaders {
 }
 
 /**
- * Maintains the load / save / auto-save semantics of the workspace graph.
+ * 维护工作区图谱的加载、保存和自动保存语义。
  *
- * Every entry that actually mutates graphSnapshot goes through setGraphSnapshot; auto-save uses a single debounce
- * queue to avoid concurrent overwrites. After staging is accepted, clearAutoSave is called to drop stale pending snapshots,
- * preventing an old snapshot from overwriting the new nodes / new edges the backend just persisted.
+ * 任何真正修改 graphSnapshot 的入口都经过 setGraphSnapshot；自动保存使用单个防抖队列，
+ * 避免并发覆盖。暂存项接受后会调用 clearAutoSave 丢弃过期的待保存快照，
+ * 防止旧快照覆盖后端刚持久化的新节点 / 新边。
  */
 export function useGraphPersistence(
   applyIndexingStatus: (indexing?: IndexingStatusDto) => void,
@@ -50,7 +50,7 @@ export function useGraphPersistence(
     return JSON.parse(JSON.stringify({ nodes: s.nodes, edges: s.edges }))
   }
 
-  /** Record the current snapshot as an undo checkpoint (call BEFORE applying a user edit). */
+  /** 把当前快照记录为撤销检查点；应在应用用户编辑前调用。 */
   function recordHistory() {
     undoStack.value.push(cloneSnapshot(graphSnapshot.value))
     if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
@@ -118,7 +118,7 @@ export function useGraphPersistence(
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer)
     }
-    saveState.value = 'Unsaved changes'
+    saveState.value = '有未保存修改'
     autoSaveTimer = setTimeout(() => {
       void persistGraph(false)
     }, delayMs)
@@ -142,13 +142,13 @@ export function useGraphPersistence(
       undoStack.value = []
       redoStack.value = []
       isGraphReady.value = true
-      saveState.value = 'Loaded'
+      saveState.value = '已加载'
       applyIndexingStatus(graph.indexing)
       return { initialNodeId: snapshot.nodes[0]?.id ?? '' }
     } catch (error) {
       isGraphReady.value = false
       saveState.value =
-        error instanceof Error ? `Load failed: ${error.message}` : 'Load failed'
+        error instanceof Error ? `加载失败: ${error.message}` : '加载失败'
       return { initialNodeId: '' }
     }
   }

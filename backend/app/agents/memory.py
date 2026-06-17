@@ -1,16 +1,13 @@
-"""Multi-layer memory prompt assembler.
+"""多层记忆 prompt 组装器。
 
-Assembles the six context blocks in AgentState (world_brief / key_facts /
-conversation_summary / recent_messages / current_nodes / merged_context) into a
-fixed-structure brief, so every agent node's HumanMessage injects background
-information in the same format.
+将 AgentState 中的六类上下文块（world_brief / key_facts / conversation_summary /
+recent_messages / current_nodes / merged_context）组装成固定结构摘要，让每个 agent 节点的
+HumanMessage 都以同一格式注入背景信息。
 
-Upgrades (v2):
-- Added a "core facts layer": key_facts accumulated and extracted by
-  summary_compress, never lost across turns, preventing early key settings from
-  being overwritten by the rolling summary after a long conversation
-- intent-aware assembly: small_talk uses a trimmed version to save tokens, while
-  the other intents use the full set
+升级点（v2）：
+- 新增“核心事实层”：由 summary_compress 累积并抽取 key_facts，跨轮不会丢失，避免长对话后
+  早期关键设定被滚动摘要覆盖。
+- 按意图组装：small_talk 使用精简版本节省 token，其他意图使用完整上下文。
 """
 
 from __future__ import annotations
@@ -44,13 +41,13 @@ def _format_node_body(node: RagCurrentNodePayload, limit: int) -> str:
         )
         if field_text:
             parts.append(field_text)
-    body = " | ".join(parts) if parts else "(no body yet)"
+    body = " | ".join(parts) if parts else "（暂无正文）"
     return _truncate(body, limit)
 
 
 def _format_recent_messages(messages: list[dict]) -> str:
     if not messages:
-        return "(none)"
+        return "（无）"
     lines: list[str] = []
     for message in messages:
         role = message.get("role", "?")
@@ -61,7 +58,7 @@ def _format_recent_messages(messages: list[dict]) -> str:
 
 def _format_merged_context(items: list[RagMergedContextItem]) -> str:
     if not items:
-        return "(none)"
+        return "（无）"
     return "\n".join(
         f"- [{item.id}] {item.title} ({item.type}): "
         f"{_truncate(item.content, _MERGED_TRUNCATE)}"
@@ -75,8 +72,8 @@ def _format_current_nodes(nodes: list[RagCurrentNodePayload]) -> str:
     if len(nodes) == 1:
         node = nodes[0]
         body = _format_node_body(node, _CURRENT_NODE_TRUNCATE)
-        return f"【Current Node】\n[{node.id}] {node.title} ({node.type}): {body}"
-    lines = [f"【Current Nodes ({len(nodes)} total, the user wants to focus on all of them)】"]
+        return f"【当前节点】\n[{node.id}] {node.title} ({node.type}): {body}"
+    lines = [f"【当前节点（共 {len(nodes)} 个，用户希望同时关注它们）】"]
     for node in nodes:
         body = _format_node_body(node, _CURRENT_NODE_TRUNCATE)
         lines.append(f"- [{node.id}] {node.title} ({node.type}): {body}")
@@ -84,26 +81,24 @@ def _format_current_nodes(nodes: list[RagCurrentNodePayload]) -> str:
 
 
 def format_current_nodes(nodes: list[RagCurrentNodePayload]) -> str:
-    """Public wrapper for quoted-node blocks outside build_memory_block."""
+    """供 build_memory_block 外部复用的引用节点块包装函数。"""
     section = _format_current_nodes(nodes)
-    return section if section else "(no quoted nodes)"
+    return section if section else "（没有引用节点）"
 
 
 def _format_key_facts(facts: list[str]) -> str:
-    """Accumulated core facts, keeping only the most recent _KEY_FACTS_MAX entries to avoid unbounded growth."""
+    """累积核心事实，仅保留最近的 _KEY_FACTS_MAX 条，避免无界增长。"""
     if not facts:
-        return "(nothing accumulated yet)"
+        return "（尚未积累）"
     tail = facts[-_KEY_FACTS_MAX:]
     return "\n".join(f"- {fact}" for fact in tail)
 
 
 def build_memory_block(state: AgentState, intent: str | None = None) -> str:
-    """Selectively assemble multi-layer memory sections by intent.
+    """根据意图选择性组装多层记忆片段。
 
-    small_talk only needs the worldbuilding outline + recent conversation, not
-    the canvas retrieval results or the core facts layer, which saves tokens and
-    keeps the LLM from misusing project character names in chit-chat replies.
-    Other intents use the full set.
+    small_talk 只需要世界观概要和最近对话，不需要画布检索结果或核心事实层；这样能节省 token，
+    并避免 LLM 在闲聊回复中误用项目角色名。其他意图使用完整上下文。
     """
     world_brief = (state.get("world_brief") or "").strip()
     seed_context = (state.get("seed_context") or "").strip()
@@ -113,27 +108,27 @@ def build_memory_block(state: AgentState, intent: str | None = None) -> str:
     merged = state.get("merged_context") or []
     current_node_section = _format_current_nodes(state.get("current_nodes") or [])
 
-    seed_section = f"【Project Seed (snapshot of the current full picture)】\n{seed_context}" if seed_context else ""
+    seed_section = f"【项目 Seed（当前全貌快照）】\n{seed_context}" if seed_context else ""
 
     if intent == "small_talk":
-        sections = [f"【Worldbuilding Outline】\n{world_brief or '(nothing accumulated yet)'}"]
+        sections = [f"【世界观概要】\n{world_brief or '（尚未积累）'}"]
         if seed_section:
             sections.append(seed_section)
-        sections.append(f"【Recent Conversation】\n{_format_recent_messages(recent)}")
+        sections.append(f"【最近对话】\n{_format_recent_messages(recent)}")
         if current_node_section:
             sections.append(current_node_section)
         return "\n\n".join(sections)
 
     sections = [
-        f"【Worldbuilding Outline】\n{world_brief or '(nothing accumulated yet)'}",
+        f"【世界观概要】\n{world_brief or '（尚未积累）'}",
     ]
     if seed_section:
         sections.append(seed_section)
     sections += [
-        f"【Core Facts Layer (accumulated across turns, never overwritten by the summary)】\n{_format_key_facts(key_facts)}",
-        f"【Past Conversation Summary】\n{summary or '(none)'}",
-        f"【Recent Conversation】\n{_format_recent_messages(recent)}",
-        f"【Canvas-Related Nodes】\n{_format_merged_context(merged)}",
+        f"【核心事实层（跨轮累积，不会被摘要覆盖）】\n{_format_key_facts(key_facts)}",
+        f"【过往对话摘要】\n{summary or '（无）'}",
+        f"【最近对话】\n{_format_recent_messages(recent)}",
+        f"【画布相关节点】\n{_format_merged_context(merged)}",
     ]
     if current_node_section:
         sections.append(current_node_section)

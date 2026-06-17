@@ -2,8 +2,8 @@
 import type { QuotedNodeRef } from '../../stores/useComposerStore'
 
 /**
- * Small quoted-node chip in the bottom composer (second_revision change C).
- * Shows a type icon + node name, with an X to remove it.
+ * 底部输入框中的引用节点小标签（second_revision 变更 C）。
+ * 展示类型图标 + 节点名称，并提供 X 按钮移除。
  */
 defineProps<{ node: QuotedNodeRef; removable?: boolean }>()
 const emit = defineEmits<{ remove: [id: string] }>()

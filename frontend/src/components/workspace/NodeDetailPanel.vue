@@ -4,12 +4,10 @@ import { loadRagContext, type RagContextResponseDto } from '../../api/graphApi'
 import type { CreativeFlowNode, CreativeNodeData } from '../../types/node'
 
 /**
- * Node detail panel.
+ * 节点详情面板。
  *
- * Hosts node field editing, the Agent mock placeholder, and the RAG debug view at
- * once; all three only make sense when "a single node is selected", so they are
- * merged into the same child component, and switching nodes clears the temporary
- * preview via watch(props.selectedNode.id).
+ * 同时承载节点字段编辑、智能体 mock 占位和 RAG 调试视图；三者都只有在“选中单个节点”时才有意义，
+ * 因此合并在同一个子组件里。切换节点时会通过 watch(props.selectedNode.id) 清空临时预览。
  */
 const props = defineProps<{
   selectedNode: CreativeFlowNode
@@ -26,8 +24,7 @@ const ragResult = ref<RagContextResponseDto | null>(null)
 const ragError = ref('')
 const isRagLoading = ref(false)
 
-/* The custom dropdown does not use a native select, so the component must track the
-   open state itself and collapse on outside clicks. */
+/* 自定义下拉框没有使用原生 select，因此组件需要自行跟踪展开状态，并在外部点击时收起。 */
 const isNodeStatusSelectOpen = ref(false)
 
 function closeAllSelects(e: MouseEvent) {
@@ -76,11 +73,10 @@ function handleDeleteNode() {
 }
 
 /**
- * Generate a placeholder Agent result.
+ * 生成占位智能体结果。
  *
- * The current mock only confirms the sidebar interaction and result presentation;
- * it does not auto-write into the node body, preserving the product boundary where
- * the user manually adopts generated content.
+ * 当前 mock 只用于确认侧栏交互和结果展示；不会自动写入节点正文，
+ * 保留“用户手动采纳生成内容”的产品边界。
  */
 function runAgentMock(type: 'inspiration' | 'research' | 'structure') {
   if (type === 'inspiration') {
@@ -116,7 +112,7 @@ function runAgentMock(type: 'inspiration' | 'research' | 'structure') {
     {
       type: 'structure',
       summary: '未来这里会把多个节点整理成角色卡、关系图或剧情框架。',
-      status: '结构 Agent 尚未连接',
+      status: '结构智能体尚未连接',
     },
     null,
     2,
@@ -128,11 +124,10 @@ function summarizeContent(content: string) {
 }
 
 /**
- * Load the RAG debug context for the current node.
+ * 加载当前节点的 RAG 调试上下文。
  *
- * Only displays the graph relations, vector context, and final prompt retrieved by
- * the backend; it does not call the LLM, nor does it write results back into the
- * node content.
+ * 只展示后端返回的图关系、向量上下文和最终 prompt；不会调用 LLM，
+ * 也不会把结果写回节点正文。
  */
 async function handleLoadRagContext() {
   try {
@@ -152,8 +147,7 @@ async function handleLoadRagContext() {
   }
 }
 
-/* Clear the temporary preview when switching nodes, so the previous node's Agent/RAG
-   results aren't mistaken for the current context. */
+/* 切换节点时清空临时预览，避免把上一个节点的智能体 / RAG 结果误认为当前上下文。 */
 watch(
   () => props.selectedNode.id,
   () => {
@@ -236,7 +230,7 @@ watch(
     </section>
 
     <section class="detail-panel">
-      <h3>Agent 操作占位</h3>
+      <h3>智能体操作占位</h3>
       <div class="agent-actions">
         <button type="button" @click="runAgentMock('inspiration')">灵感</button>
         <button type="button" @click="runAgentMock('research')">资料</button>
@@ -246,7 +240,7 @@ watch(
     </section>
 
     <section class="detail-panel rag-panel">
-      <h3>RAG / Agent 调试</h3>
+      <h3>RAG / 智能体调试</h3>
       <label for="rag-query">用户请求</label>
       <div class="input-wrapper">
         <textarea
@@ -256,7 +250,7 @@ watch(
           placeholder="留空则使用当前节点标题和正文作为检索问题"
         />
       </div>
-      <!-- This button only inspects the context; it does not call the LLM, nor does it write results into the node body. -->
+      <!-- 该按钮只查看上下文，不调用 LLM，也不会把结果写入节点正文。 -->
       <button type="button" :disabled="isRagLoading" @click="handleLoadRagContext">
         {{ isRagLoading ? '正在加载 RAG 上下文…' : '查看 RAG 上下文' }}
       </button>
@@ -286,19 +280,19 @@ watch(
           <summary>向量上下文</summary>
           <p v-if="ragResult.vector_context.length === 0" class="rag-empty">暂无向量检索结果</p>
           <article v-for="item in ragResult.vector_context" :key="item.id" class="rag-card">
-            <strong>score {{ item.score.toFixed(2) }}</strong>
+            <strong>分数 {{ item.score.toFixed(2) }}</strong>
             <span>{{ item.type }} · {{ item.title }}</span>
             <p>{{ summarizeContent(item.content) }}</p>
           </article>
           <p class="rag-debug-line">
-            vector_store: {{ ragResult.debug.vector_store }}
+            向量库: {{ ragResult.debug.vector_store }}
             <span v-if="ragResult.debug.vector_error"> / {{ ragResult.debug.vector_error }}</span>
           </p>
         </details>
 
         <details>
-          <summary>最终 Prompt</summary>
-          <!-- Show the user the context the AI will receive first, to help verify that retrieval and assembly are reasonable. -->
+          <summary>最终提示词</summary>
+          <!-- 先展示 AI 将收到的上下文，便于确认检索与组装是否合理。 -->
           <pre class="prompt-preview">{{ ragResult.prompt }}</pre>
         </details>
       </div>

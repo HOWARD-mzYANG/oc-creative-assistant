@@ -1,13 +1,13 @@
 /**
- * Project / sub-graph / seed related types (first_revision, phase 1).
+ * 项目 / 子图 / seed 相关类型（first_revision 第 1 阶段）。
  *
- * Field naming is aligned with the backend DTO (snake_case) to avoid an extra conversion layer at the API boundary.
+ * 字段命名与后端 DTO（snake_case）保持一致，避免在 API 边界额外做一层转换。
  */
 
-/** sub-graph section. */
+/** 子图分区。 */
 export type GraphSection = 'plot' | 'character' | 'world'
 
-/** Project seed (decision 3). */
+/** 项目 seed（决策 3）。 */
 export interface ProjectSeed {
   id: string
   project_id: string
@@ -17,30 +17,30 @@ export interface ProjectSeed {
   created_at?: string | null
 }
 
-/** sub-graph metadata. */
+/** 子图元数据。 */
 export interface GraphInfo {
   id: string
   project_id: string
   section: GraphSection
 }
 
-/** 概览 information needed for project library cards. */
+/** 项目库卡片所需的概览信息。 */
 export interface ProjectSummary {
   id: string
   name: string
   description: string
-  /** Optional cover image as a base64 data URL. */
+  /** 可选封面图，格式为 base64 data URL。 */
   cover_image: string
   created_at?: string | null
   updated_at?: string | null
 }
 
-/** Project detail: includes the three sub-graph ids and the latest seed. */
+/** 项目详情：包含三个子图 ID 和最新 seed。 */
 export interface ProjectDetail {
   id: string
   name: string
   description: string
-  /** Optional cover image as a base64 data URL. */
+  /** 可选封面图，格式为 base64 data URL。 */
   cover_image: string
   plot_graph_id: string | null
   character_graph_id: string | null
@@ -50,7 +50,7 @@ export interface ProjectDetail {
   updated_at?: string | null
 }
 
-/** Create project request body. */
+/** 创建项目请求体。 */
 export interface ProjectCreatePayload {
   name: string
   description?: string

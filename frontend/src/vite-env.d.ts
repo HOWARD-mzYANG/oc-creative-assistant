@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface Window {
-  /** Minimal runtime bridge injected by the Electron preload; may be absent during browser-based development. */
+  /** Electron preload 注入的最小运行时桥接；浏览器开发模式下可能不存在。 */
   ocDesktop?: {
     config: {
       backendUrl: string | null

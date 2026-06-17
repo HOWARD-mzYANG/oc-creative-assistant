@@ -19,7 +19,7 @@ function renderMarkdown(text: string): string {
 }
 
 /**
- * 独立对话模块：项目范围会话 + 主 LangGraph Agent。
+ * 独立对话模块：项目范围会话 + 主 LangGraph 智能体。
  * 后台抽取/暂存与工作区外壳使用相同 API。
  */
 const props = defineProps<{ projectId: string }>()
@@ -90,7 +90,7 @@ async function handleExit() {
   try {
     await rebuildProjectSeed(props.projectId)
   } catch {
-    /* Seed 重建失败不应阻塞退出 */
+    /* 项目种子重建失败不应阻塞退出 */
   }
   router.push('/')
 }
@@ -102,7 +102,7 @@ async function handleExit() {
       <button type="button" class="chat-workspace__exit" @click="handleExit">← 首页</button>
       <div class="chat-workspace__title-block">
         <span class="chat-workspace__title">{{ projectName }}</span>
-        <span class="chat-workspace__subtitle">主 Agent · 后台同步</span>
+        <span class="chat-workspace__subtitle">主智能体 · 后台同步</span>
       </div>
       <button
         type="button"
@@ -119,7 +119,7 @@ async function handleExit() {
       <section class="chat-workspace__chat">
         <div ref="streamRef" class="chat-workspace__stream">
           <p v-if="messages.length === 0 && !streamingReply && !isStreaming" class="chat-workspace__empty">
-            开始一场对话：主 Agent 会在后台引导创作、抽取实体并建议结构。
+            开始一场对话：主智能体会在后台引导创作、抽取实体并建议结构。
           </p>
 
           <div

@@ -21,7 +21,7 @@ const path = computed(() =>
 const edgePath = computed(() => path.value[0])
 const labelX = computed(() => path.value[1])
 const labelY = computed(() => path.value[2])
-/** EdgeProps.label is a union (string | VNode | …); only render plain-string labels. */
+/** EdgeProps.label 是联合类型（string | VNode | …）；这里只渲染普通字符串标签。 */
 const labelText = computed(() => (typeof props.label === 'string' ? props.label : ''))
 </script>
 

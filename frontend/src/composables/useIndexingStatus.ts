@@ -2,49 +2,49 @@ import { ref } from 'vue'
 import type { IndexingStatusDto } from '../api/graphApi'
 
 /**
- * Centralizes the translation and display of the backend embedding / ChromaDB sync status.
+ * 集中处理后端 embedding / ChromaDB 同步状态的翻译与展示。
  *
- * The status bar (indexState) gives a short phrase; the alert banner (indexingAlert) translates the detailed reason and
- * condenses the backend's raw exception into a hint the user can act on directly, avoiding exposing the entire API-error JSON to the UI.
+ * 状态栏（indexState）展示短句；警告条（indexingAlert）把详细原因整理成用户可处理的提示，
+ * 避免直接把完整 API 错误 JSON 暴露到界面上。
  */
 export function useIndexingStatus() {
   const indexingStatus = ref<IndexingStatusDto | undefined>()
   const indexingAlert = ref('')
-  const indexState = ref('Vector index not checked')
+  const indexState = ref('向量索引未检查')
 
   function simplifyError(error?: string | null) {
     if (!error) {
-      return 'Please check the embedding configuration in backend/.env.'
+      return '请检查 backend/.env 中的 embedding 配置。'
     }
     if (error.includes('invalid_api_key') || error.includes('Incorrect API key') || error.includes('401')) {
-      return 'Invalid API Key.'
+      return 'API Key 无效。'
     }
     if (error.toLowerCase().includes('timeout')) {
-      return 'The embedding service request timed out, please try again later.'
+      return 'embedding 服务请求超时，请稍后重试。'
     }
     if (error.includes('Connection') || error.includes('connect') || error.includes('network')) {
-      return 'Cannot connect to the embedding service, please check the network or base_url.'
+      return '无法连接 embedding 服务，请检查网络或 base_url。'
     }
     return error.length > 120 ? `${error.slice(0, 120)}...` : error
   }
 
   function formatState(indexing?: IndexingStatusDto) {
     if (!indexing || indexing.status === 'not_checked') {
-      return 'Vector index not checked'
+      return '向量索引未检查'
     }
     if (indexing.status === 'synced') {
-      return `Vector index synced ${indexing.indexed_nodes}/${indexing.expected_nodes}`
+      return `向量索引已同步 ${indexing.indexed_nodes}/${indexing.expected_nodes}`
     }
     return indexing.status === 'failed'
-      ? `Vector index failed ${indexing.indexed_nodes}/${indexing.expected_nodes}`
-      : `Vector index incomplete ${indexing.indexed_nodes}/${indexing.expected_nodes}`
+      ? `向量索引失败 ${indexing.indexed_nodes}/${indexing.expected_nodes}`
+      : `向量索引不完整 ${indexing.indexed_nodes}/${indexing.expected_nodes}`
   }
 
   function formatAlert(indexing: IndexingStatusDto) {
     const problem = simplifyError(indexing.error)
     const missingCount = indexing.missing_node_ids.length
-    const missingText = missingCount > 0 ? `There are currently ${missingCount} nodes still missing a usable vector.` : ''
-    return `SQLite was saved, but the vector index ${indexing.status === 'failed' ? 'failed' : 'is incomplete'}. ${problem} ${missingText}`.trim()
+    const missingText = missingCount > 0 ? `目前还有 ${missingCount} 个节点缺少可用向量。` : ''
+    return `SQLite 已保存，但向量索引${indexing.status === 'failed' ? '失败' : '不完整'}。${problem} ${missingText}`.trim()
   }
 
   function applyIndexingStatus(indexing?: IndexingStatusDto) {

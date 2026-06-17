@@ -15,11 +15,10 @@ interface Options {
   redo?: () => void
 }
 /**
- * Centralizes graph mutations triggered by the right detail panel and keyboard shortcuts.
+ * 集中处理右侧详情面板和键盘快捷键触发的图谱变更。
  *
- * All mutations enter the main flow via setGraphSnapshot, triggering the unified debounced auto-save; deleting a node
- * also removes its related edges, matching the backend's ondelete=CASCADE behavior. Keyboard shortcuts
- * keep the default text-editing semantics inside input controls.
+ * 所有变更都通过 setGraphSnapshot 进入主流程，并触发统一的防抖自动保存；删除节点时也会移除相关边，
+ * 与后端 ondelete=CASCADE 行为一致。键盘快捷键会保留输入控件内默认的文本编辑语义。
  */
 export function useGraphMutations(options: Options) {
   const { graphSnapshot, selectedNodeId, selectedEdgeId, setGraphSnapshot, scheduleAutoSave } = options
@@ -48,7 +47,7 @@ export function useGraphMutations(options: Options) {
     if (!node) {
       return
     }
-    const confirmed = window.confirm(`Are you sure you want to delete the node "${node.data.title}"? Its related edges will be deleted too.`)
+    const confirmed = window.confirm(`确定删除节点“${node.data.title}”吗？相关边也会一并删除。`)
     if (!confirmed) {
       return
     }

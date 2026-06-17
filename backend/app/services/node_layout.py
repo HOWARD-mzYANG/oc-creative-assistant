@@ -1,8 +1,7 @@
-"""Deterministic canvas placement helpers.
+"""确定性的画布节点摆放辅助函数。
 
-The LLM decides what to create; application code owns coordinates.  These
-helpers place newly-created nodes near a useful anchor while avoiding overlap
-with the existing nodes in the same subgraph.
+LLM 负责决定创建什么；应用代码负责坐标。这些辅助函数会把新建节点放在有用锚点附近，同时避免
+与同一子图中的已有节点重叠。
 """
 
 from __future__ import annotations
@@ -82,16 +81,16 @@ def find_free_node_position(
     graph_id: str | None,
     anchor_node_id: str | None = None,
 ) -> CanvasPosition:
-    """Return a non-overlapping position in the target subgraph.
+    """返回目标子图中的一个非重叠位置。
 
-    Args:
-        db: Current SQLAlchemy session.
-        project_id: Project boundary.
-        graph_id: Subgraph boundary; nodes in other subgraphs are ignored.
-        anchor_node_id: Optional node to place beside.
+    参数：
+        db: 当前 SQLAlchemy session。
+        project_id: 项目边界。
+        graph_id: 子图边界；其他子图中的节点会被忽略。
+        anchor_node_id: 可选锚点节点，新节点会优先放在它旁边。
 
-    Returns:
-        Top-left canvas coordinates for the new node.
+    返回：
+        新节点左上角的画布坐标。
     """
     nodes = _nodes_for_layout(db, project_id=project_id, graph_id=graph_id)
     anchor = (

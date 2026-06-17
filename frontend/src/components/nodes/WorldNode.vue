@@ -6,7 +6,7 @@ import NodeHandles from './NodeHandles.vue'
 import InlineEditableText from '../canvas/InlineEditableText.vue'
 
 /**
- * 世界观 node card. Title and summary support inline edit.
+ * 世界观节点卡片。标题和摘要支持行内编辑。
  */
 const props = defineProps<NodeProps<CreativeNodeData>>()
 const updateNodeData = inject<(id: string, patch: { title?: string; content?: string }) => void>(

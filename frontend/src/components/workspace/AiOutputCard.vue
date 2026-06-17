@@ -2,17 +2,17 @@
 import type { AiOutput } from '../../stores/useAiOutputStore'
 
 /**
- * A single AI output card (second_revision change B / W5).
- * Source-type tag at the top + collapse/expand; content can be long or short.
+ * 单张 AI 输出卡片（second_revision 变更 B / W5）。
+ * 顶部展示来源类型标签，并支持折叠 / 展开；内容可长可短。
  */
 defineProps<{ output: AiOutput }>()
 const emit = defineEmits<{ toggle: [id: string] }>()
 
 const TYPE_META: Record<string, { icon: string; label: string }> = {
-  search: { icon: '🌐', label: 'Web search' },
-  rag: { icon: '📚', label: 'Memory' },
-  question: { icon: '💡', label: 'Prompt' },
-  feedback: { icon: '✨', label: 'Feedback' },
+  search: { icon: '🌐', label: '网页搜索' },
+  rag: { icon: '📚', label: '记忆' },
+  question: { icon: '💡', label: '提示' },
+  feedback: { icon: '✨', label: '反馈' },
 }
 </script>
 

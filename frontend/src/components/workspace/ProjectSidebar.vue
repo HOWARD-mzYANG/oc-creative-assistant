@@ -11,11 +11,10 @@ import type { CreativeFlowNode, CreativeNodeType } from '../../types/node'
 import { nodeTypeOptions } from '../../utils/nodeFactory'
 
 /**
- * Left-hand project sidebar.
+ * 左侧项目侧边栏。
  *
- * Displays the node types that can be created, project-memory navigation, and a
- * lightweight search entry point; graph writes are still handled centrally by
- * AppShell, while the sidebar only emits create and select intents.
+ * 展示可创建的节点类型、项目记忆导航和轻量搜索入口；图谱写入仍由 AppShell 集中处理，
+ * 侧边栏只负责发出创建和选择意图。
  */
 const props = defineProps<{
   projectId: string
@@ -68,13 +67,13 @@ const memoryGroups = computed(() =>
 
 
 /**
- * Truncate the node body so long settings don't crowd the left-hand memory list.
+ * 截断节点正文，避免过长设定挤满左侧记忆列表。
  *
- * Args:
- *   content: The node's full body text.
+ * 参数：
+ *   content: 节点完整正文。
  *
- * Returns:
- *   A short summary for the card preview.
+ * 返回：
+ *   卡片预览中展示的短摘要。
  */
 function summarizeContent(content: string) {
   if (!content.trim()) {
@@ -97,10 +96,10 @@ function getMemorySourceLabel(source: string) {
 }
 
 /**
- * Request creation of a node of the given type.
+ * 请求创建指定类型的节点。
  *
- * Args:
- *   nodeType: The node type the user selected in the left toolbar.
+ * 参数：
+ *   nodeType: 用户在左侧工具栏选择的节点类型。
  */
 function handleCreateNode(nodeType: CreativeNodeType) {
   emit('createNode', nodeType)
@@ -111,10 +110,9 @@ function handleSelectNode(nodeId: string) {
 }
 
 /**
- * Load related memories for the currently selected node.
+ * 加载当前选中节点的相关记忆。
  *
- * The left panel only shows the merged, concise memory cards; the full prompt and
- * vector debug info remain in the right-hand panel.
+ * 左侧面板只展示合并后的简洁记忆卡片；完整 prompt 和向量调试信息仍保留在右侧面板。
  */
 async function handleLoadRelatedMemory() {
   if (!props.selectedNode) {
@@ -141,10 +139,9 @@ async function handleLoadRelatedMemory() {
 }
 
 /**
- * Run a semantic search across project-level memory.
+ * 在项目级记忆中执行语义搜索。
  *
- * This entry point does not depend on the current node, so it suits searching
- * existing lore directly by question; indexing errors only show a short hint.
+ * 这个入口不依赖当前节点，适合直接按问题搜索已有设定；索引错误只展示短提示。
  */
 async function handleSearchMemory() {
   const query = memorySearchQuery.value.trim()
@@ -185,7 +182,7 @@ watch(
 </script>
 
 <template>
-  <!-- Left sidebar: node types, project-memory navigation, and a lightweight search entry point -->
+  <!-- 左侧栏：节点类型、项目记忆导航和轻量搜索入口。 -->
   <aside class="project-sidebar">
     <section class="sidebar-section">
       <h2>节点类型</h2>
@@ -208,7 +205,7 @@ watch(
 
     <!-- <section class="sidebar-section"> -->
       <!-- <div class="section-header">
-        <h2>Lore Memory</h2>
+        <h2>设定记忆</h2>
         <span class="memory-health" :class="memoryHealth.tone">{{ memoryHealth.label }}</span>
       </div>
       <div class="memory-stats">

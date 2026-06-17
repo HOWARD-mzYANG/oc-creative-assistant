@@ -120,7 +120,7 @@ export function createNodeData(type: CreativeNodeType): CreativeNodeData {
 /**
  * 创建新的画布节点。
  *
- * 在 PoC 阶段，点击节点工具栏会直接生成本地节点，不触发 Agent、RAG 或后端 LLM 调用。
+ * 在 PoC 阶段，点击节点工具栏会直接生成本地节点，不触发智能体、RAG 或后端 LLM 调用。
  *
  * 参数：
  *   type: 业务节点类型。

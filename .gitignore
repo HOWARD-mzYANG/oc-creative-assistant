@@ -220,6 +220,7 @@ electron/.bundle/
 # === Local drafts / one-off scripts / editor leftovers ===
 /proposal.md
 /graph.json
+/大作业*
 backend/scripts/
 backend/test_main.http
 .vscode/

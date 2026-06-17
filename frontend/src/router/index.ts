@@ -1,14 +1,14 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 /**
- * Application routing skeleton (stage 0).
+ * 应用路由骨架（第 0 阶段）。
  *
- * Target product shape: home (HomeLanding) → chat entry / library →
- * ChatWorkspace / Workspace. `/workspace/:projectId` is served by
- * `WorkspaceShell.vue` plus its three sub-route views.
+ * 产品入口形态：首页（HomeLanding）→ 对话入口 / 项目库 →
+ * ChatWorkspace / Workspace。`/workspace/:projectId` 由
+ * `WorkspaceShell.vue` 和三个子路由视图承载。
  *
- * Desktop uses hash history: Electron loads the bundled index.html via file://,
- * and hash mode doesn't depend on server-side routing, so a refresh won't 404.
+ * 桌面端使用 hash history：Electron 通过 file:// 加载打包后的 index.html，
+ * hash 模式不依赖服务端路由，刷新时不会 404。
  */
 export const router = createRouter({
   history: createWebHashHistory(),

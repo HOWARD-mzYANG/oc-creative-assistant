@@ -3,12 +3,11 @@ import { ref } from 'vue'
 import type { AppliedEntityDto } from '../../api/chatApi'
 
 /**
- * Inline entity card in the chat.
+ * 聊天中的行内实体卡片。
  *
- * The backend already persists extracted entities by default, so this only does
- * "notify + optional edit/undo":
- * - Collapsed: a single line like "✅ 已添加 角色 X"; if not expanded it stays added by default;
- * - Expanded: edit title/body -> save (update), or reject (delete) to undo this addition.
+ * 后端默认已经持久化抽取出的实体，因此这里负责“通知 + 可选编辑 / 撤销”：
+ * - 折叠态：单行展示，例如“✅ 已添加 角色 X”；不展开时默认保留新增；
+ * - 展开态：编辑标题 / 正文后保存（update），或拒绝（delete）来撤销本次新增。
  */
 const props = defineProps<{ item: AppliedEntityDto }>()
 const emit = defineEmits<{

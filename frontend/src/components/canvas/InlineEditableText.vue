@@ -2,11 +2,10 @@
 import { nextTick, ref } from 'vue'
 
 /**
- * Generic inline edit text component.
+ * 通用行内文本编辑组件。
  *
- * Shows plain text by default; click to enter edit mode: Enter / blur saves, Esc cancels.
- * Both the edit and display elements carry `nodrag nopan` to keep Vue Flow from
- * intercepting the mouse and causing drag conflicts.
+ * 默认展示普通文本；点击进入编辑模式：Enter / blur 保存，Esc 取消。
+ * 编辑态和展示态都带 `nodrag nopan`，避免 Vue Flow 截获鼠标事件导致拖拽冲突。
  */
 const props = defineProps<{
   modelValue: string

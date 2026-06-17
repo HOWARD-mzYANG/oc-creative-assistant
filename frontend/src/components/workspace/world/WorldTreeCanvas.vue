@@ -26,7 +26,7 @@ const emit = defineEmits<{
       还没有笔记，请在“笔记”视图添加根笔记。
     </p>
     <p v-else-if="active" class="world-tree-canvas__hint">
-      Hierarchy only · click a node to edit in Notes view
+      仅展示层级 · 点击节点回到笔记视图编辑
     </p>
   </div>
 </template>

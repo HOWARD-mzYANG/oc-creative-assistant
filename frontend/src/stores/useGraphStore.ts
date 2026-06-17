@@ -4,11 +4,10 @@ import type { GraphEdgeDto, GraphNodeDto } from '../api/graphApi'
 import { loadSubgraph } from '../api/graphApi'
 
 /**
- * Currently open sub-graph store (first_revision decision 6 / phase 3).
+ * 当前打开子图的状态仓库（first_revision 决策 6 / 第 3 阶段）。
  *
- * Mainly serves the two 角色-card routes (CharacterCardList ↔ CharacterCardDetail), letting them share the same
- * sub-graph data and avoiding a second full fetch on the detail page. The Plot/World canvases use useGraphPersistence's
- * injected loading and do not depend on this store.
+ * 主要服务两个角色卡路由（CharacterCardList ↔ CharacterCardDetail），让它们共享同一份子图数据，避免详情页
+ * 再做一次完整拉取。Plot / World 画布使用 useGraphPersistence 注入的加载逻辑，不依赖该 store。
  */
 export const useGraphStore = defineStore('graph', () => {
   const graphId = ref('')
@@ -17,7 +16,7 @@ export const useGraphStore = defineStore('graph', () => {
   const isLoading = ref(false)
   const error = ref('')
 
-  /** Load a sub-graph by graph_id; can force-refresh when it is already the current graph. */
+  /** 按 graph_id 加载子图；当它已经是当前子图时也可强制刷新。 */
   async function load(targetGraphId: string, force = false): Promise<void> {
     if (!force && graphId.value === targetGraphId && nodes.value.length > 0) return
     isLoading.value = true
@@ -36,12 +35,12 @@ export const useGraphStore = defineStore('graph', () => {
     }
   }
 
-  /** Get a single node (used by the detail page). */
+  /** 获取单个节点（详情页使用）。 */
   function getNode(nodeId: string): GraphNodeDto | undefined {
     return nodes.value.find((node) => node.id === nodeId)
   }
 
-  /** Get a node's outgoing edges (角色 relations, shown as labels rather than drawn lines). */
+  /** 获取节点的出边（角色关系以标签展示，而不是绘制连线）。 */
   function outgoingEdges(nodeId: string): GraphEdgeDto[] {
     return edges.value.filter((edge) => edge.source === nodeId)
   }

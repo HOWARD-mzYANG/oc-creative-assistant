@@ -191,13 +191,13 @@ def intent_router_node(state: AgentState) -> dict[str, Any]:
             intent = IntentClassification(
                 primary="research",
                 confidence=0.5,
-                reasoning="Intent LLM returned no result; user quoted canvas nodes, falling back to research.",
+                reasoning="意图分类 LLM 未返回结果；用户引用了画布节点，回退到 research。",
             )
         else:
             intent = IntentClassification(
                 primary="small_talk",
                 confidence=0.5,
-                reasoning="Intent LLM returned no result; falling back to small_talk.",
+                reasoning="意图分类 LLM 未返回结果；回退到 small_talk。",
             )
     else:
         intent = _coerce_substantive_intent(intent, user_message)

@@ -1,13 +1,10 @@
-"""Question planner node (Agent B part two, first_revision decision 5).
+"""追问规划节点（Agent B 第二部分，first_revision 决策 5）。
 
-Runs before chat_assembler: based on the seed / recent conversation / fields to
-fill, it plans the direction the chat assistant should naturally follow up on
-next and writes it to ``state.next_question_hint`` for the assembler to weave
-into the reply.
+在 chat_assembler 之前运行：根据 seed、最近对话和待补字段，规划聊天助手下一步应该自然追问的
+方向，并写入 ``state.next_question_hint``，供 assembler 编织进回复。
 
-Works only when ``extraction_enabled`` is true (ChatWorkspace full-screen chat
-mode); when off it is a direct no-op, guaranteeing the FloatingChatDock legacy
-flow's behavior and cost are completely unchanged.
+仅在 ``extraction_enabled`` 为 true 时工作（ChatWorkspace 全屏聊天模式）；关闭时直接空操作，
+保证 FloatingChatDock 旧流程的行为和成本完全不变。
 """
 
 from __future__ import annotations
@@ -32,10 +29,10 @@ def question_planner_node(state: AgentState) -> dict[str, Any]:
         return {}
 
     recent = state.get("recent_messages") or []
-    history = "\n".join(f"{m['role']}: {m['content']}" for m in recent[-6:]) or "(none)"
+    history = "\n".join(f"{m['role']}: {m['content']}" for m in recent[-6:]) or "（无）"
     deferred = state.get("deferred_fields") or []
     deferred_block = (
-        "\n".join(f"- {d.get('entity')}: {d.get('field')}" for d in deferred) or "(none)"
+        "\n".join(f"- {d.get('entity')}: {d.get('field')}" for d in deferred) or "（无）"
     )
     seed = (state.get("seed_context") or state.get("world_brief") or "").strip()
     quoted_block = format_current_nodes(state.get("current_nodes") or [])
@@ -43,11 +40,11 @@ def question_planner_node(state: AgentState) -> dict[str, Any]:
     messages = [
         SystemMessage(_SYSTEM_PROMPT),
         HumanMessage(
-            f"[项目 seed/background]\n{seed[:500] or '(none yet)'}\n\n"
-            f"[Quoted nodes from canvas]\n{quoted_block}\n\n"
-            f"[Recent conversation]\n{history}\n\n"
-            f"[Fields to fill]\n{deferred_block}\n\n"
-            f"[User's latest message]\n{state.get('user_message', '')}"
+            f"[项目 seed / 背景]\n{seed[:500] or '（暂无）'}\n\n"
+            f"[画布引用节点]\n{quoted_block}\n\n"
+            f"[最近对话]\n{history}\n\n"
+            f"[待补字段]\n{deferred_block}\n\n"
+            f"[用户最新消息]\n{state.get('user_message', '')}"
         ),
     ]
 

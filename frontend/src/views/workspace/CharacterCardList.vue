@@ -11,11 +11,10 @@ import { createCreativeNode } from '../../utils/nodeFactory'
 import { useCharacterAvatarCache } from '../../composables/useCharacterAvatarCache'
 
 /**
- * 角色 list (first_revision decision 2, a user-approved deviation from the proposal).
+ * 角色列表（first_revision 决策 2，对原提案的已批准偏离）。
  *
- * A Notion-style card grid sourced from the nodes of the character sub-graph;
- * character relations are not drawn as Vue Flow connecting lines but shown as
- * tags on the detail page. Clicking a card opens CharacterCardDetail.
+ * 使用来自角色子图节点的 Notion 风格卡片网格；角色关系不画成 Vue Flow 连线，
+ * 而是在详情页以标签展示。点击卡片会打开 CharacterCardDetail。
  */
 const route = useRoute()
 const router = useRouter()
@@ -105,7 +104,7 @@ function characterInitials(name: string): string {
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
 }
 
-/** Node type tag is shown in the footer — only show extra tags in the body. */
+/** 节点类型标签已经在底部展示，正文区域只显示额外标签。 */
 function extraTags(tags: string[] | undefined): string[] {
   return (tags ?? []).filter((tag) => tag.toLowerCase() !== 'character')
 }
@@ -392,7 +391,7 @@ async function handleCreate() {
   gap: 16px;
 }
 
-/* ---------- ID card ---------- */
+/* ---------- 身份卡 ---------- */
 .id-card {
   position: relative;
   overflow: hidden;
@@ -416,7 +415,7 @@ async function handleCreate() {
   transform: translateY(-3px);
 }
 
-/* registration / crop marks in opposite corners */
+/* 对角注册 / 裁切标记。 */
 .id-card::before,
 .id-card::after {
   content: '';
@@ -447,7 +446,7 @@ async function handleCreate() {
   border-color: var(--text-soft);
 }
 
-/* header band: dot-grid texture + mono serial + chip */
+/* 头部条：点阵纹理 + 等宽编号 + 芯片。 */
 .id-card__band {
   display: flex;
   align-items: center;
@@ -490,7 +489,7 @@ async function handleCreate() {
   opacity: 0.65;
 }
 
-/* main row: portrait + identity block */
+/* 主体行：头像 + 身份信息。 */
 .id-card__main {
   flex: 1;
   display: flex;
@@ -599,7 +598,7 @@ async function handleCreate() {
   color: var(--muted);
 }
 
-/* footer: role stamp */
+/* 底部：角色印章。 */
 .id-card__footer {
   display: flex;
   align-items: center;
@@ -622,7 +621,7 @@ async function handleCreate() {
   box-shadow: inset 0 0 0 1px var(--border);
 }
 
-/* ---------- create card ---------- */
+/* ---------- 新建卡片 ---------- */
 .id-card--create {
   align-items: center;
   justify-content: center;

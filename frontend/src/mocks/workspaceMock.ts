@@ -8,7 +8,7 @@ export const mockProjectName = '霍格沃茨：最后围城'
 /** 旧版左侧栏分组数据；真实图谱现在从后端加载。 */
 export const mockProjectGroups: ProjectGroup[] = buildProjectGroupsFromNodes(mockGraphNodes)
 
-/** 尚未接入真实 LLM 的 UI 状态使用的占位 Agent 建议。 */
+/** 尚未接入真实 LLM 的 UI 状态使用的占位智能体建议。 */
 export const mockAgentSuggestions: Record<AgentMode, AgentSuggestion[]> = {
   inspiration: [
     {

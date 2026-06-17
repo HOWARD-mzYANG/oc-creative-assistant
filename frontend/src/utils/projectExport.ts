@@ -4,12 +4,12 @@ type OcNode = OcExport['nodes'][number]
 type OcEdge = OcExport['edges'][number]
 
 const RELATION_LABEL: Record<string, string> = {
-    develops_into: 'Develops into',
-    causes: 'Causes',
-    belongs_to: 'Belongs to',
-    conflicts_with: 'Conflicts with',
-    references: 'References',
-    relates_to: 'Relates to',
+    develops_into: '发展为',
+    causes: '导致',
+    belongs_to: '归属',
+    conflicts_with: '冲突',
+    references: '引用',
+    relates_to: '相关',
 }
 
 const byOrder = (a: OcNode, b: OcNode) => a.sort_order - b.sort_order
@@ -149,7 +149,7 @@ type BuildProjectHtmlOptions = {
   autoPrint?: boolean
 }
 
-/** Build a printable HTML document from the project snapshot. */
+/** 根据项目快照构建可打印 HTML 文档。 */
 export function buildProjectHtml(data: OcExport, options: BuildProjectHtmlOptions = {}): string {
   const { project, nodes, edges } = data
   const autoPrint = options.autoPrint ?? true
@@ -161,14 +161,14 @@ export function buildProjectHtml(data: OcExport, options: BuildProjectHtmlOption
     charactersSection(nodes),
     worldSection(nodes, edges),
   ].join('')
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(
     project.name,
   )}</title><style>${CSS}</style></head><body>${body}${
     autoPrint ? '<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>' : ''
   }</body></html>`
 }
 
-/** 导出 a project as PDF, using Electron's native PDF writer when available. */
+/** 将项目导出为 PDF；可用时优先使用 Electron 原生 PDF 写入能力。 */
 export async function openProjectPdf(data: OcExport): Promise<void> {
   if (window.ocDesktop?.exportProjectPdf) {
     await window.ocDesktop.exportProjectPdf({
@@ -180,7 +180,7 @@ export async function openProjectPdf(data: OcExport): Promise<void> {
 
   const win = window.open('', '_blank')
   if (!win) {
-    window.alert('Please allow pop-ups to export PDF')
+    window.alert('请允许弹出窗口以导出 PDF')
     return
   }
   win.document.open()

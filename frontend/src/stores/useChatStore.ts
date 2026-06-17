@@ -23,36 +23,35 @@ import {
 import { deleteNode as apiDeleteNode, updateNode as apiUpdateNode } from '../api/projectApi'
 import { router } from '../router'
 
-/** Chat + workspace: auto-apply staging, show ✅ inline cards (edit / discard). */
+/** Chat + Workspace：自动应用暂存项，并显示行内卡片（编辑 / 丢弃）。 */
 function usesAutoApplyStaging(): boolean {
   const path = router.currentRoute.value.path
   return path.startsWith('/workspace/') || path.startsWith('/chat/')
 }
 
-/** The lightweight message model used in ChatWorkspace (shared by historical messages + this turn's streaming message). */
+/** ChatWorkspace 使用的轻量消息模型（历史消息和本轮流式消息共用）。 */
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   agentType?: string
-  /** Cards auto-persisted in the background this turn (revamp 1: inline display in chat). */
+  /** 本轮后台自动持久化的卡片（revamp 1：行内显示在聊天中）。 */
   applied?: AppliedEntityDto[]
-  /** Web search source links (research / external facts). */
+  /** 网页搜索来源链接（research / 外部事实）。 */
   webSources?: WebSourceDto[]
-  /** Related nodes (cited in the reply). */
+  /** 相关节点（回复中引用过）。 */
   relatedNodes?: RelatedNodeDto[]
-  /** Visible reasoning trace for the current local turn; not persisted in history. */
+  /** 当前本地轮次的可见推理轨迹；不持久化到历史记录。 */
   trace?: AgentTraceItemDto[]
-  /** Raw provider thinking returned by reasoning models; current local turn only. */
+  /** reasoning 模型返回的原始思考内容；仅当前本地轮次使用。 */
   providerThinking?: string
 }
 
 /**
- * Full-screen chat store (first_revision phase 4).
+ * 全屏聊天状态仓库（first_revision 第 4 阶段）。
  *
- * Handles the session lifecycle, message stream (reusing streamChat SSE), and the staging list extracted in the background.
- * Keeps background extraction off by default; explicit canvas edits still go through
- * structure_agent -> staging -> canvas_apply.
+ * 管理会话生命周期、消息流（复用 streamChat SSE）以及后台抽取出的暂存列表。
+ * 默认关闭后台抽取；显式画布编辑仍走 structure_agent -> staging -> canvas_apply。
  */
 export const useChatStore = defineStore('chat', () => {
   const projectId = ref('')
@@ -63,7 +62,7 @@ export const useChatStore = defineStore('chat', () => {
   const streamingWebSources = ref<WebSourceDto[]>([])
   const streamingTrace = ref<AgentTraceItemDto[]>([])
   const streamingProviderThinking = ref('')
-  /** Inline ✅ cards while the current turn is still streaming (workspace auto-apply). */
+  /** 当前轮次仍在流式输出时展示的行内卡片（工作区自动应用）。 */
   const streamingApplied = ref<AppliedEntityDto[]>([])
   const isStreaming = ref(false)
   const progressLabel = ref('')
@@ -89,7 +88,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!target.some((a) => a.node_id === item.node_id)) target.push(item)
   }
 
-  /** Rebuild ✅ inline cards from accepted staging (not stored on chat messages). */
+  /** 根据已接受的暂存项重建行内卡片（聊天消息本身不保存这些卡片）。 */
   async function hydrateAppliedIntoMessages(): Promise<void> {
     if (!sessionId.value || !usesAutoApplyStaging()) return
     try {
@@ -109,7 +108,7 @@ export const useChatStore = defineStore('chat', () => {
         if (applied?.length) message.applied = applied
       }
     } catch {
-      /* inline cards are optional UI sugar */
+      /* 行内卡片只是可选的 UI 增强。 */
     }
   }
 
@@ -123,7 +122,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Enter a project: load the session list, reuse the most recent one (don't auto-create on refresh). */
+  /** 进入项目：加载会话列表，复用最近会话（刷新时不自动新建）。 */
   async function init(targetProjectId: string): Promise<void> {
     if (projectId.value === targetProjectId && sessionId.value) {
       await hydrateAppliedIntoMessages()
@@ -141,13 +140,13 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Reload the session list from the backend. */
+  /** 从后端重新加载会话列表。 */
   async function loadSessions(): Promise<void> {
     if (!projectId.value) return
     sessions.value = await listProjectSessions(projectId.value)
   }
 
-  /** Switch to a session and load its history + inline ✅ cards. */
+  /** 切换到指定会话，并加载历史消息和行内卡片。 */
   async function switchSession(id: string): Promise<void> {
     if (!id) return
     sessionId.value = id
@@ -155,7 +154,7 @@ export const useChatStore = defineStore('chat', () => {
     await hydrateAppliedIntoMessages()
   }
 
-  /** Create a fresh chat session and switch to it (explicit user action only). */
+  /** 新建聊天会话并切换过去（仅由用户显式操作触发）。 */
   async function newSession(): Promise<void> {
     if (!projectId.value) return
     const session = await createChatSession(projectId.value, '新对话')
@@ -164,7 +163,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = []
   }
 
-  /** Delete a session; if it was the active one, fall back to the most recent remaining (or a new one). */
+  /** 删除会话；如果删除的是当前会话，则回退到剩余会话中最近的一条（或新建）。 */
   async function deleteSession(id: string): Promise<void> {
     await deleteChatSession(id)
     sessions.value = sessions.value.filter((s) => s.id !== id)
@@ -174,7 +173,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Rename a session and sync the local list. */
+  /** 重命名会话并同步本地列表。 */
   async function renameSession(id: string, title: string): Promise<void> {
     const updated = await renameChatSession(id, title)
     sessions.value = sessions.value.map((s) => (s.id === id ? updated : s))
@@ -190,18 +189,18 @@ export const useChatStore = defineStore('chat', () => {
     if (onGraphMutated) await onGraphMutated()
   }
 
-  /** Reload history from the server (single source of truth after each turn). */
+  /** 从服务器重新加载历史消息（每轮结束后的唯一可信来源）。 */
   async function reloadMessages(): Promise<void> {
     if (!sessionId.value) return
     try {
       messages.value = (await listSessionMessages(sessionId.value)).map(_toMessage)
       await hydrateAppliedIntoMessages()
     } catch {
-      /* keep optimistic messages if reload fails */
+      /* 重新加载失败时保留乐观消息。 */
     }
   }
 
-  /** Send a message, enable background extraction, and receive the reply via streaming. */
+  /** 发送消息，启用后台流程，并通过流式响应接收回复。 */
   async function send(
     text: string,
     selectedNodeIds: string[] = [],
@@ -213,7 +212,7 @@ export const useChatStore = defineStore('chat', () => {
     const isFirstTurn = messages.value.length === 0
     const turnSessionId = sessionId.value
     isStreaming.value = true
-    // Optimistic user bubble; backend persistence_hub also writes this turn.
+    // 乐观用户气泡；后端 persistence_hub 也会写入本轮消息。
     messages.value.push({ id: `local-${Date.now()}`, role: 'user', content })
     streamingReply.value = ''
     streamingWebSources.value = []
@@ -303,11 +302,11 @@ export const useChatStore = defineStore('chat', () => {
             error.value = parts.join('\n\n')
           }
         },
-        false, // extraction_enabled：默认关闭后台抽取/追问规划，避免回复结束后继续卡住。
+        false, // extraction_enabled：默认关闭后台抽取 / 追问规划，避免回复结束后继续卡住。
         webSearchMode,
         shouldAutoApply,
       )
-      // Replace optimistic local copies with server-persisted messages (avoids duplicates).
+      // 用服务器持久化后的消息替换本地乐观副本，避免重复。
       const traceThisTurn = [...streamingTrace.value]
       const providerThinkingThisTurn = streamingProviderThinking.value
       await reloadMessages()
@@ -324,7 +323,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Reply failed'
+      error.value = e instanceof Error ? e.message : '回复失败'
     } finally {
       streamingReply.value = ''
       streamingWebSources.value = []
@@ -342,13 +341,13 @@ export const useChatStore = defineStore('chat', () => {
           const updated = await generateSessionTitle(turnSessionId, content)
           sessions.value = sessions.value.map((s) => (s.id === updated.id ? updated : s))
         } catch {
-          /* title generation is best-effort */
+          /* 标题生成是尽力而为的辅助能力。 */
         }
       }
     }
   }
 
-  /** 编辑 the title/body of the node behind a given inline card (revamp 1). */
+  /** 编辑指定行内卡片背后的节点标题 / 正文（revamp 1）。 */
   async function editAppliedNode(
     nodeId: string,
     patch: { title?: string; content?: string },
@@ -364,7 +363,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Undo (delete) the node behind a given inline card (revamp 1: added by default, can be rejected). */
+  /** 撤销（删除）指定行内卡片背后的节点（revamp 1：默认新增，可丢弃）。 */
   async function removeAppliedNode(nodeId: string): Promise<void> {
     if (!projectId.value) return
     await apiDeleteNode(projectId.value, nodeId)

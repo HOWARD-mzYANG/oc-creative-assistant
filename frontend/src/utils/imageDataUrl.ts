@@ -1,4 +1,4 @@
-/** Read an image file, scale it down, and return a JPEG data URL for storage in node fields. */
+/** 读取图片文件，按尺寸压缩后返回 JPEG data URL，用于写入节点字段。 */
 export function fileToScaledDataUrl(
   file: File,
   maxSize = 640,

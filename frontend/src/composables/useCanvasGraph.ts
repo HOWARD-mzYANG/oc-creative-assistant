@@ -30,11 +30,10 @@ interface Options {
 }
 
 /**
- * The core composable for canvas graph operations.
+ * 画布图谱操作的核心 composable。
  *
- * Centralizes all interactions that "change the content of nodes / edges": creating nodes, clearing, auto-layout,
- * manual edge connection, and snapshot syncing after a drag ends. All emits are delegated to the host
- * component via callbacks injected through options, keeping this composable decoupled from business events outside Vue Flow.
+ * 集中处理所有会“改变节点 / 边内容”的交互：创建节点、清空、自动布局、手动连边，以及拖拽结束后的
+ * 快照同步。所有 emit 都委托给 options 注入的宿主回调，让该 composable 与 Vue Flow 外部的业务事件解耦。
  */
 export function useCanvasGraph(options: Options) {
   const addNodeCount = ref(0)
@@ -65,10 +64,10 @@ export function useCanvasGraph(options: Options) {
   }
 
   /**
-   * Compute the canvas coordinates for a newly added node.
+   * 计算新建节点的画布坐标。
    *
-   * Back-computes the canvas coordinates from the current viewport so the node lands near the center of the area the user is viewing;
-   * offsets by a counter on repeated consecutive creations to avoid stacking at the same coordinate.
+   * 根据当前视口反推出画布坐标，让节点落在用户正在查看区域的中心附近；连续创建时按计数偏移，
+   * 避免堆叠在同一坐标。
    */
   function getNextNodePosition() {
     const viewport = options.getViewport()
@@ -105,10 +104,10 @@ export function useCanvasGraph(options: Options) {
   }
 
   /**
-   * Update a node's display data in place (second_revision change A: inline edit).
+   * 原地更新节点展示数据（second_revision 变更 A：行内编辑）。
    *
-   * Called when InlineEditableText in the node component saves; updates the data field of the matching node in nodes.value
-   * and triggers auto-save, going through the same "mutate nodes.value then emit" path as dragging / connecting.
+   * 节点组件中的 InlineEditableText 保存时调用；更新 nodes.value 中匹配节点的 data 字段并触发自动保存，
+   * 走与拖拽 / 连线相同的“修改 nodes.value 后 emit”路径。
    */
   function updateNodeData(nodeId: string, patch: { title?: string; content?: string }) {
     let changed = false
@@ -128,7 +127,7 @@ export function useCanvasGraph(options: Options) {
     if (changed) emitGraphChanged()
   }
 
-  /** Delete a single node and its related edges (right-click menu delete, second_revision change A). */
+  /** 删除单个节点及其相关边（右键菜单删除，second_revision 变更 A）。 */
   function removeNode(nodeId: string) {
     options.edges.value = options.edges.value.filter(
       (edge) => edge.source !== nodeId && edge.target !== nodeId,
@@ -144,7 +143,7 @@ export function useCanvasGraph(options: Options) {
   }
 
   function handleClearCanvas() {
-    const confirmed = window.confirm('Clear the whole canvas? This removes every node and edge.')
+    const confirmed = window.confirm('确定清空整个画布吗？所有节点和边都会被移除。')
     if (!confirmed) return
 
     options.nodes.value = []

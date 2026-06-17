@@ -17,13 +17,12 @@ interface RelationEdgeStyle {
 }
 
 /**
- * Relation type -> visual style lookup table.
+ * 关系类型 -> 视觉样式查找表。
  *
- * Color / light background / whether to animate flow map to the stroke, label
- * background and animated properties. A record is used instead of a switch so
- * that adding a new relation type later only requires changing this one place.
+ * 颜色、浅色背景、是否启用流动动画会映射到描边、标签背景和 animated 属性。这里使用 record
+ * 而不是 switch，后续新增关系类型时只需要修改这一处。
  */
-// The palette stays within the purple / orange / rose (tension) / gray family to echo the overall dreamy tone.
+// 调色盘控制在紫 / 橙 / 玫红（冲突感）/ 灰色范围内，以呼应整体轻梦幻的基调。
 const relationEdgeStyles: Record<CreativeRelationType, RelationEdgeStyle> = {
   relates_to: { color: '#a29bc4', labelBg: '#f6f4fb' },
   causes: { color: '#f59e0b', labelBg: '#fff7ed' },
@@ -34,7 +33,7 @@ const relationEdgeStyles: Record<CreativeRelationType, RelationEdgeStyle> = {
 }
 
 export function getRelationLabel(relationType: CreativeRelationType): string {
-  return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? 'related'
+  return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? '相关'
 }
 
 export function getRelationStyle(relationType: CreativeRelationType): RelationEdgeStyle {
@@ -42,20 +41,18 @@ export function getRelationStyle(relationType: CreativeRelationType): RelationEd
 }
 
 /**
- * Clone a node and write in the frontend presentation state.
+ * 克隆节点并写入前端展示状态。
  *
- * Vue Flow mutates node objects during interactions, so this avoids mutating the
- * props passed in by the parent component directly. The highlighted set controls
- * the brief flash of "just-appeared nodes", while the selected state is determined
- * by selectedNodeId.
+ * Vue Flow 会在交互过程中修改节点对象；这里避免直接改动父组件传入的 props。highlighted 集合控制
+ * “刚出现节点”的短暂闪烁，选中状态由 selectedNodeId 决定。
  *
- * Args:
- *   node: The source node.
- *   selectedNodeId: The ID of the currently selected node.
- *   highlighted: The set of node IDs that should currently flash.
+ * 参数：
+ *   node: 源节点。
+ *   selectedNodeId: 当前选中节点 ID。
+ *   highlighted: 当前需要闪烁的节点 ID 集合。
  *
- * Returns:
- *   A copy of the node with presentation-state fields.
+ * 返回：
+ *   带展示状态字段的节点副本。
  */
 export function cloneNode(
   node: CreativeFlowNode,
@@ -70,19 +67,17 @@ export function cloneNode(
 }
 
 /**
- * Fill in an edge's presentation fields and business relation type.
+ * 补齐边的展示字段和业务关系类型。
  *
- * Used after an edge is returned from the backend, the parent component or Vue
- * Flow, to uniformly fill in visual fields such as markerEnd, stroke and label
- * background, and to ensure required fields like sourceHandle / targetHandle /
- * type are not lost.
+ * 用于处理后端、父组件或 Vue Flow 返回的边，统一补齐 markerEnd、stroke、label background 等视觉字段，
+ * 并确保 sourceHandle / targetHandle / type 等必需字段不丢失。
  *
- * Args:
- *   edge: The raw edge.
- *   highlighted: The set of edge IDs that should currently flash; defaults to an empty set (for the save-snapshot scenario).
+ * 参数：
+ *   edge: 原始边。
+ *   highlighted: 当前需要闪烁的边 ID 集合；默认空集合（用于保存快照场景）。
  *
- * Returns:
- *   An edge object that renders stably and can be saved.
+ * 返回：
+ *   可稳定渲染并保存的边对象。
  */
 export function normalizeEdge(
   edge: CreativeFlowEdge,

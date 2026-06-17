@@ -1,18 +1,18 @@
 import type { CreativeNodeStatus, CreativeNodeType, CreativeRelationType } from '../types/node'
 
-/** Backend project DTO, used to determine the lifecycle boundary of the current graph. */
+/** 后端项目 DTO，用于确定当前图谱的生命周期边界。 */
 export interface GraphProjectDto {
   id: string
   name: string
 }
 
-/** Node coordinates saved by the backend; does not include the Vue Flow viewport or computedPosition. */
+/** 后端保存的节点坐标；不包含 Vue Flow viewport 或 computedPosition。 */
 export interface GraphPositionDto {
   x: number
   y: number
 }
 
-/** Backend node DTO; content maps to the full text content of the frontend node. */
+/** 后端节点 DTO；content 对应前端节点的完整文本内容。 */
 export interface GraphNodeDto {
   id: string
   type: CreativeNodeType
@@ -28,7 +28,7 @@ export interface GraphNodeDto {
   sortOrder?: number
 }
 
-/** Backend edge waypoint DTO; isomorphic to the frontend CreativeEdgeWaypoint. */
+/** 后端边路径点 DTO；与前端 CreativeEdgeWaypoint 同构。 */
 export interface GraphEdgeWaypointDto {
   orientation: 'horizontal' | 'vertical'
   middle: number
@@ -36,7 +36,7 @@ export interface GraphEdgeWaypointDto {
   nearTarget?: number | null
 }
 
-/** Backend edge DTO; the handle fields are used to restore which connection point the edge was drawn from. */
+/** 后端边 DTO；handle 字段用于恢复边是从哪个连接点画出的。 */
 export interface GraphEdgeDto {
   id: string
   source: string
@@ -50,7 +50,7 @@ export interface GraphEdgeDto {
   waypoint?: GraphEdgeWaypointDto | null
 }
 
-/** Backend vector index status; a successful SQLite save does not guarantee embedding succeeded, so it needs to be shown separately. */
+/** 后端向量索引状态；SQLite 保存成功不代表 embedding 成功，因此需要单独展示。 */
 export interface IndexingStatusDto {
   status: 'not_checked' | 'synced' | 'partial' | 'failed'
   message: string
@@ -63,7 +63,7 @@ export interface IndexingStatusDto {
   error?: string | null
 }
 
-/** The full graph snapshot returned by the read endpoint. */
+/** 读取端点返回的完整图谱快照。 */
 export interface GraphDto {
   project: GraphProjectDto
   nodes: GraphNodeDto[]
@@ -77,7 +77,7 @@ export interface SaveGraphDto {
   edges: GraphEdgeDto[]
 }
 
-/** RAG context preview request body; currently only the inspiration debug entry is supported. */
+/** RAG 上下文预览请求体；当前只支持 inspiration 调试入口。 */
 export interface RagContextRequestDto {
   node_id: string
   query: string
@@ -85,7 +85,7 @@ export interface RagContextRequestDto {
   top_k: number
 }
 
-/** The current node snapshot in the RAG response. */
+/** RAG 响应中的当前节点快照。 */
 export interface RagCurrentNodeDto {
   id: string
   type: string
@@ -94,7 +94,7 @@ export interface RagCurrentNodeDto {
   tags: string[]
 }
 
-/** One-hop graph relation context derived from the canvas edges. */
+/** 从画布边推导出的一跳图关系上下文。 */
 export interface RagGraphContextItemDto {
   id: string
   type: string
@@ -105,7 +105,7 @@ export interface RagGraphContextItemDto {
   direction: string
 }
 
-/** Similar-node context hit by vector retrieval. */
+/** 向量检索命中的相似节点上下文。 */
 export interface RagVectorContextItemDto {
   id: string
   type: string
@@ -114,7 +114,7 @@ export interface RagVectorContextItemDto {
   score: number
 }
 
-/** Context entries after the backend has merged and deduplicated them. */
+/** 后端合并去重后的上下文条目。 */
 export interface RagMergedContextItemDto {
   id: string
   source: string
@@ -123,7 +123,7 @@ export interface RagMergedContextItemDto {
   content: string
 }
 
-/** RAG context preview endpoint response. */
+/** RAG 上下文预览端点响应。 */
 export interface RagContextResponseDto {
   current_node: RagCurrentNodeDto
   graph_context: RagGraphContextItemDto[]
@@ -139,14 +139,14 @@ export interface RagContextResponseDto {
   }
 }
 
-/** Project-level Lore Memory search request body; does not depend on the currently selected node. */
+/** 项目级设定记忆搜索请求体；不依赖当前选中的节点。 */
 export interface MemorySearchRequestDto {
   query: string
   node_type?: CreativeNodeType | null
   top_k: number
 }
 
-/** Project-level Lore Memory search hit. */
+/** 项目级设定记忆搜索命中项。 */
 export interface MemorySearchItemDto {
   id: string
   type: CreativeNodeType
@@ -157,7 +157,7 @@ export interface MemorySearchItemDto {
   score: number
 }
 
-/** Project-level Lore Memory search response. */
+/** 项目级设定记忆搜索响应。 */
 export interface MemorySearchResponseDto {
   items: MemorySearchItemDto[]
   debug: {
@@ -172,12 +172,12 @@ export interface MemorySearchResponseDto {
 import { requestJson } from './http'
 
 /**
- * Load the graph of the default project.
+ * 加载默认项目的图谱。
  *
- * On first launch it first hits the default-project endpoint, triggering the backend to initialize sample data.
+ * 首次启动时会先请求默认项目端点，触发后端初始化示例数据。
  *
- * Returns:
- *   The full graph DTO of the default project.
+ * 返回：
+ *   默认项目的完整图谱 DTO。
  */
 export async function loadDefaultGraph(): Promise<GraphDto> {
   const project = await requestJson<GraphProjectDto>('/api/projects/default')
@@ -188,14 +188,14 @@ export async function loadDefaultGraph(): Promise<GraphDto> {
 /**
  * 保存项目图快照。
  *
- * The backend uses a whole-graph replace strategy and syncs the vector index after the SQLite commit.
+ * 后端使用整体替换图谱的策略，并在 SQLite 提交后同步向量索引。
  *
- * Args:
- *   projectId: The current project ID.
- *   graph: The node and edge snapshot to save.
+ * 参数：
+ *   projectId: 当前项目 ID。
+ *   graph: 要保存的节点和边快照。
  *
- * Returns:
- *   The graph DTO after the backend has finally persisted it.
+ * 返回：
+ *   后端最终持久化后的图谱 DTO。
  */
 export async function saveProjectGraph(projectId: string, graph: SaveGraphDto): Promise<GraphDto> {
   return requestJson<GraphDto>(`/api/projects/${projectId}/graph`, {
@@ -205,16 +205,16 @@ export async function saveProjectGraph(projectId: string, graph: SaveGraphDto): 
 }
 
 /**
- * Load a single sub-graph by graph_id (first_revision decision 1).
+ * 按 graph_id 加载单个子图（first_revision 决策 1）。
  *
- * Coexists with the project dimension of loadDefaultGraph / saveProjectGraph: the new three-view
- * workspace (PlotCanvas / CharacterCardList / WorldCanvas) each load by their own graph_id.
+ * 与 loadDefaultGraph / saveProjectGraph 的项目维度并存：新的三视图工作区
+ *（PlotCanvas / CharacterCardList / WorldCanvas）各自按自己的 graph_id 加载。
  *
- * Args:
- *   graphId: sub-graph ID (from ProjectDetail's plot/character/world_graph_id).
+ * 参数：
+ *   graphId: 子图 ID（来自 ProjectDetail 的 plot/character/world_graph_id）。
  *
- * Returns:
- *   The node + internal-edge snapshot of that sub-graph.
+ * 返回：
+ *   该子图的节点 + 内部边快照。
  */
 export async function loadSubgraph(graphId: string): Promise<GraphDto> {
   return requestJson<GraphDto>(`/api/graphs/${graphId}`)
@@ -223,12 +223,12 @@ export async function loadSubgraph(graphId: string): Promise<GraphDto> {
 /**
  * 按 graph_id 保存单个子图快照（整体替换该子图的节点和内部边）。
  *
- * Args:
- *   graphId: sub-graph ID.
- *   graph: The node and edge snapshot to save.
+ * 参数：
+ *   graphId: 子图 ID。
+ *   graph: 要保存的节点和边快照。
  *
- * Returns:
- *   The sub-graph DTO after the backend has persisted it.
+ * 返回：
+ *   后端持久化后的子图 DTO。
  */
 export async function saveSubgraph(graphId: string, graph: SaveGraphDto): Promise<GraphDto> {
   return requestJson<GraphDto>(`/api/graphs/${graphId}`, {
@@ -238,15 +238,15 @@ export async function saveSubgraph(graphId: string, graph: SaveGraphDto): Promis
 }
 
 /**
- * Load a RAG context preview.
+ * 加载 RAG 上下文预览。
  *
- * This endpoint is currently only for debugging graph relations, vector results, and the prompt; it does not call a real LLM.
+ * 该端点目前仅用于调试图关系、向量结果和 prompt，不会调用真实 LLM。
  *
- * Args:
- *   payload: The RAG context preview request body.
+ * 参数：
+ *   payload: RAG 上下文预览请求体。
  *
- * Returns:
- *   The context and prompt built by the backend.
+ * 返回：
+ *   后端构建的上下文和 prompt。
  */
 export async function loadRagContext(payload: RagContextRequestDto): Promise<RagContextResponseDto> {
   return requestJson<RagContextResponseDto>('/api/rag/context', {
@@ -256,16 +256,16 @@ export async function loadRagContext(payload: RagContextRequestDto): Promise<Rag
 }
 
 /**
- * Search Lore Memory within the current project.
+ * 在当前项目中搜索设定记忆。
  *
- * This endpoint only returns memory cards hit by vector retrieval; it does not build a prompt and does not call an LLM.
+ * 该端点只返回向量检索命中的记忆卡片，不构建 prompt，也不调用 LLM。
  *
- * Args:
- *   projectId: The current project ID.
- *   payload: Search text, type filter, and number of results.
+ * 参数：
+ *   projectId: 当前项目 ID。
+ *   payload: 搜索文本、类型过滤和结果数量。
  *
- * Returns:
- *   Semantically relevant memory entries within the project.
+ * 返回：
+ *   项目内语义相关的记忆条目。
  */
 export async function searchProjectMemory(
   projectId: string,

@@ -2,10 +2,10 @@
 import type { WorkspaceStatus } from '../../types/workspace'
 
 /**
- * Bottom status bar.
+ * 底部状态栏。
  *
- * Only displays the save, index, and model status aggregated by AppShell; it does
- * not directly trigger saving, index building, or model calls.
+ * 只展示 AppShell 聚合后的保存、索引和模型状态；
+ * 不直接触发保存、索引构建或模型调用。
  */
 defineProps<{
   status: WorkspaceStatus
@@ -13,11 +13,11 @@ defineProps<{
 </script>
 
 <template>
-  <!-- Status bar: shows save, index, and model status -->
+  <!-- 状态栏：展示保存、索引和模型状态。 -->
   <footer class="status-bar">
     <div class="status-left">
       <span class="status-item save-status">
-        <span class="status-dot" :class="{ 'is-saving': status.saveState.includes('Saving') }"></span>
+        <span class="status-dot" :class="{ 'is-saving': status.saveState.includes('保存中') || status.saveState.includes('Saving') }"></span>
         {{ status.saveState }}
       </span>
     </div>
@@ -61,12 +61,12 @@ defineProps<{
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10b981; /* default green: saved / ready */
+  background: #10b981; /* 默认绿色：已保存 / 就绪。 */
   transition: all 0.3s ease;
 }
 
 .status-dot.is-saving {
-  background: #f59e0b; /* amber: saving in progress */
+  background: #f59e0b; /* 琥珀色：正在保存。 */
   animation: pulse 1.5s infinite;
 }
 

@@ -1,13 +1,11 @@
-"""项目 seed compressor (first_revision stage 5).
+"""项目 seed 压缩器（first_revision 阶段 5）。
 
-A standalone entrypoint, 【not inside the main conversation StateGraph】: it
-compresses a project's current state (all nodes, partitioned by sub-graph) into
-a structured seed JSON (worldview / characters / plot / style), for the Chat
-Agent to inject cheaply at startup (decision 4: seed ~500 tokens).
+这是独立入口，【不在主对话 StateGraph 内】：它会把项目当前状态（所有节点，按子图分组）压缩成
+结构化 seed JSON（worldview / characters / plot / style），供 Chat Agent 在启动时低成本注入
+（决策 4：seed 约 500 tokens）。
 
-Called by project_service.rebuild_seed and persisted to ProjectSeedORM; trigger
-sources include chat session close, workspace save debounce, and the manual
-rebuild API.
+由 project_service.rebuild_seed 调用，并持久化到 ProjectSeedORM；触发来源包括聊天会话关闭、
+工作区保存防抖，以及手动 rebuild API。
 """
 
 from __future__ import annotations
@@ -25,19 +23,15 @@ from app.services.graph_repository import read_ordered_nodes
 
 
 _SYSTEM_PROMPT = (
-    "You are the creative assistant's project seed compressor. Task: compress "
-    "the project's current node state below into a structured snapshot, so the "
-    "conversation assistant can quickly grasp the whole project at the start. "
-    "Only summarize objectively; do not add new settings, do not extend the "
-    "plot. worldview_summary: summarize the worldbuilding in 2-3 sentences; "
-    "main_characters: list the main character names (at most 8); plot_outline: "
-    "summarize the current plot direction in 2-4 sentences; style_notes: "
-    "summarize the tone/style (leave empty if none)."
+    "你是创作助手的项目 seed 压缩器。任务：把下面的项目当前节点状态压缩成结构化快照，"
+    "让对话助手在开场时能快速理解整个项目。只做客观总结；不要新增设定，不要续写剧情。"
+    "worldview_summary：用 2-3 句话总结世界观；main_characters：列出主要角色名（最多 8 个）；"
+    "plot_outline：用 2-4 句话总结当前剧情方向；style_notes：总结语气/风格（没有则留空）。"
 )
 
 
 def _collect_project_brief(project_id: str) -> tuple[str, str]:
-    """读取 project name + node list grouped by type, assembled into the compression input text."""
+    """读取项目名和按类型分组的节点列表，并组装成压缩输入文本。"""
     with SessionLocal() as db:
         project = db.get(ProjectORM, project_id)
         project_name = project.name if project is not None else project_id
@@ -47,7 +41,7 @@ def _collect_project_brief(project_id: str) -> tuple[str, str]:
     for node in nodes:
         grouped.setdefault(node.node_type, []).append(node)
 
-    lines: list[str] = [f"Project name: {project_name}"]
+    lines: list[str] = [f"项目名称：{project_name}"]
     for node_type, items in grouped.items():
         lines.append(f"\n[{node_type}]")
         for node in items:
@@ -63,18 +57,17 @@ def _collect_project_brief(project_id: str) -> tuple[str, str]:
 
 
 def build_seed_json(project_id: str) -> str | None:
-    """Generate the project seed JSON string; return None when the project has no content or the LLM fails.
+    """生成项目 seed JSON 字符串；当项目没有内容或 LLM 失败时返回 None。
 
-    When None is returned, the caller decides the fallback strategy
-    (project_service falls back to a placeholder seed).
+    返回 None 时，由调用方决定兜底策略（project_service 会回退到占位 seed）。
     """
     _, brief = _collect_project_brief(project_id)
-    if brief.count("\n") <= 1:  # only the project name line → project has no content yet
+    if brief.count("\n") <= 1:  # 只有项目名称行，说明项目还没有内容。
         return None
 
     messages = [
         SystemMessage(_SYSTEM_PROMPT),
-        HumanMessage(f"【Project Current Nodes】\n{brief}"),
+        HumanMessage(f"【项目当前节点】\n{brief}"),
     ]
     try:
         seed = get_llm_provider().structured(messages, SeedOutput)

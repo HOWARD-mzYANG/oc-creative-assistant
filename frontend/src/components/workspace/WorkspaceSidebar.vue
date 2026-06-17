@@ -10,9 +10,8 @@ import ProjectIoButtons from './ProjectIoButtons.vue'
 /**
  * 工作区左侧导航（first_revision 第 3 阶段）。
  *
- * Top to bottom: back to the project library, project name + summary, three-view
- * navigation (故事 / 角色 / 世界观), and the seed version. Navigation
- * uses router-link, and each sub-view loads by its own graph_id.
+ * 从上到下依次是：返回项目库、项目名称 + 摘要、三视图导航（故事 / 角色 / 世界观）以及 seed 版本。
+ * 导航使用 router-link，每个子视图按自己的 graph_id 加载。
  */
 const props = defineProps<{ projectId: string }>()
 
@@ -34,10 +33,10 @@ interface NavItem {
 
 const seedLabel = computed(() => {
   const seed = detail.value?.latest_seed
-  if (!seed) return 'Seed 尚未生成'
+  if (!seed) return '项目种子尚未生成'
   const time = seed.created_at ? new Date(seed.created_at) : null
   const timeLabel = time && !Number.isNaN(time.getTime()) ? ` · ${time.toLocaleString()}` : ''
-  return `Seed v${seed.version}${timeLabel}`
+  return `项目种子 v${seed.version}${timeLabel}`
 })
 
 const navItems = computed<NavItem[]>(() => [

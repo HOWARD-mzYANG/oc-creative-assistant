@@ -6,7 +6,7 @@ import { useChatStore } from '../../stores/useChatStore'
 import QuotedNodeChip from './QuotedNodeChip.vue'
 
 /**
- * Persistent bottom composer — sends to the main LangGraph agent (chat stream + extraction).
+ * 常驻底部输入框：发送到主 LangGraph 智能体（聊天流 + 抽取）。
  */
 const composer = useComposerStore()
 const chat = useChatStore()
@@ -126,7 +126,7 @@ async function handleSend() {
           v-model="input"
           class="chat-composer__field"
           type="text"
-          placeholder="和 Agent 对话，也可以在画布中按 Ctrl+C 引用节点…"
+          placeholder="和智能体对话，也可以在画布中按 Ctrl+C 引用节点…"
           :disabled="isStreaming"
         />
         <button
@@ -173,7 +173,7 @@ async function handleSend() {
   top: -8px;
 }
 
-/* Small chevron on the top divider, centered */
+/* 顶部分隔线上的小箭头，居中显示。 */
 .composer-handle {
   position: absolute;
   top: 0;

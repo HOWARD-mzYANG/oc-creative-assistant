@@ -1,11 +1,8 @@
-"""Simulation agent node.
+"""模拟 agent 节点。
 
-Receives "what if... what would happen" hypothetical intents. In a ReAct loop it
-first uses search_nodes to pin down the relevant nodes and anchor the "current
-state", then generates 2-3 distinct possible directions and outputs
-SimulationOutput. This mode never produces proposed_changes; once the user picks
-a branch, the next turn naturally switches to structure mode to carry the
-follow-through.
+接收“如果……会怎样”这类假设性意图。在 ReAct 循环中，它会先用 search_nodes 锁定相关节点，
+锚定“当前状态”，再生成 2-3 个不同走向并输出 SimulationOutput。该模式不会产生
+proposed_changes；当用户选定某个分支后，下一轮自然会切到 structure 模式继续落地。
 """
 
 from __future__ import annotations
@@ -32,13 +29,13 @@ _SYSTEM_PROMPT = load_prompt("simulation")
 
 
 def simulation_agent_node(state: AgentState) -> dict[str, Any]:
-    """Anchor the current state in a ReAct loop then simulate branches; degrade to empty branches when the LLM fails."""
+    """在 ReAct 循环中锚定当前状态并模拟分支；LLM 失败时降级为空分支。"""
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "")
 
     initial_messages = [
         SystemMessage(_SYSTEM_PROMPT),
-        HumanMessage(f"{build_memory_block(state, 'simulation')}\n\n[User hypothesis]\n{user_message}"),
+        HumanMessage(f"{build_memory_block(state, 'simulation')}\n\n[用户假设]\n{user_message}"),
     ]
 
     provider = get_llm_provider()
@@ -60,13 +57,13 @@ def simulation_agent_node(state: AgentState) -> dict[str, Any]:
         )
         if output is None:
             output = SimulationOutput(
-                reasoning="Structured output was empty.",
+                reasoning="结构化输出为空。",
                 branches=[],
             )
     except Exception as error:  # noqa: BLE001
-        logger.warning("simulation_agent LLM call failed, degrading: %s", error)
+        logger.warning("simulation_agent LLM 调用失败，降级处理：%s", error)
         output = SimulationOutput(
-            reasoning=f"Call failed ({type(error).__name__}); unable to simulate branches for now.",
+            reasoning=f"调用失败（{type(error).__name__}），暂时无法模拟分支。",
             branches=[],
         )
     return {"simulation_output": output}

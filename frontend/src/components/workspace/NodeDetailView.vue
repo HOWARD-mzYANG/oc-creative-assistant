@@ -7,11 +7,10 @@ import { getNodeFields, saveNodeFields, updateNode } from '../../api/projectApi'
 import PlotCastRow from './PlotCastRow.vue'
 
 /**
- * Node detail — a stationery writing surface (second_revision change A, W3).
+ * 节点详情：带纸张质感的写作界面（second_revision 变更 A，W3）。
  *
- * Reads the initial snapshot from useCenterStageStore.detailNode, lets the writer
- * edit title / body / tags / status + free-form attributes, with debounced auto-save.
- * "Back to canvas" returns (SubgraphCanvas reloads on mode change).
+ * 从 useCenterStageStore.detailNode 读取初始快照，让用户编辑标题、正文、标签、状态和自由属性，
+ * 并通过防抖自动保存。“返回画布”会切回画布（SubgraphCanvas 在模式变化时重新加载）。
  */
 const props = defineProps<{ nodeId: string }>()
 const emit = defineEmits<{ return: [] }>()
@@ -290,7 +289,7 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
-/* —— the sheet of paper —— */
+/* —— 纸张表面 —— */
 .sheet {
   width: 100%;
   padding: 44px 52px 40px;

@@ -2,11 +2,11 @@
 import type { CreativeNodeType } from '../../types/node'
 
 /**
- * Canvas right-click context menu.
+ * 画布右键菜单。
  *
- * menuType='blank': create a new node at the cursor position (using the types allowed by the current sub-graph).
- * menuType='node': edit details / duplicate / delete / copy to composer.
- * position:fixed + z-index:9999, sits above nodes and the canvas.
+ * menuType='blank'：在光标位置新建节点（使用当前子图允许的类型）。
+ * menuType='node'：编辑详情 / 复制 / 删除 / 复制到输入框。
+ * position:fixed + z-index:9999，使菜单浮在节点和画布之上。
  */
 defineProps<{
   show: boolean

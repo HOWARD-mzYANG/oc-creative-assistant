@@ -9,7 +9,7 @@
     color: var(--text);
   }
   
-  /* Custom scrollbar */
+  /* 自定义滚动条。 */
   .detail-sidebar::-webkit-scrollbar {
     width: 6px;
   }
@@ -27,7 +27,7 @@
     background-color: rgba(156, 163, 175, 0.7);
   }
   
-  /* Header area */
+  /* 头部区域。 */
   .detail-header {
     padding: 24px 20px 20px;
     border-bottom: 1px solid var(--border);
@@ -57,7 +57,7 @@
     gap: 8px;
   }
   
-  /* Status badge */
+  /* 状态徽标。 */
   .status-badge {
     display: inline-flex;
     align-items: center;
@@ -85,7 +85,7 @@
     border-color: #ccfbf1;
   }
   
-  /* Panel section */
+  /* 面板分区。 */
   .detail-panel {
     padding: 24px 20px;
     display: flex;
@@ -103,7 +103,7 @@
     color: var(--text);
   }
   
-  /* Form controls */
+  /* 表单控件。 */
   label {
     display: block;
     margin-bottom: 8px;
@@ -158,7 +158,7 @@
     min-height: 80px;
   }
   
-  /* Custom select */
+  /* 自定义选择框。 */
   .custom-select-container {
     position: relative;
     width: 100%;
@@ -254,7 +254,7 @@
     font-weight: 600;
   }
   
-  /* Buttons */
+  /* 按钮。 */
   button {
     display: inline-flex;
     align-items: center;
@@ -304,7 +304,7 @@
     background: var(--accent-soft);
   }
   
-  /* Agent actions section */
+  /* 智能体操作区。 */
   .agent-actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -404,7 +404,7 @@
     white-space: pre-wrap;
   }
   
-  /* Edge metadata */
+  /* 边元数据。 */
   .edge-meta {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -438,7 +438,7 @@
     word-break: break-word;
   }
   
-  /* Empty state */
+  /* 空状态。 */
   .empty-state {
     display: flex;
     flex-direction: column;
