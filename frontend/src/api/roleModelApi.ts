@@ -82,6 +82,18 @@ export interface RoleModelChatMessage {
   content: string
 }
 
+export interface RoleModelChatHistoryItem {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  mode: string
+  warning: string
+  character_name: string
+  cited_node_ids: string[]
+  retrieved_context: Array<Record<string, unknown>>
+  created_at: string | null
+}
+
 export interface RoleModelChatResponse {
   reply: string
   mode: 'local_lora' | 'api_fallback' | string
@@ -167,6 +179,16 @@ export async function startRoleModelTraining(
 
 export async function getRoleModelTraining(projectId: string): Promise<RoleModelJob> {
   return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/train`)
+}
+
+export async function getRoleModelChatHistory(projectId: string): Promise<RoleModelChatHistoryItem[]> {
+  return requestJson<RoleModelChatHistoryItem[]>(`/api/projects/${projectId}/role-model/chat`)
+}
+
+export async function clearRoleModelChatHistory(projectId: string): Promise<void> {
+  await requestJson<void>(`/api/projects/${projectId}/role-model/chat`, {
+    method: 'DELETE',
+  })
 }
 
 export async function chatWithRoleModel(

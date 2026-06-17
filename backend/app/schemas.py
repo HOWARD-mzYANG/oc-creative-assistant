@@ -233,6 +233,20 @@ class RoleModelChatResponse(BaseModel):
     warning: str = ""
 
 
+class RoleModelChatHistoryItemPayload(BaseModel):
+    """持久化后的角色模型聊天消息。"""
+
+    id: str
+    role: Literal["user", "assistant"]
+    content: str
+    mode: str = ""
+    warning: str = ""
+    character_name: str = ""
+    cited_node_ids: list[str] = Field(default_factory=list)
+    retrieved_context: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
 class RoleModelStatePayload(BaseModel):
     """前端角色模型工作台所需的聚合状态。"""
 

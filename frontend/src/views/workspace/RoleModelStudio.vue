@@ -3,7 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   chatWithRoleModel,
+  clearRoleModelChatHistory,
   generateRoleModelDataset,
+  getRoleModelChatHistory,
   getRoleModelDataset,
   getRoleModelState,
   inspectRoleModelHardware,
@@ -12,6 +14,7 @@ import {
   startRoleModelDownload,
   startRoleModelTraining,
   type RoleModelChatMessage,
+  type RoleModelChatHistoryItem,
   type RoleModelDataset,
   type RoleModelJob,
   type RoleModelRecommendation,
@@ -27,6 +30,7 @@ type ActionName =
   | 'save'
   | 'download'
   | 'train'
+  | 'clear-chat'
 
 interface StudioMessage {
   role: 'user' | 'assistant'
@@ -175,6 +179,15 @@ function parseError(errorLike: unknown): string {
   return errorLike instanceof Error ? errorLike.message : String(errorLike)
 }
 
+function historyItemToStudioMessage(item: RoleModelChatHistoryItem): StudioMessage {
+  return {
+    role: item.role,
+    content: item.content,
+    mode: item.mode || undefined,
+    warning: item.warning || undefined,
+  }
+}
+
 function clampInteger(value: number, min: number, max: number, fallback: number): number {
   const next = Math.round(Number(value))
   if (!Number.isFinite(next)) return fallback
@@ -253,20 +266,30 @@ async function refreshState(): Promise<void> {
   }
 }
 
+async function loadChatHistory(): Promise<void> {
+  if (!projectId.value) return
+  const history = await getRoleModelChatHistory(projectId.value)
+  chatMessages.value = history.map(historyItemToStudioMessage)
+  scrollChat()
+}
+
 async function loadAll(): Promise<void> {
   await runAction('load', async () => {
-    const [nextState, nextDataset] = await Promise.all([
+    const [nextState, nextDataset, nextChatHistory] = await Promise.all([
       getRoleModelState(projectId.value),
       getRoleModelDataset(projectId.value),
+      getRoleModelChatHistory(projectId.value),
     ])
     state.value = nextState
     dataset.value = nextDataset
+    chatMessages.value = nextChatHistory.map(historyItemToStudioMessage)
     datasetPage.value = 1
     datasetDirty.value = false
     applyRecommendation(nextState.recommendation)
     if (!preferredModelId.value.trim()) {
       syncRecommendedModelInput(nextState.recommendation)
     }
+    scrollChat()
   })
 }
 
@@ -411,6 +434,11 @@ async function sendChat(): Promise<void> {
       mode: response.mode,
       warning: response.warning,
     })
+    try {
+      await loadChatHistory()
+    } catch (caught) {
+      notice.value = `角色模型已回复，但刷新聊天记录失败：${parseError(caught)}`
+    }
   } catch (caught) {
     chatMessages.value.push({
       role: 'assistant',
@@ -423,8 +451,12 @@ async function sendChat(): Promise<void> {
   }
 }
 
-function clearChat(): void {
-  chatMessages.value = []
+async function clearChat(): Promise<void> {
+  await runAction('clear-chat', async () => {
+    await clearRoleModelChatHistory(projectId.value)
+    chatMessages.value = []
+    notice.value = '角色模型聊天记录已清空'
+  })
 }
 
 function scrollChat(): void {
@@ -763,7 +795,12 @@ onBeforeUnmount(() => {
               <span class="role-model__kicker">Step 4</span>
               <h3>角色模型聊天</h3>
             </div>
-            <button type="button" class="role-model__button role-model__button--ghost" @click="clearChat">
+            <button
+              type="button"
+              class="role-model__button role-model__button--ghost"
+              :disabled="isBusy || !chatMessages.length"
+              @click="clearChat"
+            >
               清空
             </button>
           </div>

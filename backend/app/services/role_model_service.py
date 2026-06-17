@@ -20,21 +20,23 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.paths import DATA_DIR
 from app.db.database import SessionLocal
-from app.db.models import EdgeORM, NodeORM, ProjectORM
+from app.db.models import ChatMessageORM, ChatSessionORM, EdgeORM, NodeORM, ProjectORM
 from app.llm.factory import get_llm_provider
 from app.rag.retrieval import build_project_vector_context, merge_context
 from app.schemas import (
     RoleModelChatMessagePayload,
+    RoleModelChatHistoryItemPayload,
     RoleModelChatRequest,
     RoleModelChatResponse,
     RoleModelDatasetPayload,
@@ -60,6 +62,8 @@ _DATASET_MAX_GENERATED_SAMPLES = 800
 _THREAD_LOCK = threading.Lock()
 _RUNNING_THREADS: dict[tuple[str, str], threading.Thread] = {}
 _LOCAL_RUNTIME_CACHE: dict[str, Any] = {}
+_ROLE_CHAT_HISTORY_LIMIT = 16
+_ROLE_CHAT_THREAD_PREFIX = "role-model-chat"
 
 
 _MODEL_CANDIDATES: list[dict[str, Any]] = [
@@ -164,6 +168,161 @@ def _validate_model_id(model_id: str) -> str:
     if not _MODEL_ID_RE.match(cleaned):
         raise ValueError("ModelScope model_id must look like 'namespace/model-name'")
     return cleaned
+
+
+def _role_chat_digest(project_id: str) -> str:
+    return hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:24]
+
+
+def _role_chat_session_id(project_id: str) -> str:
+    return f"{_ROLE_CHAT_THREAD_PREFIX}-{_role_chat_digest(project_id)}"
+
+
+def _role_chat_thread_id(project_id: str) -> str:
+    return f"{_ROLE_CHAT_THREAD_PREFIX}:{_role_chat_digest(project_id)}"
+
+
+def _get_role_chat_session(db, project_id: str, *, create: bool) -> ChatSessionORM | None:
+    require_project(db, project_id)
+    thread_id = _role_chat_thread_id(project_id)
+    session = db.execute(
+        select(ChatSessionORM).where(
+            ChatSessionORM.project_id == project_id,
+            ChatSessionORM.thread_id == thread_id,
+        )
+    ).scalar_one_or_none()
+    if session is not None or not create:
+        return session
+
+    session = ChatSessionORM(
+        id=_role_chat_session_id(project_id),
+        project_id=project_id,
+        thread_id=thread_id,
+        title="角色模型聊天",
+    )
+    db.add(session)
+    db.flush()
+    return session
+
+
+def _chat_history_item(message: ChatMessageORM) -> RoleModelChatHistoryItemPayload:
+    meta = message.meta if isinstance(message.meta, dict) else {}
+    cited_node_ids = meta.get("cited_node_ids")
+    if not isinstance(cited_node_ids, list):
+        cited_node_ids = []
+    retrieved_context = meta.get("retrieved_context")
+    if not isinstance(retrieved_context, list):
+        retrieved_context = []
+    return RoleModelChatHistoryItemPayload(
+        id=message.id,
+        role="assistant" if message.role == "assistant" else "user",
+        content=message.content,
+        mode=str(meta.get("mode") or ""),
+        warning=str(meta.get("warning") or ""),
+        character_name=str(meta.get("character_name") or ""),
+        cited_node_ids=[str(item) for item in cited_node_ids],
+        retrieved_context=[
+            item for item in retrieved_context if isinstance(item, dict)
+        ],
+        created_at=message.created_at,
+    )
+
+
+def get_role_model_chat_history(project_id: str) -> list[RoleModelChatHistoryItemPayload]:
+    """Read the persisted role-model chat history for a project."""
+    with SessionLocal.begin() as db:
+        session = _get_role_chat_session(db, project_id, create=False)
+        if session is None:
+            return []
+        messages = db.execute(
+            select(ChatMessageORM)
+            .where(
+                ChatMessageORM.session_id == session.id,
+                ChatMessageORM.role.in_(("user", "assistant")),
+            )
+            .order_by(ChatMessageORM.created_at, ChatMessageORM.id)
+        ).scalars()
+        return [_chat_history_item(message) for message in messages]
+
+
+def clear_role_model_chat_history(project_id: str) -> None:
+    """Delete the persisted role-model chat history for a project."""
+    with SessionLocal.begin() as db:
+        session = _get_role_chat_session(db, project_id, create=False)
+        if session is None:
+            require_project(db, project_id)
+            return
+        db.execute(delete(ChatMessageORM).where(ChatMessageORM.session_id == session.id))
+        session.conversation_summary = ""
+        session.key_facts = []
+        session.summary_message_count = 0
+
+
+def _persist_role_model_chat_turn(
+    project_id: str,
+    request: RoleModelChatRequest,
+    response: RoleModelChatResponse,
+) -> None:
+    now = datetime.now(timezone.utc)
+    with SessionLocal.begin() as db:
+        session = _get_role_chat_session(db, project_id, create=True)
+        if session is None:
+            raise ValueError("Role-model chat session could not be created")
+        user_meta = {
+            "kind": "role_model",
+            "character_name": request.character_name or "",
+        }
+        assistant_meta = {
+            "kind": "role_model",
+            "character_name": request.character_name or "",
+            "mode": response.mode,
+            "warning": response.warning,
+            "cited_node_ids": response.cited_node_ids,
+            "retrieved_context": response.retrieved_context,
+        }
+        db.add_all(
+            [
+                ChatMessageORM(
+                    id=f"rolemsg-{uuid4().hex}",
+                    session_id=session.id,
+                    role="user",
+                    content=request.message,
+                    meta=user_meta,
+                    created_at=now,
+                ),
+                ChatMessageORM(
+                    id=f"rolemsg-{uuid4().hex}",
+                    session_id=session.id,
+                    role="assistant",
+                    content=response.reply,
+                    meta=assistant_meta,
+                    created_at=now + timedelta(microseconds=1),
+                ),
+            ]
+        )
+
+
+def _request_with_persisted_history(
+    project_id: str,
+    request: RoleModelChatRequest,
+) -> RoleModelChatRequest:
+    persisted = get_role_model_chat_history(project_id)
+    if persisted:
+        history = [
+            RoleModelChatMessagePayload(role=item.role, content=item.content)
+            for item in persisted[-_ROLE_CHAT_HISTORY_LIMIT:]
+        ]
+    else:
+        history = [
+            item
+            for item in request.history[-_ROLE_CHAT_HISTORY_LIMIT:]
+            if item.role in {"user", "assistant"}
+        ]
+    return RoleModelChatRequest(
+        message=request.message,
+        character_name=request.character_name,
+        history=history,
+    )
 
 
 def _memory_windows() -> tuple[float, float]:
@@ -1356,9 +1515,13 @@ def _try_local_chat(
 def chat_with_role_model(project_id: str, request: RoleModelChatRequest) -> RoleModelChatResponse:
     with SessionLocal() as db:
         require_project(db, project_id)
+    request_with_history = _request_with_persisted_history(project_id, request)
     context, _ = _context_for_chat(project_id, request.message)
-    local = _try_local_chat(project_id, request, context)
+    local = _try_local_chat(project_id, request_with_history, context)
     if local is not None:
+        _persist_role_model_chat_turn(project_id, request, local)
         return local
     warning = "本地 LoRA 模型尚未就绪或当前设备缺少推理依赖，已使用主 AI API 按训练样本风格兜底。"
-    return _chat_with_api_fallback(project_id, request, context, warning)
+    fallback = _chat_with_api_fallback(project_id, request_with_history, context, warning)
+    _persist_role_model_chat_turn(project_id, request, fallback)
+    return fallback

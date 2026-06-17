@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from app.schemas import (
+    RoleModelChatHistoryItemPayload,
     RoleModelChatRequest,
     RoleModelChatResponse,
     RoleModelDatasetGenerateRequest,
@@ -19,9 +20,11 @@ from app.schemas import (
 )
 from app.services.role_model_service import (
     chat_with_role_model,
+    clear_role_model_chat_history,
     generate_dataset,
     get_dataset,
     get_download_status,
+    get_role_model_chat_history,
     get_role_model_state,
     get_training_status,
     inspect_hardware,
@@ -125,6 +128,18 @@ async def create_role_model_training(
 async def read_role_model_training(project_id: str) -> RoleModelJobPayload:
     """Read the current LoRA training job state."""
     return get_training_status(project_id)
+
+
+@router.get("/chat", response_model=list[RoleModelChatHistoryItemPayload])
+async def read_role_model_chat(project_id: str) -> list[RoleModelChatHistoryItemPayload]:
+    """Read persisted role-model chat history."""
+    return get_role_model_chat_history(project_id)
+
+
+@router.delete("/chat", status_code=204)
+async def delete_role_model_chat(project_id: str) -> None:
+    """Clear persisted role-model chat history."""
+    clear_role_model_chat_history(project_id)
 
 
 @router.post("/chat", response_model=RoleModelChatResponse)
