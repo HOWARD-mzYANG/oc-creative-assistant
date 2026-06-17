@@ -79,6 +79,10 @@ class ServiceSettings:
     quantization_bit: int | None
     fp16: bool
     bf16: bool
+    model_api_auto_start: bool
+    model_api_host: str
+    model_api_port: int
+    model_api_startup_timeout: int
     model_api_base_url: str | None
     model_api_key: str | None
     model_api_name: str
@@ -98,7 +102,9 @@ def get_settings() -> ServiceSettings:
     - ROLE_TRAINING_DRY_RUN：演示时跳过真实训练，只验证数据和状态链路。
     - ROLE_QUANTIZATION_BIT：QLoRA 量化位数，默认 4；设为 0 可关闭量化。
     - ROLE_TRAINING_FP16 / ROLE_TRAINING_BF16：训练混合精度；普通 AutoDL 卡默认用 fp16。
-    - ROLE_MODEL_API_BASE_URL：已加载 LoRA adapter 的 OpenAI-style 推理服务地址。
+    - ROLE_MODEL_API_AUTO_START：对话时自动启动/切换 LLaMA-Factory API，默认开启。
+    - ROLE_MODEL_API_HOST / ROLE_MODEL_API_PORT：自动启动模型 API 时的监听地址和端口。
+    - ROLE_MODEL_API_BASE_URL：可选；自动模式下作为内部访问地址，手动模式下表示外部固定 API。
     - ROLE_DATASET_API_BASE_URL：训练数据生成使用的 OpenAI-style API 地址；配置后 240 条样本必须由 API 生成。
     """
     workspace = Path(
@@ -116,6 +122,10 @@ def get_settings() -> ServiceSettings:
         quantization_bit=_get_optional_int("ROLE_QUANTIZATION_BIT", 4),
         fp16=_get_bool("ROLE_TRAINING_FP16", True),
         bf16=_get_bool("ROLE_TRAINING_BF16", False),
+        model_api_auto_start=_get_bool("ROLE_MODEL_API_AUTO_START", True),
+        model_api_host=os.getenv("ROLE_MODEL_API_HOST", "127.0.0.1"),
+        model_api_port=_get_int("ROLE_MODEL_API_PORT", 8000),
+        model_api_startup_timeout=_get_int("ROLE_MODEL_API_STARTUP_TIMEOUT", 180),
         model_api_base_url=os.getenv("ROLE_MODEL_API_BASE_URL") or None,
         model_api_key=os.getenv("ROLE_MODEL_API_KEY") or None,
         model_api_name=os.getenv("ROLE_MODEL_API_NAME", "role-lora"),

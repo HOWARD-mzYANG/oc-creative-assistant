@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from app.dataset import role_system_prompt, snapshot_context
 from app.jobs import append_chat_turn, create_job, get_job, get_material_brief, list_jobs, read_chat_history
+from app.model_runtime import ensure_model_api, get_runtime_status, stop_model_api
 from app.schemas import CreateJobRequest, HealthResponse, RoleChatLogItem, RoleChatRequest, RoleModelJob
 from app.settings import get_settings
 
@@ -35,10 +36,17 @@ async def health() -> HealthResponse:
     """
     settings = get_settings()
     settings.workspace.mkdir(parents=True, exist_ok=True)
+    runtime = get_runtime_status()
     return HealthResponse(
         workspace=str(settings.workspace),
         dry_run=settings.dry_run,
-        model_api_configured=bool(settings.model_api_base_url),
+        model_api_configured=settings.model_api_auto_start or bool(settings.model_api_base_url),
+        model_api_auto_start=settings.model_api_auto_start,
+        active_model_job_id=runtime["active_model_job_id"],
+        active_model_api_url=runtime["active_model_api_url"],
+        active_model_api_pid=runtime["active_model_api_pid"],
+        active_model_api_config=runtime["active_model_api_config"],
+        active_model_api_log=runtime["active_model_api_log"],
         dataset_api_configured=bool(settings.dataset_api_base_url),
     )
 
@@ -126,7 +134,17 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
         yield _sse({"type": "error", "message": f"训练任务状态为 {job.status}，还不能用于对话"})
         return
     material_brief = get_material_brief(job_id)
-    if not settings.model_api_base_url:
+
+    # 自动模式下，用户在前端选中哪个 succeeded job，这里就加载哪个 job 的 adapter。
+    # 如果关闭自动模式且没有配置固定模型 API，则保留演示兜底，方便无 GPU 环境验证链路。
+    if settings.model_api_auto_start or settings.model_api_base_url:
+        yield _sse({"type": "status", "message": "正在加载或切换角色模型..."})
+        try:
+            model_api_base_url = await asyncio.to_thread(ensure_model_api, job)
+        except Exception as exc:  # noqa: BLE001
+            yield _sse({"type": "error", "message": f"角色模型启动失败：{exc}"})
+            return
+    else:
         reply = _demo_reply_text(payload, job_id)
         async for item in _stream_text(reply):
             yield item
@@ -151,7 +169,7 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
     messages.extend({"role": message.role, "content": message.content} for message in history)
     messages.append({"role": "user", "content": payload.message})
 
-    url = settings.model_api_base_url.rstrip("/") + "/v1/chat/completions"
+    url = model_api_base_url.rstrip("/") + "/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     if settings.model_api_key:
         headers["Authorization"] = f"Bearer {settings.model_api_key}"
@@ -203,3 +221,9 @@ async def stream_role_chat(job_id: str, payload: RoleChatRequest) -> StreamingRe
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.on_event("shutdown")
+async def shutdown_runtime() -> None:
+    """关闭训练服务时顺手停止托管的模型 API，避免 AutoDL 上残留占显存的子进程。"""
+    await asyncio.to_thread(stop_model_api)

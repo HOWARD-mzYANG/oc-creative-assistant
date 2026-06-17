@@ -101,6 +101,7 @@ export interface RoleChatLogItemDto extends RoleChatMessageDto {
 
 export type RoleChatStreamEvent =
   | { type: 'token'; text: string }
+  | { type: 'status'; message: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 

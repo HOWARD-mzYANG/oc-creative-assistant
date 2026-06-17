@@ -45,6 +45,8 @@ const materialError = ref('')
 const draft = ref('')
 const chatMessages = ref<RoleChatMessageDto[]>([])
 const streamingReply = ref('')
+// 自动切换 LoRA 时，远程服务可能需要先加载基础模型和 adapter；这个状态只做过程提示，不会写入聊天历史。
+const chatStatus = ref('')
 const isChatting = ref(false)
 
 // 自定义“已有模型”下拉框状态。用自定义下拉而不是原生 select，是为了让展开面板
@@ -386,6 +388,7 @@ async function handleSend() {
   draft.value = ''
   chatMessages.value.push({ role: 'user', content: text })
   streamingReply.value = ''
+  chatStatus.value = ''
   isChatting.value = true
   error.value = ''
 
@@ -400,7 +403,10 @@ async function handleSend() {
       },
       (event) => {
         if (event.type === 'token') {
+          chatStatus.value = ''
           streamingReply.value += event.text
+        } else if (event.type === 'status') {
+          chatStatus.value = event.message
         } else if (event.type === 'error') {
           error.value = event.message
         }
@@ -413,6 +419,7 @@ async function handleSend() {
     error.value = e instanceof Error ? e.message : '角色对话失败'
   } finally {
     streamingReply.value = ''
+    chatStatus.value = ''
     isChatting.value = false
   }
 }
@@ -578,6 +585,7 @@ onBeforeUnmount(() => {
         </header>
         <div class="role-model__chat">
           <p v-if="isHistoryLoading" class="role-model__hint">正在读取远程聊天记录...</p>
+          <p v-if="chatStatus" class="role-model__hint">{{ chatStatus }}</p>
           <p v-if="!chatMessages.length && !streamingReply" class="role-model__hint">
             请选择已完成的角色 LoRA 对话；没有可用模型时会用现有 API + 快照资料。
           </p>

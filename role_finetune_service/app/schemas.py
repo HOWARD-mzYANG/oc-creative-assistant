@@ -146,6 +146,12 @@ class HealthResponse(BaseModel):
     workspace: str
     dry_run: bool
     model_api_configured: bool
+    model_api_auto_start: bool = False
+    active_model_job_id: str | None = None
+    active_model_api_url: str | None = None
+    active_model_api_pid: int | None = None
+    active_model_api_config: str | None = None
+    active_model_api_log: str | None = None
     dataset_api_configured: bool
 
 
