@@ -116,6 +116,10 @@ async def _proxy_model_api(job_id: str, payload: RoleChatRequest) -> AsyncIterat
     训练服务在这里负责拼入角色 system prompt、资料快照和最近对话历史，再把上游
     流式 token 统一转换成前端约定的 SSE 事件。
     """
+    if not payload.message.strip():
+        yield _sse({"type": "error", "message": "消息不能为空。"})
+        yield _sse({"type": "done"})
+        return
     settings = get_settings()
     job = get_job(job_id)
     if job is None:

@@ -443,10 +443,23 @@ async def stream_role_chat(
     有可用 job_id 且训练服务在线时，转发到训练服务的 adapter/API；否则立刻降级到
     主后端资料兜底。这个策略让“训练服务离线”不会阻断角色对话演示。
     """
+    if not payload.message.strip():
+        yield _sse({"type": "error", "message": "消息不能为空。"})
+        yield _sse({"type": "done"})
+        return
     snapshot = build_role_snapshot(project_id, character_id)
     material_brief = build_role_material_brief(snapshot)
     settings = _settings_or_none()
     if settings is None or not payload.job_id:
+        async for item in _fallback_stream(snapshot, payload, material_brief):
+            yield item
+        return
+
+    try:
+        job = get_role_training_job(project_id, character_id, payload.job_id)
+    except HTTPException:
+        job = None
+    if job is None or job.status != "succeeded":
         async for item in _fallback_stream(snapshot, payload, material_brief):
             yield item
         return
