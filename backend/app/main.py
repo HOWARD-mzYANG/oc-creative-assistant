@@ -12,7 +12,6 @@ from app.api.routes.chat import router as chat_router
 from app.api.routes.graph import router as graph_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.rag import router as rag_router
-from app.api.routes.role_model import router as role_model_router
 from app.api.routes.system import router as system_router
 from app.db.database import init_db
 from app.services.graph_store import ensure_default_project
@@ -55,4 +54,3 @@ app.include_router(graph_router)
 app.include_router(projects_router)
 app.include_router(rag_router)
 app.include_router(chat_router)
-app.include_router(role_model_router)

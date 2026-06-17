@@ -66,11 +66,6 @@ export const router = createRouter({
           name: 'workspace-world',
           component: () => import('../views/workspace/WorldCanvas.vue'),
         },
-        {
-          path: 'role-model',
-          name: 'workspace-role-model',
-          component: () => import('../views/workspace/RoleModelStudio.vue'),
-        },
       ],
     },
     {

@@ -1,4 +1,0 @@
-# Optional CUDA runtime for local LoRA training on NVIDIA GPUs.
-# Install this after backend/requirements.txt when the host driver supports CUDA 12.8+.
---index-url https://download.pytorch.org/whl/cu128
-torch==2.11.0+cu128
