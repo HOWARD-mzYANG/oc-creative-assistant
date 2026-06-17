@@ -112,9 +112,13 @@ export async function getRoleModelDataset(projectId: string): Promise<RoleModelD
   return requestJson<RoleModelDataset>(`/api/projects/${projectId}/role-model/dataset`)
 }
 
-export async function generateRoleModelDataset(projectId: string): Promise<RoleModelDataset> {
+export async function generateRoleModelDataset(
+  projectId: string,
+  payload?: { samples_per_character?: number; max_samples?: number },
+): Promise<RoleModelDataset> {
   return requestJson<RoleModelDataset>(`/api/projects/${projectId}/role-model/dataset/generate`, {
     method: 'POST',
+    body: JSON.stringify(payload ?? {}),
   })
 }
 

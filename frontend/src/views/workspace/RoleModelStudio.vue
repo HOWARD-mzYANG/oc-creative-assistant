@@ -57,6 +57,10 @@ const chatSending = ref(false)
 const isRefreshing = ref(false)
 const appliedRecommendationKey = ref('')
 const datasetPage = ref(1)
+const datasetGenerateForm = ref({
+  samples_per_character: 32,
+  max_samples: 500,
+})
 
 const trainForm = ref({
   epochs: 1,
@@ -171,6 +175,23 @@ function parseError(errorLike: unknown): string {
   return errorLike instanceof Error ? errorLike.message : String(errorLike)
 }
 
+function clampInteger(value: number, min: number, max: number, fallback: number): number {
+  const next = Math.round(Number(value))
+  if (!Number.isFinite(next)) return fallback
+  return Math.max(min, Math.min(next, max))
+}
+
+function datasetGenerationPayload(): { samples_per_character: number; max_samples: number } {
+  const samplesPerCharacter = clampInteger(datasetGenerateForm.value.samples_per_character, 8, 80, 32)
+  const maxSamples = clampInteger(datasetGenerateForm.value.max_samples, 24, 800, 500)
+  datasetGenerateForm.value.samples_per_character = samplesPerCharacter
+  datasetGenerateForm.value.max_samples = maxSamples
+  return {
+    samples_per_character: samplesPerCharacter,
+    max_samples: maxSamples,
+  }
+}
+
 function applyRecommendation(next: RoleModelRecommendation | null): void {
   recommendation.value = next
   if (!next) return
@@ -274,7 +295,8 @@ async function recommendModel(): Promise<void> {
 
 async function generateDataset(): Promise<void> {
   await runAction('generate', async () => {
-    dataset.value = await generateRoleModelDataset(projectId.value)
+    const payload = datasetGenerationPayload()
+    dataset.value = await generateRoleModelDataset(projectId.value, payload)
     datasetPage.value = 1
     datasetDirty.value = false
     await refreshState()
@@ -652,6 +674,29 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <div class="role-model__dataset-controls">
+            <label class="role-model__field role-model__field--compact">
+              <span>每角色目标</span>
+              <input
+                v-model.number="datasetGenerateForm.samples_per_character"
+                type="number"
+                min="8"
+                max="80"
+                step="4"
+              />
+            </label>
+            <label class="role-model__field role-model__field--compact">
+              <span>最多样本</span>
+              <input
+                v-model.number="datasetGenerateForm.max_samples"
+                type="number"
+                min="24"
+                max="800"
+                step="24"
+              />
+            </label>
+          </div>
+
           <div class="role-model__dataset-meta">
             <span>{{ enabledSampleCount }} / {{ dataset.samples.length }} 条启用</span>
             <span>当前 {{ datasetRangeLabel }}</span>
@@ -1016,6 +1061,11 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.role-model__field--compact {
+  width: min(160px, 100%);
+  margin-top: 0;
+}
+
 .role-model__field input,
 .role-model__train-grid input,
 .role-model__sample-name,
@@ -1185,6 +1235,13 @@ onBeforeUnmount(() => {
 .role-model__dataset-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.role-model__dataset-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .role-model__dataset-meta {

@@ -38,6 +38,7 @@ from app.schemas import (
     RoleModelChatRequest,
     RoleModelChatResponse,
     RoleModelDatasetPayload,
+    RoleModelDatasetGenerateRequest,
     RoleModelDatasetSamplePayload,
     RoleModelDatasetUpdateRequest,
     RoleModelDownloadRequest,
@@ -55,7 +56,7 @@ from app.services.graph_repository import require_project
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _ROLE_MODEL_ROOT = DATA_DIR / "role_models"
-_DATASET_MAX_GENERATED_SAMPLES = 120
+_DATASET_MAX_GENERATED_SAMPLES = 800
 _THREAD_LOCK = threading.Lock()
 _RUNNING_THREADS: dict[tuple[str, str], threading.Thread] = {}
 _LOCAL_RUNTIME_CACHE: dict[str, Any] = {}
@@ -548,10 +549,218 @@ def _fallback_samples(project_id: str) -> list[RoleModelDatasetSamplePayload]:
     return samples
 
 
-def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
+def _dataset_generation_targets(
+    payload: RoleModelDatasetGenerateRequest | None,
+    character_count: int,
+) -> tuple[int, int]:
+    request = payload or RoleModelDatasetGenerateRequest()
+    per_character = max(8, min(int(request.samples_per_character), 80))
+    requested_total = max(24, min(int(request.max_samples), _DATASET_MAX_GENERATED_SAMPLES))
+    if character_count <= 0:
+        return per_character, min(requested_total, 24)
+    target_total = min(requested_total, max(24, character_count * per_character))
+    per_character = max(8, min(per_character, max(8, target_total // character_count)))
+    return per_character, target_total
+
+
+def _profile_base_text(profile: dict[str, Any]) -> str:
+    fields = profile.get("fields") or {}
+    field_text = "；".join(f"{key}: {value}" for key, value in fields.items() if str(value).strip())
+    return (profile.get("content") or field_text or "这个角色还没有详细介绍。").strip()
+
+
+def _supplemental_samples(
+    profiles: list[dict[str, Any]],
+    context: list[dict[str, Any]],
+    samples_per_character: int,
+) -> list[RoleModelDatasetSamplePayload]:
+    world_hint = "；".join(item["title"] for item in context[:6]) or "当前项目世界观"
+    scene_templates = [
+        (
+            "self-intro",
+            "请用{name}自己的口吻介绍自己，不要像设定说明。",
+            "",
+            "我是{name}。{base}\n{nuance}如果你想理解我，别只看我的身份，要看我在关键时刻会守住什么。",
+        ),
+        (
+            "motivation",
+            "{name}真正想要的是什么？",
+            "",
+            "我想要的从来不是一句漂亮话能概括的。{base}\n{nuance}我会把这件事藏在行动里，而不是反复解释给旁人听。",
+        ),
+        (
+            "boundary",
+            "如果有人要求{name}做违背本心的事，{name}会怎么回答？",
+            "对方语气很强硬，希望角色立刻妥协。",
+            "我可以听完你的理由，但不代表我会照做。{nuance}有些界线一旦退开，就再也不像自己了。",
+        ),
+        (
+            "conflict",
+            "写一段{name}在冲突中的回应。",
+            "对方质疑角色的决定，并把局势推向僵持。",
+            "你可以质疑我，但别把犹豫误认成软弱。{nuance}我做这个决定，是因为我已经看见了不做决定的代价。",
+        ),
+        (
+            "trust",
+            "{name}会怎样表达信任？",
+            "",
+            "信任不是把后背随便交出去。{nuance}如果我愿意相信你，那是因为我把你的选择也算进了我的未来。",
+        ),
+        (
+            "fear",
+            "{name}最害怕什么？请用角色口吻回答。",
+            "",
+            "我怕的不是输。{nuance}我怕的是到了最后才发现，自己为了赢，把真正不能失去的东西也交出去了。",
+        ),
+        (
+            "memory",
+            "让{name}讲一个和世界观有关的记忆。",
+            "当前世界/剧情线索：{world}",
+            "我记得{world}。那不是背景板，它会逼人选择，也会让人明白自己到底站在哪一边。",
+        ),
+        (
+            "relationship",
+            "{name}如何评价自己和其他角色的关系？",
+            "相关关系：{related}",
+            "关系从来不是写在纸上的称呼。{related}。{nuance}真正重要的是，当事情变糟时，谁还愿意留下来。",
+        ),
+        (
+            "apology",
+            "{name}做错事后会怎样道歉？",
+            "",
+            "我不会把道歉说得很轻。{nuance}如果是我的错，我会承认；但承认之后，我还得把它补回来。",
+        ),
+        (
+            "refusal",
+            "写一段{name}拒绝别人请求的对白。",
+            "请求看似合理，但会伤害角色珍视的东西。",
+            "不行。不是因为我不理解你的处境，而是因为我太理解这一步之后会发生什么。{nuance}",
+        ),
+        (
+            "comfort",
+            "{name}会怎样安慰一个陷入自责的人？",
+            "",
+            "别急着把所有错都揽到自己身上。{nuance}人会在混乱里做出不完整的选择，但这不代表你只能停在那一刻。",
+        ),
+        (
+            "anger",
+            "{name}生气时会怎么说话？",
+            "对方触碰了角色底线。",
+            "你最好现在停下。{nuance}我不想把话说得更难听，但你已经越过了我能忍受的地方。",
+        ),
+        (
+            "choice",
+            "让{name}在两个艰难选择之间做决定。",
+            "两个选择都需要付出代价。",
+            "没有干净的选择。{nuance}所以我会选那个让我明天还能直视自己的答案，哪怕它更痛。",
+        ),
+        (
+            "secret",
+            "{name}被问到秘密时会怎样回避？",
+            "",
+            "有些事我还不能告诉你。{nuance}不是因为我不信任你，而是因为说出口以后，你也会被卷进来。",
+        ),
+        (
+            "plan",
+            "{name}制定计划时会怎么表达？",
+            "局势紧张，时间不多。",
+            "先别慌。{nuance}把能确认的事排出来，把不能确认的风险留出余地，然后我们再决定谁往前走。",
+        ),
+        (
+            "challenge",
+            "用户质疑{name}不像自己，角色会怎么回应？",
+            "",
+            "你看到的只是我现在这一面。{base}\n{nuance}人不是永远用同一种语气活着，但核心的东西不会轻易变。",
+        ),
+        (
+            "promise",
+            "{name}会怎样许下承诺？",
+            "",
+            "我不会轻易保证。{nuance}但如果我说了会做到，那这句话就不只是安慰你，也是拴住我自己的绳结。",
+        ),
+        (
+            "doubt",
+            "{name}动摇时会怎么说？",
+            "",
+            "我也会怀疑。{nuance}只是怀疑不代表停下，它提醒我再看一眼自己为什么走到这里。",
+        ),
+        (
+            "scene-dialogue",
+            "写一段{name}和用户的短对白，体现角色语气。",
+            "用户：你现在还相信这个计划吗？",
+            "相信，但不是盲信。{nuance}如果它开始偏离我们要保护的东西，我会第一个把它改掉。",
+        ),
+        (
+            "worldview",
+            "{name}如何看待这个世界？",
+            "世界/剧情线索：{world}",
+            "这个世界不会因为谁心软就停下来。{nuance}可正因为如此，人才更要决定自己不愿意变成什么样。",
+        ),
+        (
+            "help",
+            "{name}会怎样请求帮助？",
+            "",
+            "我需要你帮我。{nuance}这句话对我来说并不容易，但现在逞强只会让局势更糟。",
+        ),
+        (
+            "lonely",
+            "{name}独处时会说什么？",
+            "",
+            "安静下来以后，很多声音反而更清楚。{nuance}我会想起自己从哪里来，也会想起还有哪些事没做完。",
+        ),
+        (
+            "betrayal",
+            "{name}面对背叛会怎样反应？",
+            "",
+            "我最难接受的不是你骗了我。{nuance}是我曾经真的把你放进了计划里，甚至放进了希望里。",
+        ),
+        (
+            "resolve",
+            "{name}在最后关头会怎样表态？",
+            "局势已经没有完美方案。",
+            "那就这样。{nuance}既然没有人能替我承担这个选择，我就自己站到它前面去。",
+        ),
+    ]
+    moods = ["克制", "更锋利", "更疲惫", "更温柔", "更坚定", "更警惕"]
+    samples: list[RoleModelDatasetSamplePayload] = []
+    for profile in profiles:
+        name = profile["name"]
+        base = _profile_base_text(profile)[:900]
+        related = "；".join(profile.get("related") or []) or "暂无明确关系"
+        for index in range(samples_per_character):
+            tag, instruction, input_text, output = scene_templates[index % len(scene_templates)]
+            mood = moods[(index // len(scene_templates)) % len(moods)]
+            nuance = f"这一次，我的语气会更偏向{mood}。"
+            rendered_instruction = instruction.format(name=name, world=world_hint, related=related)
+            rendered_input = input_text.format(name=name, world=world_hint, related=related)
+            rendered_output = output.format(
+                name=name,
+                base=base,
+                world=world_hint,
+                related=related,
+                nuance=nuance,
+            )
+            samples.append(
+                RoleModelDatasetSamplePayload(
+                    id=_sample_id(name, rendered_instruction, rendered_output),
+                    character_name=name,
+                    instruction=rendered_instruction,
+                    input=rendered_input,
+                    output=rendered_output,
+                    tags=[tag, "supplemental"],
+                    source_node_ids=[profile["id"]],
+                )
+            )
+    return samples
+
+
+def generate_dataset(
+    project_id: str,
+    payload: RoleModelDatasetGenerateRequest | None = None,
+) -> RoleModelDatasetPayload:
     """Generate editable SFT samples from current OC character profiles."""
     profiles, context = _character_profiles(project_id)
-    max_samples = min(_DATASET_MAX_GENERATED_SAMPLES, max(24, len(profiles) * 8))
+    samples_per_character, max_samples = _dataset_generation_targets(payload, len(profiles))
     if not profiles:
         samples = _fallback_samples(project_id)
     else:
@@ -563,8 +772,9 @@ def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
         user = (
             f"[角色卡]\n{json.dumps(profiles, ensure_ascii=False)}\n\n"
             f"[项目世界/剧情摘要]\n{json.dumps(context, ensure_ascii=False)}\n\n"
-            "请为每个角色生成 4 到 8 条中文或用户原语言的 instruction/input/output 样本。"
-            f"总样本数不要超过 {max_samples} 条。"
+            f"请为每个角色生成约 {samples_per_character} 条中文或用户原语言的 instruction/input/output 样本。"
+            f"总样本数尽量接近但不要超过 {max_samples} 条。"
+            "样本需要覆盖自我介绍、关系、冲突、拒绝、安慰、情绪失控、计划、世界观、关键选择、短对白等场景。"
             "id 可以先留空或自拟；source_node_ids 使用角色 id。"
         )
         try:
@@ -578,15 +788,22 @@ def generate_dataset(project_id: str) -> RoleModelDatasetPayload:
 
         if not samples:
             samples = _fallback_samples(project_id)
+        samples.extend(_supplemental_samples(profiles, context, samples_per_character))
 
     normalized: list[RoleModelDatasetSamplePayload] = []
-    for sample in samples[:max_samples]:
+    seen_ids: set[str] = set()
+    for sample in samples:
+        if len(normalized) >= max_samples:
+            break
         instruction = sample.instruction.strip()
         output = sample.output.strip()
         if not instruction or not output:
             continue
         character_name = sample.character_name.strip() or "角色"
         sample_id = sample.id.strip() or _sample_id(character_name, instruction, output)
+        if sample_id in seen_ids:
+            continue
+        seen_ids.add(sample_id)
         normalized.append(
             RoleModelDatasetSamplePayload(
                 id=sample_id,

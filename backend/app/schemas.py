@@ -163,6 +163,13 @@ class RoleModelDatasetPayload(BaseModel):
     updated_at: str | None = None
 
 
+class RoleModelDatasetGenerateRequest(BaseModel):
+    """控制 AI 生成角色 LoRA 数据集的规模。"""
+
+    samples_per_character: int = Field(default=32, ge=8, le=80)
+    max_samples: int = Field(default=500, ge=24, le=800)
+
+
 class RoleModelDatasetUpdateRequest(BaseModel):
     """整体替换角色模型训练数据集。"""
 

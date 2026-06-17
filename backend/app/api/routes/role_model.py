@@ -1,10 +1,11 @@
 """HTTP routes for project-scoped OC role model workflows."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 from app.schemas import (
     RoleModelChatRequest,
     RoleModelChatResponse,
+    RoleModelDatasetGenerateRequest,
     RoleModelDatasetPayload,
     RoleModelDatasetUpdateRequest,
     RoleModelDownloadRequest,
@@ -68,9 +69,12 @@ async def read_role_model_dataset(project_id: str) -> RoleModelDatasetPayload:
 
 
 @router.post("/dataset/generate", response_model=RoleModelDatasetPayload)
-async def create_role_model_dataset(project_id: str) -> RoleModelDatasetPayload:
+async def create_role_model_dataset(
+    project_id: str,
+    payload: RoleModelDatasetGenerateRequest | None = Body(default=None),
+) -> RoleModelDatasetPayload:
     """Generate editable SFT samples from project characters."""
-    return generate_dataset(project_id)
+    return generate_dataset(project_id, payload or RoleModelDatasetGenerateRequest())
 
 
 @router.put("/dataset", response_model=RoleModelDatasetPayload)
