@@ -41,7 +41,7 @@ _VALID_NODE_TYPES = {
 _UPDATABLE_FIELDS = {"title", "content", "node_type", "parent_id", "parentId", "sort_order", "sortOrder"}
 _TITLE_MAX = 100
 _CONTENT_MAX = 2000
-_MAX_CHANGES_PER_BATCH = 15
+_MAX_CHANGES_PER_BATCH = 25
 _AGENTS_WITH_CHANGES = {"inspiration", "research", "structure"}
 
 
@@ -94,6 +94,7 @@ def _filter_changes(
         changes = changes[:_MAX_CHANGES_PER_BATCH]
 
     pending_ids: set[str] = set()
+    pending_node_types: dict[str, str] = {}
     seen_signatures: set[tuple] = set()
     duplicate_indices: set[int] = set()
 
@@ -107,6 +108,9 @@ def _filter_changes(
                 )
             else:
                 pending_ids.add(change.pending_id)
+                pending_node_types[change.pending_id] = str(
+                    (change.payload or {}).get("node_type") or ""
+                )
 
         signature = _signature_of(change)
         if signature is None:
@@ -124,7 +128,13 @@ def _filter_changes(
         for idx, change in enumerate(changes):
             if idx in duplicate_indices:
                 continue
-            problem = _check_one(change, db, project_id, pending_ids)
+            problem = _check_one(
+                change,
+                db,
+                project_id,
+                pending_ids,
+                pending_node_types,
+            )
             if problem is None:
                 accepted.append(change)
             else:
@@ -183,6 +193,7 @@ def _check_one(
     db: Session,
     project_id: str,
     pending_ids: set[str],
+    pending_node_types: dict[str, str],
 ) -> str | None:
     """对单条变更运行所有规则；通过则返回 None，否则返回拒绝原因。"""
     payload = change.payload or {}
@@ -206,6 +217,8 @@ def _check_one(
                 db,
                 project_id,
                 _payload_parent_id(payload),
+                pending_node_types=pending_node_types,
+                current_pending_id=change.pending_id,
             )
             if parent_problem is not None:
                 return parent_problem
@@ -291,9 +304,17 @@ def _check_world_parent(
     parent_id: str | None,
     *,
     moving_node_id: str | None = None,
+    pending_node_types: dict[str, str] | None = None,
+    current_pending_id: str | None = None,
 ) -> str | None:
     """校验 parent_id 可作为世界观父节点；None 表示根层级。"""
     if parent_id is None:
+        return None
+    if parent_id == current_pending_id:
+        return "parent_id 不能指向同一条 create_node 的 pending_id。"
+    if pending_node_types and parent_id in pending_node_types:
+        if pending_node_types[parent_id] != "worldbuilding":
+            return f"parent_id={parent_id!r} 指向的同批次 pending_id 不是 worldbuilding。"
         return None
     if parent_id == moving_node_id:
         return "parent_id 不能指向节点自身。"

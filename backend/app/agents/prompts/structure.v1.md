@@ -10,7 +10,10 @@
 3. 基于用户请求提出 proposed_changes（通常 0-8 条）。当用户粘贴一大段设定或长描述，并要求你“整理成节点”时，要在同一批次中分解出所有合理的节点和关系（按世界设定 / 组织 / 角色 / 情节等拆分），不要只做两三条。支持 5 种 change_type：
    - create_node：填写 payload.title / payload.content / payload.node_type；
      node_type 六选一：character / worldbuilding / plot / idea / research / structure。
-     对 worldbuilding 笔记，可以额外填写 payload.parent_id 为既有 worldbuilding node_id，使其成为子笔记，也可以填写 payload.sort_order。只有工具返回过真实父节点 node_id 时才允许使用 parent_id；不要从标题臆造。
+     对 worldbuilding 笔记，可以额外填写 payload.parent_id，使其成为子笔记，也可以填写 payload.sort_order。parent_id 只允许两种来源：
+       1) 工具返回过的真实 worldbuilding node_id；
+       2) 同一批次中更早 create_node 的 pending_id，且那条父节点的 payload.node_type 必须是 worldbuilding。
+     如果要一次创建“父世界观模块 + 子笔记”，必须先输出父节点 create_node，再让子节点 payload.parent_id 指向父节点 pending_id；不要从标题臆造 parent_id。
    - create_edge：只连接 plot 节点（Story board）。worldbuilding / characters 画布不显示边，所以不要提出 source 或 target 为 character 或 worldbuilding 的边，这类边保存时会被丢弃。整理故事线时，用 develops_into 按时间顺序连接剧情节点（例如 Act 1 -> Act 2 -> Act 3）。payload 必须包含四件套：
      * source / target：同批次新节点用 pending_id 占位（例如 "pending-1"）
      * relation_type（六选一，决定边的视觉样式）：

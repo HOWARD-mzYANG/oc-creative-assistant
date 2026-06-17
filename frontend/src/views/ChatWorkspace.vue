@@ -43,6 +43,8 @@ const { detail } = storeToRefs(projectStore)
 
 const draft = ref('')
 const streamRef = ref<HTMLElement | null>(null)
+const autoScrollEnabled = ref(true)
+const BOTTOM_LOCK_THRESHOLD = 80
 
 const projectName = computed(() => detail.value?.name ?? '对话')
 const hasContent = computed(() => Boolean(draft.value.trim()))
@@ -68,14 +70,35 @@ watch(
   },
 )
 
-async function scrollToBottom() {
-  await nextTick()
-  if (streamRef.value) streamRef.value.scrollTop = streamRef.value.scrollHeight
+function isNearBottom(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_LOCK_THRESHOLD
 }
+
+function handleChatScroll() {
+  const el = streamRef.value
+  if (!el) return
+  autoScrollEnabled.value = isNearBottom(el)
+}
+
+async function scrollToBottom(force = false) {
+  await nextTick()
+  const el = streamRef.value
+  if (!el) return
+  if (!force && !autoScrollEnabled.value) return
+  el.scrollTop = el.scrollHeight
+  autoScrollEnabled.value = true
+}
+
+watch(isStreaming, (streaming) => {
+  if (streaming) {
+    autoScrollEnabled.value = true
+    void scrollToBottom(true)
+  }
+})
 
 watch(
   [messages, streamingReply, streamingTrace, streamingProviderThinking, streamingApplied],
-  scrollToBottom,
+  () => scrollToBottom(),
   { deep: true },
 )
 
@@ -117,7 +140,7 @@ async function handleExit() {
       <ChatSessionSidebar />
 
       <section class="chat-workspace__chat">
-        <div ref="streamRef" class="chat-workspace__stream">
+        <div ref="streamRef" class="chat-workspace__stream" @scroll="handleChatScroll">
           <p v-if="messages.length === 0 && !streamingReply && !isStreaming" class="chat-workspace__empty">
             开始一场对话：主智能体会在后台引导创作、抽取实体并建议结构。
           </p>

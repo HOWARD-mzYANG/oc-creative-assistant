@@ -1,6 +1,7 @@
 """HTTP routes for project-scoped OC role model workflows."""
 
 from fastapi import APIRouter, Body, HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 from app.schemas import (
     RoleModelChatRequest,
@@ -74,7 +75,11 @@ async def create_role_model_dataset(
     payload: RoleModelDatasetGenerateRequest | None = Body(default=None),
 ) -> RoleModelDatasetPayload:
     """Generate editable SFT samples from project characters."""
-    return generate_dataset(project_id, payload or RoleModelDatasetGenerateRequest())
+    return await run_in_threadpool(
+        generate_dataset,
+        project_id,
+        payload or RoleModelDatasetGenerateRequest(),
+    )
 
 
 @router.put("/dataset", response_model=RoleModelDatasetPayload)

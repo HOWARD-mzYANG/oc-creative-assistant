@@ -6,7 +6,8 @@
 支持的变更类型：
 - ``create_node``：写入 NodeORM，并标记为 AI 来源；同批次内的 pending_id
   由调用方在返回时累积到 ``pending_id_map``；生成的 node_id 也会写回
-  ``record.target_id``，使跨 HTTP 请求单条接受 create_edge 时能从 DB 找回映射。
+  ``record.target_id``，使跨 HTTP 请求单条接受 create_edge / world parent_id
+  时能从 DB 找回映射。
 - ``create_edge``：写入 EdgeORM；source / target 可以是真实 node_id，也可以是
   同批次 create_node 的 pending_id；当端点无效或由 LLM 捏造时静默跳过，避免
   SQLite 外键约束导致事务炸掉。
@@ -68,6 +69,17 @@ def _payload_parent_id(payload: dict[str, Any]) -> str | None:
         return None
     value = str(raw).strip()
     return value or None
+
+
+def _resolve_world_parent_id(
+    payload: dict[str, Any],
+    pending_id_map: dict[str, str],
+) -> str | None:
+    """把 worldbuilding parent_id 从同批次 pending_id 解析成真实 node_id。"""
+    parent_id = _payload_parent_id(payload)
+    if parent_id in pending_id_map:
+        return pending_id_map[parent_id]
+    return parent_id
 
 
 def _payload_has_parent(payload: dict[str, Any]) -> bool:
@@ -301,7 +313,9 @@ def _apply_create_node(
     sort_order = _payload_sort_order(payload)
     if node_type == "worldbuilding":
         parent_id = _validate_world_parent(
-            db, record.project_id, _payload_parent_id(payload)
+            db,
+            record.project_id,
+            _resolve_world_parent_id(payload, pending_id_map),
         )
         if sort_order is None:
             sort_order = _next_world_sort_order(db, record.project_id, parent_id)

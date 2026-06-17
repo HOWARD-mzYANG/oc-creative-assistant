@@ -27,7 +27,7 @@ export interface ProjectGroup {
   items: ProjectItem[]
 }
 
-/** 右侧智能体面板中的建议卡片，目前来自 mock 数据。 */
+/** 右侧智能体面板中的建议卡片 */
 export interface AgentSuggestion {
   id: string
   title: string

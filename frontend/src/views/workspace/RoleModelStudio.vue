@@ -58,8 +58,8 @@ const isRefreshing = ref(false)
 const appliedRecommendationKey = ref('')
 const datasetPage = ref(1)
 const datasetGenerateForm = ref({
-  samples_per_character: 32,
-  max_samples: 500,
+  samples_per_character: 8,
+  max_samples: 24,
 })
 
 const trainForm = ref({
@@ -182,8 +182,8 @@ function clampInteger(value: number, min: number, max: number, fallback: number)
 }
 
 function datasetGenerationPayload(): { samples_per_character: number; max_samples: number } {
-  const samplesPerCharacter = clampInteger(datasetGenerateForm.value.samples_per_character, 8, 80, 32)
-  const maxSamples = clampInteger(datasetGenerateForm.value.max_samples, 24, 800, 500)
+  const samplesPerCharacter = clampInteger(datasetGenerateForm.value.samples_per_character, 8, 80, 8)
+  const maxSamples = clampInteger(datasetGenerateForm.value.max_samples, 24, 800, 24)
   datasetGenerateForm.value.samples_per_character = samplesPerCharacter
   datasetGenerateForm.value.max_samples = maxSamples
   return {
