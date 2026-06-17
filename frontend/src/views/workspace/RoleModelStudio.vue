@@ -29,6 +29,8 @@ const draft = ref('')
 const chatMessages = ref<RoleChatMessageDto[]>([])
 const streamingReply = ref('')
 const isChatting = ref(false)
+const isJobMenuOpen = ref(false)
+const jobSelectEl = ref<HTMLElement | null>(null)
 
 let pollTimer: ReturnType<typeof window.setInterval> | null = null
 
@@ -65,6 +67,10 @@ const jobLabel = computed(() => {
   }
   return labels[status] ?? status
 })
+const selectedJobLabel = computed(() => {
+  if (!jobs.value.length) return '暂无可选模型'
+  return activeJob.value ? labelForJob(activeJob.value) : '选择模型'
+})
 
 function labelForJob(item: RoleModelJobDto) {
   const labels: Record<string, string> = {
@@ -75,6 +81,24 @@ function labelForJob(item: RoleModelJobDto) {
   }
   const time = new Date(item.created_at).toLocaleString()
   return `${labels[item.status] ?? item.status} · ${item.sample_count || '准备中'} 条 · ${time}`
+}
+
+function toggleJobMenu() {
+  if (!jobs.value.length) return
+  isJobMenuOpen.value = !isJobMenuOpen.value
+}
+
+function selectJob(jobId: string) {
+  selectedJobId.value = jobId
+  isJobMenuOpen.value = false
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (!jobSelectEl.value?.contains(target)) {
+    isJobMenuOpen.value = false
+  }
 }
 
 function stopPolling() {
@@ -227,10 +251,14 @@ watch(selectedJobId, () => {
 })
 
 onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
   void loadOverview()
 })
 
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(() => {
+  stopPolling()
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+})
 </script>
 
 <template>
@@ -289,18 +317,48 @@ onBeforeUnmount(stopPolling)
         </header>
         <label class="role-model__select">
           <span>已有模型</span>
-          <select v-model="selectedJobId" :disabled="!jobs.length">
-            <option value="">暂无可选模型</option>
-            <option v-for="item in jobs" :key="item.id" :value="item.id">
-              {{ labelForJob(item) }}
-            </option>
-          </select>
+          <div
+            ref="jobSelectEl"
+            class="role-model__custom-select"
+            :class="{ 'is-disabled': !jobs.length }"
+            @keydown.escape.stop="isJobMenuOpen = false"
+          >
+            <button
+              type="button"
+              class="role-model__select-trigger"
+              :class="{ 'is-open': isJobMenuOpen }"
+              :disabled="!jobs.length"
+              aria-haspopup="listbox"
+              :aria-expanded="isJobMenuOpen"
+              @click="toggleJobMenu"
+            >
+              <span class="role-model__select-value">{{ selectedJobLabel }}</span>
+              <span class="role-model__select-arrow" aria-hidden="true"></span>
+            </button>
+
+            <ul v-if="isJobMenuOpen" class="role-model__select-options" role="listbox">
+              <li
+                v-for="item in jobs"
+                :key="item.id"
+                role="option"
+                :aria-selected="item.id === selectedJobId"
+              >
+                <button
+                  type="button"
+                  class="role-model__select-option"
+                  :class="{ 'is-selected': item.id === selectedJobId }"
+                  @click="selectJob(item.id)"
+                >
+                  <span>{{ labelForJob(item) }}</span>
+                  <span v-if="item.id === selectedJobId" class="role-model__select-check">已选</span>
+                </button>
+              </li>
+            </ul>
+          </div>
         </label>
         <div class="role-model__job">
           <span class="role-model__job-status">{{ jobLabel }}</span>
           <span v-if="activeJob">样本 {{ activeJob.sample_count || '准备中' }}</span>
-          <span v-if="activeJob?.adapter_path">适配器：{{ activeJob.adapter_path }}</span>
-          <span v-if="activeJob?.dataset_path">数据集：{{ activeJob.dataset_path }}</span>
         </div>
         <pre v-if="activeJob?.log_tail" class="role-model__log">{{ activeJob.log_tail }}</pre>
         <p v-else class="role-model__hint">
@@ -435,6 +493,7 @@ onBeforeUnmount(stopPolling)
 
 .role-model__panel {
   min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
@@ -521,19 +580,152 @@ onBeforeUnmount(stopPolling)
   color: var(--text-soft);
 }
 
-.role-model__select select {
+.role-model__custom-select {
+  position: relative;
+  width: 100%;
+}
+
+.role-model__select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
   min-width: 0;
+  min-height: 46px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--panel);
+  border-radius: var(--radius, 12px);
+  padding: 10px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 250, 249, 0.98)),
+    var(--panel);
   color: var(--text);
   font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.role-model__select-trigger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+}
+
+.role-model__select-trigger:focus,
+.role-model__select-trigger.is-open {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-sm);
+}
+
+.role-model__select-trigger:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.role-model__select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-model__select-arrow {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.16s ease;
+}
+
+.role-model__select-trigger.is-open .role-model__select-arrow {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.role-model__custom-select.is-disabled .role-model__select-arrow {
+  opacity: 0.5;
+}
+
+.role-model__select-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 248px;
+  margin: 0;
+  padding: 7px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  animation: roleModelMenuIn 0.15s ease-out both;
+}
+
+.role-model__select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.role-model__select-option span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-model__select-option:hover,
+.role-model__select-option:focus {
+  outline: none;
+  background: var(--accent-soft);
+}
+
+.role-model__select-option.is-selected {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.role-model__select-check {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+@keyframes roleModelMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .role-model__log {
-  max-height: 260px;
+  height: 260px;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: auto;
   margin: 14px 0 0;
   padding: 12px;
@@ -542,11 +734,13 @@ onBeforeUnmount(stopPolling)
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .role-model__chat {
-  min-height: 220px;
-  max-height: 420px;
+  height: 360px;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -558,11 +752,13 @@ onBeforeUnmount(stopPolling)
 
 .role-chat-msg {
   max-width: 76%;
+  box-sizing: border-box;
   padding: 9px 12px;
   border-radius: 10px;
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .role-chat-msg--user {
