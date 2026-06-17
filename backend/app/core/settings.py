@@ -244,8 +244,8 @@ def get_agent_settings() -> AgentSettings:
         checkpointer_db_path=DATA_DIR / "langgraph_checkpoint.sqlite3",
         context_token_cap=_get_int("OC_AGENT_CONTEXT_TOKEN_CAP", 6000),
         recent_message_window=_get_int("OC_AGENT_RECENT_MESSAGE_WINDOW", 10),
-        summary_keep_recent=_get_int("OC_AGENT_SUMMARY_KEEP_RECENT", 10),
-        summary_compress_every=_get_int("OC_AGENT_SUMMARY_COMPRESS_EVERY", 6),
+        summary_keep_recent=_get_int("OC_AGENT_SUMMARY_KEEP_RECENT", 16),
+        summary_compress_every=_get_int("OC_AGENT_SUMMARY_COMPRESS_EVERY", 20),
     )
 
 

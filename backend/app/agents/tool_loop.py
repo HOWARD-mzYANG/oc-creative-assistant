@@ -38,10 +38,10 @@ from app.llm.provider import LlmProvider, extract_provider_reasoning
 MAX_TOOL_LOOPS = 4
 
 # 每一轮里最多允许并行/批量调用几个工具。
-MAX_CALLS_PER_BATCH = 4
+MAX_CALLS_PER_BATCH = 5
 
 # 整轮对话里工具调用总次数上限。
-MAX_TOTAL_TOOL_CALLS = 15
+MAX_TOTAL_TOOL_CALLS = 20
 _TOOL_RESULT_TOKEN_CAP = 2000
 _MIDDLE_THOUGHT_CHAR_CAP = 400
 _TOOL_TRACE_PREVIEW_CHAR_CAP = 180

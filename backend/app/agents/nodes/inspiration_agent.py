@@ -20,7 +20,7 @@ from app.agents.memory import build_memory_block
 from app.agents.schemas import InspirationOutput
 from app.agents.state import AgentState
 from app.agents.structured_call import call_structured
-from app.agents.tool_loop import compact_history_for_structured, run_tool_loop
+from app.agents.tool_loop import compact_history_for_structured, emit_trace_item, run_tool_loop
 from app.agents.tools import make_project_tools
 from app.agents.web_query import resolve_web_search_enabled
 from app.llm.factory import get_llm_provider
@@ -60,6 +60,11 @@ def inspiration_agent_node(state: AgentState) -> dict[str, Any]:
 
     try:
         history = run_tool_loop(provider, initial_messages, tools)
+        emit_trace_item(
+            "Agent 正在思考中",
+            "工具证据已收集完成，正在整理灵感建议。",
+            node="inspiration_agent",
+        )
         output = call_structured(
             provider,
             compact_history_for_structured(history),

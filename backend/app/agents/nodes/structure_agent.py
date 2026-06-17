@@ -21,7 +21,7 @@ from app.agents.tools import make_project_tools
 from app.agents.web_query import resolve_web_search_enabled
 from app.llm.factory import get_llm_provider
 from app.agents.structured_call import call_structured
-from app.agents.tool_loop import compact_history_for_structured, run_tool_loop
+from app.agents.tool_loop import compact_history_for_structured, emit_trace_item, run_tool_loop
 from app.agents.prompts import load_prompt
 
 
@@ -53,6 +53,11 @@ def structure_agent_node(state: AgentState) -> dict[str, Any]:
 
     try:
         history = run_tool_loop(provider, initial_messages, tools)
+        emit_trace_item(
+            "Agent 正在思考中",
+            "工具证据已收集完成，正在整理结构化画布变更。",
+            node="structure_agent",
+        )
         output = call_structured(
             provider,
             compact_history_for_structured(history),
