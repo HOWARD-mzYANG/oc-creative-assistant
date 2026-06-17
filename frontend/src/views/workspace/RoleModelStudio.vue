@@ -311,12 +311,12 @@ onBeforeUnmount(stopPolling)
       <section class="role-model__panel role-model__panel--chat">
         <header class="role-model__panel-head">
           <h2>角色对话</h2>
-          <span class="role-model__mode">{{ canUseAdapter ? '微调模型优先' : '资料兜底' }}</span>
+          <span class="role-model__mode">{{ canUseAdapter ? '微调模型' : '资料' }}</span>
         </header>
         <div class="role-model__chat">
           <p v-if="isHistoryLoading" class="role-model__hint">正在读取远程聊天记录...</p>
           <p v-if="!chatMessages.length && !streamingReply" class="role-model__hint">
-            请选择已完成的角色 LoRA 对话；没有可用模型时会用现有 API + 快照资料兜底。
+            请选择已完成的角色 LoRA 对话；没有可用模型时会用现有 API + 快照资料。
           </p>
           <article
             v-for="(message, index) in chatMessages"

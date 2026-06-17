@@ -47,6 +47,8 @@ class ServiceSettings:
     base_model: str
     sample_count: int
     dry_run: bool
+    fp16: bool
+    bf16: bool
     model_api_base_url: str | None
     model_api_key: str | None
     model_api_name: str
@@ -58,6 +60,7 @@ def get_settings() -> ServiceSettings:
     重要变量：
     - ROLE_FINETUNE_WORKSPACE：任务、数据集、日志和 adapter 输出目录。
     - ROLE_TRAINING_DRY_RUN：演示时跳过真实训练，只验证数据和状态链路。
+    - ROLE_TRAINING_FP16 / ROLE_TRAINING_BF16：训练混合精度；普通 AutoDL 卡默认用 fp16。
     - ROLE_MODEL_API_BASE_URL：已加载 LoRA adapter 的 OpenAI-style 推理服务地址。
     """
     workspace = Path(
@@ -72,6 +75,8 @@ def get_settings() -> ServiceSettings:
         base_model=os.getenv("ROLE_BASE_MODEL", "Qwen/Qwen2.5-1.5B-Instruct"),
         sample_count=_get_int("ROLE_SAMPLE_COUNT", 240),
         dry_run=_get_bool("ROLE_TRAINING_DRY_RUN", False),
+        fp16=_get_bool("ROLE_TRAINING_FP16", True),
+        bf16=_get_bool("ROLE_TRAINING_BF16", False),
         model_api_base_url=os.getenv("ROLE_MODEL_API_BASE_URL") or None,
         model_api_key=os.getenv("ROLE_MODEL_API_KEY") or None,
         model_api_name=os.getenv("ROLE_MODEL_API_NAME", "role-lora"),

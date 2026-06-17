@@ -209,6 +209,7 @@ def _write_train_config(
 
     YAML 的字段名是 LLaMA-Factory CLI 约定，必须保持英文。这里固定演示版的
     QLoRA 参数：Qwen2.5-1.5B-Instruct、4-bit、rank 8、alpha 16、3 epochs。
+    混合精度从环境变量读取，默认 fp16，避免普通显卡或 CUDA 环境不支持 bf16 时失败。
     之后如果要做多模型/多显存档位，可以从这里扩展配置模板。
     """
     config = {
@@ -236,10 +237,11 @@ def _write_train_config(
         "per_device_train_batch_size": 1,
         "gradient_accumulation_steps": 8,
         "learning_rate": 2.0e-4,
-        "num_train_epochs": 3.0,
+        "num_train_epochs": 50.0,
         "lr_scheduler_type": "cosine",
         "warmup_ratio": 0.1,
-        "bf16": True,
+        "fp16": settings.fp16,
+        "bf16": settings.bf16,
     }
     path = _job_dir(job_id, settings) / "train.yaml"
     path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
