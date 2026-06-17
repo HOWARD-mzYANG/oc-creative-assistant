@@ -79,6 +79,10 @@ function openPlotNode() {
   router.push(`/workspace/${projectId.value}/plot`)
 }
 
+function openRoleModel() {
+  router.push(`/workspace/${projectId.value}/characters/${props.charId}/model`)
+}
+
 // 关系：该角色的出边 -> 标签（关系名 + 目标角色名）。
 const relations = computed(() =>
   graphStore.outgoingEdges(props.charId).map((edge) => ({
@@ -406,7 +410,12 @@ onBeforeUnmount(async () => {
       <button type="button" class="char-detail__back" @click="router.push(`/workspace/${projectId}/characters`)">
         ← 角色
       </button>
-      <span v-if="saveState" class="char-detail__state">{{ saveState }}</span>
+      <div class="char-detail__actions">
+        <span v-if="saveState" class="char-detail__state">{{ saveState }}</span>
+        <button type="button" class="char-detail__model" @click="openRoleModel">
+          角色模型
+        </button>
+      </div>
     </header>
 
     <input
@@ -514,11 +523,26 @@ onBeforeUnmount(async () => {
   justify-content: space-between;
   gap: 12px;
 }
+.char-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .char-detail__back {
   font-size: 13px;
   color: var(--muted, #888);
   background: none;
   border: none;
+  cursor: pointer;
+}
+.char-detail__model {
+  padding: 7px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 .char-detail__file-input {

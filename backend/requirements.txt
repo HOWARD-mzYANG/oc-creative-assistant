@@ -13,11 +13,3 @@ langgraph-checkpoint-sqlite
 tiktoken
 python-multipart
 pyinstaller
-modelscope
-torch>=2.11,<2.12
-transformers
-datasets
-peft
-accelerate
-sentencepiece
-safetensors

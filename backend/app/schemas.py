@@ -91,178 +91,6 @@ class WorkspaceChatRequest(BaseModel):
     quoted_node_ids: list[str] = Field(default_factory=list)
 
 
-class RoleModelGpuPayload(BaseModel):
-    """单块 GPU 的轻量硬件信息。"""
-
-    name: str = ""
-    memory_gb: float = 0.0
-    backend: str = ""
-    available: bool = False
-
-
-class RoleModelHardwarePayload(BaseModel):
-    """用于本地角色模型推荐与训练能力判断的主机配置快照。"""
-
-    os: str = ""
-    python: str = ""
-    cpu_count: int = 0
-    ram_total_gb: float = 0.0
-    ram_available_gb: float = 0.0
-    disk_free_gb: float = 0.0
-    gpus: list[RoleModelGpuPayload] = Field(default_factory=list)
-    has_cuda: bool = False
-    can_train_lora: bool = False
-    notes: list[str] = Field(default_factory=list)
-
-
-class RoleModelRecommendationRequest(BaseModel):
-    """角色模型推荐请求；允许用户指定偏好的模型 ID。"""
-
-    preferred_model_id: str | None = None
-    target_character: str | None = None
-
-
-class RoleModelRecommendationPayload(BaseModel):
-    """推荐的 ModelScope 模型和 LoRA 训练参数。"""
-
-    model_id: str
-    display_name: str
-    parameter_count_b: float
-    quantization: str = "none"
-    context_length: int = 4096
-    estimated_vram_gb: float = 0.0
-    lora_rank: int = 8
-    lora_alpha: int = 16
-    batch_size: int = 1
-    gradient_accumulation_steps: int = 8
-    max_seq_length: int = 1024
-    learning_rate: float = 0.0002
-    download_url: str
-    reason: str = ""
-    warnings: list[str] = Field(default_factory=list)
-
-
-class RoleModelDatasetSamplePayload(BaseModel):
-    """可由用户编辑的一条 LoRA/SFT 对话样本。"""
-
-    id: str
-    character_name: str = ""
-    instruction: str
-    input: str = ""
-    output: str
-    tags: list[str] = Field(default_factory=list)
-    source_node_ids: list[str] = Field(default_factory=list)
-    enabled: bool = True
-
-
-class RoleModelDatasetPayload(BaseModel):
-    """项目级角色模型训练数据集。"""
-
-    project_id: str
-    samples: list[RoleModelDatasetSamplePayload] = Field(default_factory=list)
-    updated_at: str | None = None
-
-
-class RoleModelDatasetGenerateRequest(BaseModel):
-    """控制 AI 生成角色 LoRA 数据集的规模。"""
-
-    samples_per_character: int = Field(default=64, ge=8, le=240)
-    max_samples: int = Field(default=500, ge=200, le=800)
-
-
-class RoleModelDatasetUpdateRequest(BaseModel):
-    """整体替换角色模型训练数据集。"""
-
-    samples: list[RoleModelDatasetSamplePayload] = Field(default_factory=list)
-
-
-class RoleModelDownloadRequest(BaseModel):
-    """启动模型下载任务。"""
-
-    model_id: str | None = None
-
-
-class RoleModelTrainRequest(BaseModel):
-    """启动 LoRA 微调任务。"""
-
-    model_id: str | None = None
-    epochs: float = 1.0
-    batch_size: int | None = None
-    gradient_accumulation_steps: int | None = None
-    lora_rank: int | None = None
-    lora_alpha: int | None = None
-    learning_rate: float | None = None
-    max_seq_length: int | None = None
-
-
-class RoleModelJobPayload(BaseModel):
-    """下载/训练任务的跨请求状态。"""
-
-    status: str = "idle"
-    message: str = ""
-    progress: float = 0.0
-    model_id: str = ""
-    artifact_path: str = ""
-    started_at: str | None = None
-    finished_at: str | None = None
-    log: list[str] = Field(default_factory=list)
-
-
-class RoleModelChatMessagePayload(BaseModel):
-    """角色模型聊天历史中的单条消息。"""
-
-    role: Literal["user", "assistant", "system"]
-    content: str
-
-
-class RoleModelChatRequest(BaseModel):
-    """与项目专属角色模型聊天。"""
-
-    message: str
-    character_name: str | None = None
-    history: list[RoleModelChatMessagePayload] = Field(default_factory=list)
-
-
-class RoleModelChatResponse(BaseModel):
-    """角色模型聊天响应。"""
-
-    reply: str
-    mode: str
-    cited_node_ids: list[str] = Field(default_factory=list)
-    retrieved_context: list[dict[str, Any]] = Field(default_factory=list)
-    warning: str = ""
-
-
-class RoleModelChatHistoryItemPayload(BaseModel):
-    """持久化后的角色模型聊天消息。"""
-
-    id: str
-    role: Literal["user", "assistant"]
-    content: str
-    mode: str = ""
-    warning: str = ""
-    character_name: str = ""
-    cited_node_ids: list[str] = Field(default_factory=list)
-    retrieved_context: list[dict[str, Any]] = Field(default_factory=list)
-    created_at: datetime | None = None
-
-
-class RoleModelStatePayload(BaseModel):
-    """前端角色模型工作台所需的聚合状态。"""
-
-    project_id: str
-    hardware: RoleModelHardwarePayload | None = None
-    recommendation: RoleModelRecommendationPayload | None = None
-    dataset_count: int = 0
-    dataset_updated_at: str | None = None
-    download: RoleModelJobPayload = Field(default_factory=RoleModelJobPayload)
-    training: RoleModelJobPayload = Field(default_factory=RoleModelJobPayload)
-    adapter_ready: bool = False
-    local_runtime_ready: bool = False
-    runtime_warning: str = ""
-    chat_characters: list[str] = Field(default_factory=list)
-
-
 class CrossReferenceItem(BaseModel):
     """单条跨子图引用（first_revision 第 6 阶段）。"""
 
@@ -644,3 +472,125 @@ class ChatResponse(BaseModel):
     batch_id: str | None
     staging_count: int
     staging_summary: str = ""
+
+
+class RoleModelRelationPayload(BaseModel):
+    """A role's direct graph relation used by the external LoRA service."""
+
+    other_node_id: str
+    other_title: str
+    other_type: str = ""
+    relation_label: str = ""
+    relation_type: str = ""
+    direction: Literal["outgoing", "incoming"]
+    content: str = ""
+
+
+class RoleModelCrossReferencePayload(BaseModel):
+    """A cross-section reference for the selected role."""
+
+    other_node_id: str
+    other_title: str
+    other_section: str
+    relation_label: str = ""
+    relation_type: str = ""
+    direction: Literal["outgoing", "incoming"]
+    content: str = ""
+
+
+class RoleModelRelatedNodePayload(BaseModel):
+    """Compact node context sent to the training service."""
+
+    id: str
+    title: str
+    node_type: str
+    content: str = ""
+    relation_label: str = ""
+
+
+class RoleModelSnapshotPayload(BaseModel):
+    """Current role snapshot exported from the creative graph."""
+
+    project_id: str
+    project_name: str = ""
+    character_id: str
+    character_name: str
+    character_summary: str = ""
+    fields: dict[str, str] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    relations: list[RoleModelRelationPayload] = Field(default_factory=list)
+    cross_references: list[RoleModelCrossReferencePayload] = Field(default_factory=list)
+    related_nodes: list[RoleModelRelatedNodePayload] = Field(default_factory=list)
+    project_seed: str = ""
+
+
+class RoleMaterialBriefPayload(BaseModel):
+    """资料 agent 整理后的角色训练档案。"""
+
+    identity: str = ""
+    personality: str = ""
+    voice_style: str = ""
+    known_facts: list[str] = Field(default_factory=list)
+    relationships: list[str] = Field(default_factory=list)
+    world_context: list[str] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    sample_plan: list[str] = Field(default_factory=list)
+
+
+class RoleModelJobPayload(BaseModel):
+    """Training job status mirrored from role_finetune_service."""
+
+    id: str
+    project_id: str
+    character_id: str
+    character_name: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    sample_count: int = 0
+    dataset_path: str = ""
+    dataset_info_path: str = ""
+    train_config_path: str = ""
+    adapter_path: str = ""
+    material_brief_path: str = ""
+    log_tail: str = ""
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RoleModelOverviewPayload(BaseModel):
+    """Role model studio bootstrap payload."""
+
+    service_configured: bool
+    service_online: bool
+    service_error: str | None = None
+    snapshot: RoleModelSnapshotPayload
+    material_brief: RoleMaterialBriefPayload | None = None
+    jobs: list[RoleModelJobPayload] = Field(default_factory=list)
+    latest_job: RoleModelJobPayload | None = None
+
+
+class RoleModelTrainRequest(BaseModel):
+    """Start a role LoRA training job."""
+
+    sample_count: int | None = None
+
+
+class RoleChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class RoleChatLogItem(BaseModel):
+    """训练服务持久化的一条角色聊天消息。"""
+
+    role: Literal["user", "assistant", "system"]
+    content: str
+    created_at: datetime
+
+
+class RoleChatRequest(BaseModel):
+    """Role chat request for either trained adapter or API/RAG fallback."""
+
+    message: str
+    job_id: str | None = None
+    history: list[RoleChatHistoryItem] = Field(default_factory=list)

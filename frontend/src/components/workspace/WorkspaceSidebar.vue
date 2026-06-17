@@ -50,7 +50,6 @@ const navItems = computed<NavItem[]>(() => [
   },
   { id: 'plot', to: `/workspace/${props.projectId}/plot`, icon: '❧', label: '故事' },
   { id: 'characters', to: `/workspace/${props.projectId}/characters`, icon: '✦', label: '角色' },
-  { id: 'role-model', to: `/workspace/${props.projectId}/role-model`, icon: 'LoRA', label: '角色模型' },
 ])
 
 function isNavActive(item: NavItem) {
@@ -102,7 +101,6 @@ function handleNavClick(item: NavItem, event: MouseEvent) {
         :class="{
           'is-active': isNavActive(item),
           'is-world-canvas': item.id === 'world' && isNavActive(item) && worldMode === 'canvas',
-          'is-role-model': item.id === 'role-model',
         }"
         :title="item.id === 'world' && isNavActive(item) ? '再次点击切换视图' : undefined"
         @click="handleNavClick(item, $event)"
@@ -208,15 +206,6 @@ function handleNavClick(item: NavItem, event: MouseEvent) {
 .workspace-sidebar__link.is-world-canvas.is-active:hover {
   background: rgba(233, 130, 74, 0.18);
   color: #b04f22;
-}
-.workspace-sidebar__link.is-role-model.is-active {
-  background: rgba(15, 118, 110, 0.12);
-  color: #0f766e;
-  box-shadow: inset 0 0 0 1.5px rgba(15, 118, 110, 0.36);
-}
-.workspace-sidebar__link.is-role-model.is-active:hover {
-  background: rgba(15, 118, 110, 0.16);
-  color: #115e59;
 }
 .workspace-sidebar__label {
   flex: 1;

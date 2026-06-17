@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useGraphStore } from '../stores/useGraphStore'
 import { useChatStore } from '../stores/useChatStore'
@@ -16,7 +15,6 @@ import PanelToggleButton from '../components/workspace/PanelToggleButton.vue'
  */
 const props = defineProps<{ projectId: string }>()
 
-const route = useRoute()
 const projectStore = useProjectStore()
 const graphStore = useGraphStore()
 const chatStore = useChatStore()
@@ -37,8 +35,6 @@ const rightWidth = ref(RIGHT_DEFAULT)
 
 const leftPanelWidth = computed(() => (leftOpen.value ? leftWidth.value : COLLAPSED_WIDTH))
 const rightPanelWidth = computed(() => (rightOpen.value ? rightWidth.value : COLLAPSED_WIDTH))
-const showBottomComposer = computed(() => route.name !== 'workspace-role-model')
-const showRightStage = computed(() => route.name !== 'workspace-role-model')
 
 const leftResize = usePanelResize({
   min: LEFT_MIN,
@@ -127,12 +123,11 @@ onBeforeUnmount(() => {
         <section class="workspace-shell__view">
           <router-view />
         </section>
-        <BottomComposer v-if="showBottomComposer" />
+        <BottomComposer />
       </div>
 
       <!-- 右侧面板 -->
       <aside
-        v-if="showRightStage"
         class="side-panel side-panel--right"
         :class="{ 'is-collapsed': !rightOpen }"
         :style="{ width: `${rightPanelWidth}px` }"

@@ -18,6 +18,11 @@ from app.schemas import (
     ProjectSeedPayload,
     ProjectSummaryPayload,
     ProjectUpdateRequest,
+    RoleChatRequest,
+    RoleChatLogItem,
+    RoleModelJobPayload,
+    RoleModelOverviewPayload,
+    RoleModelTrainRequest,
     WorkspaceChatRequest,
 )
 from app.services.chat_service import list_project_staging
@@ -34,6 +39,13 @@ from app.services.project_service import (
     update_project,
 )
 from app.services.project_io import export_project_oc, import_project_oc
+from app.services.role_model_service import (
+    get_role_chat_history,
+    get_role_model_overview,
+    get_role_training_job,
+    start_role_training,
+    stream_role_chat,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -112,6 +124,71 @@ async def replace_node_fields(
 ) -> NodeFieldsPayload:
     """整体替换角色卡自由表单字段，并持久化到 node.meta JSON。"""
     return set_node_fields(project_id, node_id, payload.fields)
+
+
+@router.get(
+    "/{project_id}/characters/{character_id}/role-model",
+    response_model=RoleModelOverviewPayload,
+)
+async def read_character_role_model(
+    project_id: str,
+    character_id: str,
+) -> RoleModelOverviewPayload:
+    """Return role snapshot plus external training-service status."""
+    return get_role_model_overview(project_id, character_id)
+
+
+@router.post(
+    "/{project_id}/characters/{character_id}/role-model/train",
+    response_model=RoleModelJobPayload,
+)
+async def train_character_role_model(
+    project_id: str,
+    character_id: str,
+    payload: RoleModelTrainRequest,
+) -> RoleModelJobPayload:
+    """Start a single-character LoRA job in the external training service."""
+    return start_role_training(project_id, character_id, payload)
+
+
+@router.get(
+    "/{project_id}/characters/{character_id}/role-model/jobs/{job_id}",
+    response_model=RoleModelJobPayload,
+)
+async def read_character_role_model_job(
+    project_id: str,
+    character_id: str,
+    job_id: str,
+) -> RoleModelJobPayload:
+    """Read the latest status for a role LoRA training job."""
+    return get_role_training_job(project_id, character_id, job_id)
+
+
+@router.get(
+    "/{project_id}/characters/{character_id}/role-model/jobs/{job_id}/chat-history",
+    response_model=list[RoleChatLogItem],
+)
+async def read_character_role_chat_history(
+    project_id: str,
+    character_id: str,
+    job_id: str,
+) -> list[RoleChatLogItem]:
+    """读取远程训练服务保存的角色聊天历史。"""
+    return get_role_chat_history(project_id, character_id, job_id)
+
+
+@router.post("/{project_id}/characters/{character_id}/role-chat/stream")
+async def stream_character_role_chat(
+    project_id: str,
+    character_id: str,
+    payload: RoleChatRequest,
+) -> StreamingResponse:
+    """Stream role chat from the trained adapter, falling back to API+snapshot."""
+    return StreamingResponse(
+        stream_role_chat(project_id, character_id, payload),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/{project_id}/workspace_chat")

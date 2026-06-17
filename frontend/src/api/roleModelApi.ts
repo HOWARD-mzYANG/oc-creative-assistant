@@ -1,218 +1,190 @@
-import { requestJson } from './http'
+import { backendBaseUrl, requestJson } from './http'
 
-export interface RoleModelGpu {
-  name: string
-  memory_gb: number
-  backend: string
-  available: boolean
+export type RoleJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+
+export interface RoleModelRelationDto {
+  other_node_id: string
+  other_title: string
+  other_type: string
+  relation_label: string
+  relation_type: string
+  direction: 'outgoing' | 'incoming'
+  content: string
 }
 
-export interface RoleModelHardware {
-  os: string
-  python: string
-  cpu_count: number
-  ram_total_gb: number
-  ram_available_gb: number
-  disk_free_gb: number
-  gpus: RoleModelGpu[]
-  has_cuda: boolean
-  can_train_lora: boolean
-  notes: string[]
+export interface RoleModelCrossReferenceDto {
+  other_node_id: string
+  other_title: string
+  other_section: string
+  relation_label: string
+  relation_type: string
+  direction: 'outgoing' | 'incoming'
+  content: string
 }
 
-export interface RoleModelRecommendation {
-  model_id: string
-  display_name: string
-  parameter_count_b: number
-  quantization: string
-  context_length: number
-  estimated_vram_gb: number
-  lora_rank: number
-  lora_alpha: number
-  batch_size: number
-  gradient_accumulation_steps: number
-  max_seq_length: number
-  learning_rate: number
-  download_url: string
-  reason: string
-  warnings: string[]
-}
-
-export interface RoleModelDatasetSample {
+export interface RoleModelRelatedNodeDto {
   id: string
+  title: string
+  node_type: string
+  content: string
+  relation_label: string
+}
+
+export interface RoleModelSnapshotDto {
+  project_id: string
+  project_name: string
+  character_id: string
   character_name: string
-  instruction: string
-  input: string
-  output: string
+  character_summary: string
+  fields: Record<string, string>
   tags: string[]
-  source_node_ids: string[]
-  enabled: boolean
+  relations: RoleModelRelationDto[]
+  cross_references: RoleModelCrossReferenceDto[]
+  related_nodes: RoleModelRelatedNodeDto[]
+  project_seed: string
 }
 
-export interface RoleModelDataset {
+export interface RoleMaterialBriefDto {
+  identity: string
+  personality: string
+  voice_style: string
+  known_facts: string[]
+  relationships: string[]
+  world_context: string[]
+  boundaries: string[]
+  sample_plan: string[]
+}
+
+export interface RoleModelJobDto {
+  id: string
   project_id: string
-  samples: RoleModelDatasetSample[]
-  updated_at: string | null
+  character_id: string
+  character_name: string
+  status: RoleJobStatus
+  sample_count: number
+  dataset_path: string
+  dataset_info_path: string
+  train_config_path: string
+  adapter_path: string
+  material_brief_path: string
+  log_tail: string
+  error?: string | null
+  created_at: string
+  updated_at: string
 }
 
-export interface RoleModelJob {
-  status: string
-  message: string
-  progress: number
-  model_id: string
-  artifact_path: string
-  started_at: string | null
-  finished_at: string | null
-  log: string[]
+export interface RoleModelOverviewDto {
+  service_configured: boolean
+  service_online: boolean
+  service_error?: string | null
+  snapshot: RoleModelSnapshotDto
+  material_brief?: RoleMaterialBriefDto | null
+  jobs: RoleModelJobDto[]
+  latest_job?: RoleModelJobDto | null
 }
 
-export interface RoleModelState {
-  project_id: string
-  hardware: RoleModelHardware | null
-  recommendation: RoleModelRecommendation | null
-  dataset_count: number
-  dataset_updated_at: string | null
-  download: RoleModelJob
-  training: RoleModelJob
-  adapter_ready: boolean
-  local_runtime_ready: boolean
-  runtime_warning: string
-  chat_characters: string[]
-}
-
-export interface RoleModelChatMessage {
+export interface RoleChatMessageDto {
   role: 'user' | 'assistant' | 'system'
   content: string
 }
 
-export interface RoleModelChatHistoryItem {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  mode: string
-  warning: string
-  character_name: string
-  cited_node_ids: string[]
-  retrieved_context: Array<Record<string, unknown>>
-  created_at: string | null
+export interface RoleChatLogItemDto extends RoleChatMessageDto {
+  created_at: string
 }
 
-export interface RoleModelChatResponse {
-  reply: string
-  mode: 'local_lora' | 'api_fallback' | string
-  cited_node_ids: string[]
-  retrieved_context: Array<Record<string, unknown>>
-  warning: string
-}
+export type RoleChatStreamEvent =
+  | { type: 'token'; text: string }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
 
-export async function getRoleModelState(projectId: string): Promise<RoleModelState> {
-  return requestJson<RoleModelState>(`/api/projects/${projectId}/role-model`)
-}
-
-export async function inspectRoleModelHardware(projectId: string): Promise<RoleModelHardware> {
-  return requestJson<RoleModelHardware>(`/api/projects/${projectId}/role-model/hardware`)
-}
-
-export async function recommendRoleModel(
+export async function getRoleModelOverview(
   projectId: string,
-  payload: { preferred_model_id?: string | null; target_character?: string | null },
-): Promise<RoleModelRecommendation> {
-  return requestJson<RoleModelRecommendation>(`/api/projects/${projectId}/role-model/recommend`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
-}
-
-export async function getRoleModelDataset(projectId: string): Promise<RoleModelDataset> {
-  return requestJson<RoleModelDataset>(`/api/projects/${projectId}/role-model/dataset`)
-}
-
-export async function generateRoleModelDataset(
-  projectId: string,
-  payload?: { samples_per_character?: number; max_samples?: number },
-): Promise<RoleModelDataset> {
-  return requestJson<RoleModelDataset>(`/api/projects/${projectId}/role-model/dataset/generate`, {
-    method: 'POST',
-    body: JSON.stringify(payload ?? {}),
-  })
-}
-
-export async function saveRoleModelDataset(
-  projectId: string,
-  samples: RoleModelDatasetSample[],
-): Promise<RoleModelDataset> {
-  return requestJson<RoleModelDataset>(`/api/projects/${projectId}/role-model/dataset`, {
-    method: 'PUT',
-    body: JSON.stringify({ samples }),
-  })
-}
-
-export async function startRoleModelDownload(
-  projectId: string,
-  modelId?: string | null,
-): Promise<RoleModelJob> {
-  return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/download`, {
-    method: 'POST',
-    body: JSON.stringify({ model_id: modelId ?? null }),
-  })
-}
-
-export async function getRoleModelDownload(projectId: string): Promise<RoleModelJob> {
-  return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/download`)
+  characterId: string,
+): Promise<RoleModelOverviewDto> {
+  return requestJson<RoleModelOverviewDto>(
+    `/api/projects/${projectId}/characters/${characterId}/role-model`,
+  )
 }
 
 export async function startRoleModelTraining(
   projectId: string,
-  payload: {
-    model_id?: string | null
-    epochs?: number
-    batch_size?: number | null
-    gradient_accumulation_steps?: number | null
-    lora_rank?: number | null
-    lora_alpha?: number | null
-    learning_rate?: number | null
-    max_seq_length?: number | null
-  },
-): Promise<RoleModelJob> {
-  return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/train`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
-}
-
-export async function getRoleModelTraining(projectId: string): Promise<RoleModelJob> {
-  return requestJson<RoleModelJob>(`/api/projects/${projectId}/role-model/train`)
-}
-
-function roleChatQuery(characterName: string): string {
-  return `character_name=${encodeURIComponent(characterName)}`
-}
-
-export async function getRoleModelChatHistory(
-  projectId: string,
-  characterName: string,
-): Promise<RoleModelChatHistoryItem[]> {
-  return requestJson<RoleModelChatHistoryItem[]>(
-    `/api/projects/${projectId}/role-model/chat?${roleChatQuery(characterName)}`,
+  characterId: string,
+  sampleCount?: number,
+): Promise<RoleModelJobDto> {
+  return requestJson<RoleModelJobDto>(
+    `/api/projects/${projectId}/characters/${characterId}/role-model/train`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ sample_count: sampleCount ?? null }),
+    },
   )
 }
 
-export async function clearRoleModelChatHistory(projectId: string, characterName: string): Promise<void> {
-  await requestJson<void>(`/api/projects/${projectId}/role-model/chat?${roleChatQuery(characterName)}`, {
-    method: 'DELETE',
-  })
+export async function getRoleModelJob(
+  projectId: string,
+  characterId: string,
+  jobId: string,
+): Promise<RoleModelJobDto> {
+  return requestJson<RoleModelJobDto>(
+    `/api/projects/${projectId}/characters/${characterId}/role-model/jobs/${jobId}`,
+  )
 }
 
-export async function chatWithRoleModel(
+export async function getRoleChatHistory(
   projectId: string,
+  characterId: string,
+  jobId: string,
+): Promise<RoleChatLogItemDto[]> {
+  return requestJson<RoleChatLogItemDto[]>(
+    `/api/projects/${projectId}/characters/${characterId}/role-model/jobs/${jobId}/chat-history`,
+  )
+}
+
+export async function streamRoleChat(
+  projectId: string,
+  characterId: string,
   payload: {
     message: string
-    character_name?: string | null
-    history: RoleModelChatMessage[]
+    job_id?: string | null
+    history?: RoleChatMessageDto[]
   },
-): Promise<RoleModelChatResponse> {
-  return requestJson<RoleModelChatResponse>(`/api/projects/${projectId}/role-model/chat`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
+  onEvent: (event: RoleChatStreamEvent) => void,
+): Promise<void> {
+  const response = await fetch(
+    `${backendBaseUrl}/api/projects/${projectId}/characters/${characterId}/role-chat/stream`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: payload.message,
+        job_id: payload.job_id ?? null,
+        history: payload.history ?? [],
+      }),
+    },
+  )
+
+  if (!response.ok || !response.body) {
+    throw new Error(`角色对话请求失败：HTTP ${response.status}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+    for (const raw of chunks) {
+      const line = raw.trim()
+      if (!line.startsWith('data: ')) continue
+      try {
+        onEvent(JSON.parse(line.slice(6)) as RoleChatStreamEvent)
+      } catch {
+        /* Ignore broken SSE fragments. */
+      }
+    }
+  }
 }

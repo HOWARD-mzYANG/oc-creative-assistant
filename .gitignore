@@ -220,6 +220,8 @@ backend/dist/
 backend/data/
 electron/dist/
 electron/.bundle/
+role_finetune_service/workspace/
+role_finetune_service/.venv/
 
 # === Local drafts / one-off scripts / editor leftovers ===
 /proposal.md

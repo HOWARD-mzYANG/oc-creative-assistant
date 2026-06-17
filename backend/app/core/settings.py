@@ -199,6 +199,26 @@ def get_web_search_settings() -> WebSearchSettings:
 
 
 @dataclass(frozen=True)
+class RoleFinetuneSettings:
+    """Optional external role-LoRA training service configuration."""
+
+    base_url: str | None
+    timeout_seconds: int
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.base_url)
+
+
+def get_role_finetune_settings() -> RoleFinetuneSettings:
+    base_url = os.getenv("OC_ROLE_FINETUNE_BASE_URL")
+    return RoleFinetuneSettings(
+        base_url=base_url.rstrip("/") if base_url else None,
+        timeout_seconds=_get_int("OC_ROLE_FINETUNE_TIMEOUT", 10),
+    )
+
+
+@dataclass(frozen=True)
 class AgentSettings:
     """Agent 图运行时配置。
 
