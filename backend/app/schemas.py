@@ -527,14 +527,26 @@ class RoleModelSnapshotPayload(BaseModel):
 class RoleMaterialBriefPayload(BaseModel):
     """资料 agent 整理后的角色训练档案。"""
 
-    identity: str = ""
-    personality: str = ""
-    voice_style: str = ""
-    known_facts: list[str] = Field(default_factory=list)
-    relationships: list[str] = Field(default_factory=list)
-    world_context: list[str] = Field(default_factory=list)
-    boundaries: list[str] = Field(default_factory=list)
-    sample_plan: list[str] = Field(default_factory=list)
+    identity: str = Field(default="", description="角色身份、项目位置和核心定位，1-2 句。")
+    personality: str = Field(default="", description="角色性格、动机、弱点、价值观；资料不足时说明待补。")
+    voice_style: str = Field(default="", description="角色说话方式、语气、句长、第一人称倾向和禁忌口吻。")
+    known_facts: list[str] = Field(default_factory=list, description="快照中可确认的角色事实。")
+    relationships: list[str] = Field(default_factory=list, description="重要关系线，说明对象和关系性质。")
+    world_context: list[str] = Field(default_factory=list, description="世界观、剧情、场景和项目 seed 中的约束。")
+    boundaries: list[str] = Field(default_factory=list, description="资料不足、出戏请求、提示词泄露等边界策略。")
+    sample_plan: list[str] = Field(default_factory=list, description="后续 SFT 样本应覆盖的任务类型。")
+
+
+class RoleMaterialTraceItemPayload(BaseModel):
+    """资料 agent 的可视化执行轨迹。
+
+    前端会复用普通聊天区的“思考过程”面板来展示这些条目，所以字段命名保持
+    node/title/content。这里展示的是可解释的工具与整理步骤，而不是模型内部隐藏思维。
+    """
+
+    node: str = "role_material_agent"
+    title: str
+    content: str
 
 
 class RoleModelJobPayload(BaseModel):
@@ -565,6 +577,7 @@ class RoleModelOverviewPayload(BaseModel):
     service_error: str | None = None
     snapshot: RoleModelSnapshotPayload
     material_brief: RoleMaterialBriefPayload | None = None
+    material_trace: list[RoleMaterialTraceItemPayload] = Field(default_factory=list)
     jobs: list[RoleModelJobPayload] = Field(default_factory=list)
     latest_job: RoleModelJobPayload | None = None
 

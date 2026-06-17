@@ -33,6 +33,12 @@ $env:OC_ROLE_FINETUNE_BASE_URL="http://127.0.0.1:9100"
 - `ROLE_MODEL_API_BASE_URL`：可选，已加载 adapter 的 OpenAI-compatible 模型服务地址，例如 `llamafactory-cli api`。
 - `ROLE_MODEL_API_KEY`：可选，模型服务 API key。
 - `ROLE_MODEL_API_NAME`：对话接口使用的模型名，默认是 `role-lora`。
+- `ROLE_DATASET_API_BASE_URL`：可选，训练数据生成使用的 OpenAI-compatible API 地址；配置后 240 条 SFT 样本必须由这组 API 生成，失败则任务失败。
+- `ROLE_DATASET_API_KEY`：可选，训练数据生成 API key。
+- `ROLE_DATASET_API_MODEL`：训练数据生成使用的模型名，默认回退到 `ROLE_MODEL_API_NAME` 或 `role-data-generator`。
+- `ROLE_DATASET_API_BATCH_SIZE`：每次 API 调用生成多少条样本，默认 20，最大 40。
+- `ROLE_DATASET_API_TIMEOUT`：每个批次请求的超时时间秒数，默认 120。
+- `ROLE_DATASET_API_TEMPERATURE`：训练数据生成温度，默认 0.8。
 
 ## 产物说明
 

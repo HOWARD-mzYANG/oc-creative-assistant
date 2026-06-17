@@ -39,6 +39,7 @@ async def health() -> HealthResponse:
         workspace=str(settings.workspace),
         dry_run=settings.dry_run,
         model_api_configured=bool(settings.model_api_base_url),
+        dataset_api_configured=bool(settings.dataset_api_base_url),
     )
 
 

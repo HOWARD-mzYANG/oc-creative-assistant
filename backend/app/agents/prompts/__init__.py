@@ -25,6 +25,7 @@ DEFAULT_VERSIONS: dict[str, str] = {
     "chat_assembler_reply": "v1",
     "chat_assembler_metadata": "v1",
     "summary_compress": "v1",
+    "role_material_brief": "v1",
 }
 """各 prompt 当前启用的版本；需要灰度发布时在这里切换。"""
 

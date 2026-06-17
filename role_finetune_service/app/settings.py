@@ -32,6 +32,17 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
+def _get_float(name: str, default: float) -> float:
+    """读取浮点数环境变量；常用于采样温度这类可调生成参数。"""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _get_optional_int(name: str, default: int | None) -> int | None:
     """读取可关闭的整数环境变量。
 
@@ -71,6 +82,12 @@ class ServiceSettings:
     model_api_base_url: str | None
     model_api_key: str | None
     model_api_name: str
+    dataset_api_base_url: str | None
+    dataset_api_key: str | None
+    dataset_api_model: str
+    dataset_api_timeout: int
+    dataset_api_batch_size: int
+    dataset_api_temperature: float
 
 
 def get_settings() -> ServiceSettings:
@@ -82,6 +99,7 @@ def get_settings() -> ServiceSettings:
     - ROLE_QUANTIZATION_BIT：QLoRA 量化位数，默认 4；设为 0 可关闭量化。
     - ROLE_TRAINING_FP16 / ROLE_TRAINING_BF16：训练混合精度；普通 AutoDL 卡默认用 fp16。
     - ROLE_MODEL_API_BASE_URL：已加载 LoRA adapter 的 OpenAI-style 推理服务地址。
+    - ROLE_DATASET_API_BASE_URL：训练数据生成使用的 OpenAI-style API 地址；配置后 240 条样本必须由 API 生成。
     """
     workspace = Path(
         os.getenv("ROLE_FINETUNE_WORKSPACE", str(SERVICE_ROOT / "workspace"))
@@ -101,4 +119,10 @@ def get_settings() -> ServiceSettings:
         model_api_base_url=os.getenv("ROLE_MODEL_API_BASE_URL") or None,
         model_api_key=os.getenv("ROLE_MODEL_API_KEY") or None,
         model_api_name=os.getenv("ROLE_MODEL_API_NAME", "role-lora"),
+        dataset_api_base_url=os.getenv("ROLE_DATASET_API_BASE_URL") or None,
+        dataset_api_key=os.getenv("ROLE_DATASET_API_KEY") or None,
+        dataset_api_model=os.getenv("ROLE_DATASET_API_MODEL", os.getenv("ROLE_MODEL_API_NAME", "role-data-generator")),
+        dataset_api_timeout=_get_int("ROLE_DATASET_API_TIMEOUT", 120),
+        dataset_api_batch_size=max(1, min(_get_int("ROLE_DATASET_API_BATCH_SIZE", 20), 40)),
+        dataset_api_temperature=_get_float("ROLE_DATASET_API_TEMPERATURE", 0.8),
     )

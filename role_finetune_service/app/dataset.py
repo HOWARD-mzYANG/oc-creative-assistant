@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
+from app.api_dataset_generator import generate_alpaca_samples_with_api
 from app.schemas import RoleMaterialBrief, RoleModelSnapshot
+from app.settings import ServiceSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 def _clean(value: str, limit: int = 900) -> str:
@@ -230,12 +236,49 @@ def build_alpaca_samples(
     return samples
 
 
+def build_alpaca_samples_for_job(
+    snapshot: RoleModelSnapshot,
+    sample_count: int,
+    brief: RoleMaterialBrief | None,
+    settings: ServiceSettings | None,
+) -> tuple[list[dict[str, object]], str]:
+    """生成某个训练任务最终要写入磁盘的 Alpaca 样本。
+
+    未配置训练数据 API 时使用本地模板，方便离线开发；一旦配置了 `ROLE_DATASET_API_BASE_URL`，
+    就要求 API 生成满目标数量。这样不会在用户以为“240 条来自 API”时悄悄混入模板数据。
+    """
+    target_count = max(200, sample_count)
+    if settings is None or not settings.dataset_api_base_url:
+        return build_alpaca_samples(snapshot, target_count, brief), "template"
+
+    context = snapshot_context(snapshot, brief)
+    system_prompt = role_system_prompt(snapshot, brief)
+    try:
+        api_samples = generate_alpaca_samples_with_api(
+            snapshot=snapshot,
+            brief=brief,
+            context=context,
+            system_prompt=system_prompt,
+            sample_count=target_count,
+            settings=settings,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("训练数据 API 生成失败，终止训练任务：%s", exc)
+        raise RuntimeError(f"训练数据 API 生成失败：{exc}") from exc
+
+    if len(api_samples) >= target_count:
+        return api_samples[:target_count], "api"
+
+    raise RuntimeError(f"训练数据 API 只生成了 {len(api_samples)} 条样本，目标是 {target_count} 条")
+
+
 def write_dataset(
     job_dir: Path,
     snapshot: RoleModelSnapshot,
     sample_count: int,
     brief: RoleMaterialBrief | None = None,
-) -> tuple[Path, Path, int, str]:
+    settings: ServiceSettings | None = None,
+) -> tuple[Path, Path, int, str, str]:
     """写入训练数据和 LLaMA-Factory 的 `dataset_info.json`。
 
     每个训练任务有独立目录，数据集文件名使用 job id，避免多个角色/多次训练互相
@@ -245,7 +288,7 @@ def write_dataset(
     dataset_dir = job_dir / "dataset"
     dataset_dir.mkdir(parents=True, exist_ok=True)
     dataset_name = f"role_{job_dir.name}"
-    samples = build_alpaca_samples(snapshot, sample_count, brief)
+    samples, generation_source = build_alpaca_samples_for_job(snapshot, sample_count, brief, settings)
     dataset_path = dataset_dir / f"{dataset_name}.json"
     dataset_path.write_text(
         json.dumps(samples, ensure_ascii=False, indent=2),
@@ -272,4 +315,4 @@ def write_dataset(
         json.dumps(dataset_info, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    return dataset_path, dataset_info_path, len(samples), dataset_name
+    return dataset_path, dataset_info_path, len(samples), dataset_name, generation_source

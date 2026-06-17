@@ -311,12 +311,14 @@ def _run_job(job_id: str, sample_count: int) -> None:
 
         # 先把角色快照和资料整理稿变成 LLaMA-Factory 可读的数据集。生成失败时不会启动训练，
         # 这样能更快定位是资料问题还是训练环境问题。
-        dataset_path, dataset_info_path, actual_count, dataset_name = write_dataset(
+        dataset_path, dataset_info_path, actual_count, dataset_name, generation_source = write_dataset(
             _job_dir(job_id, settings),
             snapshot,
             sample_count,
             material_brief,
+            settings,
         )
+        _append_log(job_id, f"[角色微调] 训练数据来源：{generation_source}，样本数：{actual_count}")
         adapter_dir = _job_dir(job_id, settings) / "adapter"
 
         # 训练配置和数据集路径写回 job.json，前端可以直接展示，也方便演示时打开检查。

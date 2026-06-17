@@ -55,6 +55,12 @@ export interface RoleMaterialBriefDto {
   sample_plan: string[]
 }
 
+export interface RoleMaterialTraceItemDto {
+  node: string
+  title: string
+  content: string
+}
+
 export interface RoleModelJobDto {
   id: string
   project_id: string
@@ -79,6 +85,7 @@ export interface RoleModelOverviewDto {
   service_error?: string | null
   snapshot: RoleModelSnapshotDto
   material_brief?: RoleMaterialBriefDto | null
+  material_trace: RoleMaterialTraceItemDto[]
   jobs: RoleModelJobDto[]
   latest_job?: RoleModelJobDto | null
 }

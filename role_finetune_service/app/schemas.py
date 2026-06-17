@@ -146,6 +146,7 @@ class HealthResponse(BaseModel):
     workspace: str
     dry_run: bool
     model_api_configured: bool
+    dataset_api_configured: bool
 
 
 JsonDict = dict[str, Any]
