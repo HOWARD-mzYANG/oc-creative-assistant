@@ -236,23 +236,33 @@ class LlmProvider(Protocol):
     .env 无缝切换，无需修改业务代码。
     """
 
-    def chat(self, messages: list[BaseMessage]) -> str: ...
+    def chat(self, messages: list[BaseMessage]) -> str:
+        """执行一次非流式聊天调用，并返回可见文本。"""
+        ...
 
-    def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]: ...
+    def chat_stream(self, messages: list[BaseMessage]) -> Iterator[str]:
+        """按文本 token 或文本块流式返回模型可见回复。"""
+        ...
 
-    def chat_stream_chunks(self, messages: list[BaseMessage]) -> Iterator[ChatStreamDelta]: ...
+    def chat_stream_chunks(self, messages: list[BaseMessage]) -> Iterator[ChatStreamDelta]:
+        """流式返回可见文本和可选 provider thinking 增量。"""
+        ...
 
     def structured(
         self,
         messages: list[BaseMessage],
         schema: type[TSchema],
-    ) -> TSchema: ...
+    ) -> TSchema:
+        """按指定 Pydantic schema 请求结构化输出。"""
+        ...
 
     def chat_with_tools(
         self,
         messages: list[BaseMessage],
         tools: list[BaseTool],
-    ) -> AIMessage: ...
+    ) -> AIMessage:
+        """绑定工具后执行一次聊天调用，并返回原始 AIMessage。"""
+        ...
 
 
 class OpenAICompatibleProvider:
@@ -263,6 +273,7 @@ class OpenAICompatibleProvider:
     """
 
     def __init__(self, settings: LlmSettings) -> None:
+        """初始化 OpenAI 兼容客户端，并准备结构化输出策略列表。"""
         if not settings.is_configured:
             raise ValueError("缺少 OC_LLM_* 配置，无法初始化 OpenAI 兼容 provider")
 
@@ -287,6 +298,7 @@ class OpenAICompatibleProvider:
         )
 
     def chat(self, messages: list[BaseMessage]) -> str:
+        """执行一次普通 ChatOpenAI 调用，并把响应内容规整为字符串。"""
         response = self._client.invoke(messages)
         content = response.content if isinstance(response, AIMessage) else response
         return content if isinstance(content, str) else str(content)
@@ -336,6 +348,7 @@ class OpenAICompatibleProvider:
                 yield ChatStreamDelta(text=str(text), reasoning=str(reasoning))
 
     def _get_openai_client(self) -> Any:
+        """按需创建原生 OpenAI SDK 客户端，用于读取兼容服务扩展字段。"""
         if self._openai_client is None:
             try:
                 from openai import OpenAI
@@ -405,6 +418,7 @@ class OpenAICompatibleProvider:
         schema: type[TSchema],
         method: str,
     ) -> tuple[TSchema | None, str | None]:
+        """尝试单一结构化输出策略，并返回解析结果或诊断错误。"""
         runnable = self._client.with_structured_output(
             schema,
             method=method,
@@ -599,6 +613,7 @@ class MockProvider:
     """
 
     def chat(self, messages: list[BaseMessage]) -> str:
+        """生成确定性的 mock 文本回复，回显最近一条用户消息。"""
         last_user = next(
             (m.content for m in reversed(messages) if isinstance(m, HumanMessage)),
             "",
@@ -621,6 +636,7 @@ class MockProvider:
         messages: list[BaseMessage],
         schema: type[TSchema],
     ) -> TSchema:
+        """根据 schema 名称返回预置 mock 样例，并交给 Pydantic 校验。"""
         sample = _MOCK_SAMPLES.get(schema.__name__)
         if sample is None:
             raise ValueError(

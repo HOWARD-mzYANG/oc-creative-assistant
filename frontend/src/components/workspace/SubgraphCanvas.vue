@@ -85,6 +85,7 @@ const selectedEdgeId = ref('')
 const createNodeRequest = ref<{ type: CreativeNodeType; nonce: number } | null>(null)
 const focusNodeRequest = ref<{ id: string; nonce: number } | null>(null)
 
+/** 说明 tryFocusPending 的局部业务逻辑。 */
 function tryFocusPending() {
   const pendingId = nodeNav.pendingNodeId
   if (!pendingId) return
@@ -126,20 +127,24 @@ const createButtons = computed(() =>
   })),
 )
 
+/** 选择目标对象并同步当前状态。 */
 function selectNode(nodeId: string) {
   selectedNodeId.value = nodeId
   selectedEdgeId.value = ''
 }
 
+/** 选择目标对象并同步当前状态。 */
 function selectEdge(edgeId: string) {
   selectedEdgeId.value = edgeId
   selectedNodeId.value = ''
 }
 
+/** 说明 requestCreateNode 的局部业务逻辑。 */
 function requestCreateNode(nodeType: CreativeNodeType) {
   createNodeRequest.value = { type: nodeType, nonce: Date.now() }
 }
 
+/** 重新加载当前视图所需的数据。 */
 async function reload() {
   clearAutoSave()
   const { initialNodeId } = await loadGraph()
@@ -148,6 +153,7 @@ async function reload() {
   tryFocusPending()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleGraphRefreshNeeded() {
   clearAutoSave()
 

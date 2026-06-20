@@ -13,6 +13,7 @@ import PanelToggleButton from './PanelToggleButton.vue'
 
 marked.use({ gfm: true, breaks: true })
 
+/** 渲染输入内容为界面可展示的结果。 */
 function renderMarkdown(text: string): string {
   return marked.parse(text) as string
 }
@@ -36,6 +37,7 @@ const {
 const router = useRouter()
 const nodeNav = useNodeNavStore()
 
+/** 跳转到目标节点或页面。 */
 function goToNode(node: { id: string; title: string; node_type: string }) {
   const pid = chat.projectId
   if (!pid) return
@@ -65,16 +67,19 @@ const streamRef = ref<HTMLElement | null>(null)
 const autoScrollEnabled = ref(true)
 const BOTTOM_LOCK_THRESHOLD = 80
 
+/** 判断当前状态是否满足条件。 */
 function isNearBottom(el: HTMLElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_LOCK_THRESHOLD
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleChatScroll() {
   const el = streamRef.value
   if (!el) return
   autoScrollEnabled.value = isNearBottom(el)
 }
 
+/** 说明 scrollToBottom 的局部业务逻辑。 */
 async function scrollToBottom(force = false) {
   await nextTick()
   const el = streamRef.value

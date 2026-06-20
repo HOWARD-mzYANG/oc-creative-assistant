@@ -26,6 +26,7 @@ const toolbarActions = [
 
 const savingLabel = '保存中…'
 
+/** 处理对应的用户交互或组件事件。 */
 function handleActionClick(actionId: string) {
   if (actionId === 'save') {
     emit('save')

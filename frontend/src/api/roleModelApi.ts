@@ -111,6 +111,7 @@ export type RoleMaterialStreamEvent =
   | { type: 'done' }
   | { type: 'error'; message: string }
 
+/** 调用后端接口，执行 getRoleModelOverview 对应的请求。 */
 export async function getRoleModelOverview(
   projectId: string,
   characterId: string,
@@ -120,6 +121,7 @@ export async function getRoleModelOverview(
   )
 }
 
+/** 调用后端接口，执行 startRoleModelTraining 对应的请求。 */
 export async function startRoleModelTraining(
   projectId: string,
   characterId: string,
@@ -134,6 +136,7 @@ export async function startRoleModelTraining(
   )
 }
 
+/** 调用后端接口，执行 getRoleModelJob 对应的请求。 */
 export async function getRoleModelJob(
   projectId: string,
   characterId: string,
@@ -144,6 +147,7 @@ export async function getRoleModelJob(
   )
 }
 
+/** 调用后端接口，执行 getRoleChatHistory 对应的请求。 */
 export async function getRoleChatHistory(
   projectId: string,
   characterId: string,
@@ -154,6 +158,7 @@ export async function getRoleChatHistory(
   )
 }
 
+/** 调用后端接口，执行 streamRoleMaterialBrief 对应的请求。 */
 export async function streamRoleMaterialBrief(
   projectId: string,
   characterId: string,
@@ -191,6 +196,7 @@ export async function streamRoleMaterialBrief(
   }
 }
 
+/** 调用后端接口，执行 streamRoleChat 对应的请求。 */
 export async function streamRoleChat(
   projectId: string,
   characterId: string,

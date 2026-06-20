@@ -49,6 +49,7 @@ def _sse(data: dict[str, Any]) -> str:
 
 
 def _traceback_tail(exc: BaseException, *, max_lines: int = 14) -> str:
+    """截取异常 traceback 尾部，避免开发模式 SSE 错误事件过长。"""
     tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
     lines = tb.rstrip().splitlines()
     if len(lines) <= max_lines:

@@ -44,10 +44,12 @@ const avatar = ref('')
 const avatarInput = ref<HTMLInputElement | null>(null)
 const summaryEl = ref<HTMLTextAreaElement | null>(null)
 
+/** 响应对应的 DOM 或组件事件。 */
 function onSummaryInput(event: Event) {
   autoResizeTextarea(event.target as HTMLTextAreaElement)
 }
 
+/** 说明 resizeSummary 的局部业务逻辑。 */
 function resizeSummary() {
   autoResizeTextarea(summaryEl.value)
 }
@@ -66,6 +68,7 @@ const crossRefs = ref<CrossReferenceItem[]>([])
 const plotRefs = computed(() => crossRefs.value.filter((r) => r.other_section === 'plot'))
 const worldRefs = computed(() => crossRefs.value.filter((r) => r.other_section === 'world'))
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadCrossRefs() {
   try {
     const resp = await getNodeCrossReferences(projectId.value, props.charId)
@@ -75,10 +78,12 @@ async function loadCrossRefs() {
   }
 }
 
+/** 打开目标视图或弹层。 */
 function openPlotNode() {
   router.push(`/workspace/${projectId.value}/plot`)
 }
 
+/** 打开目标视图或弹层。 */
 function openRoleModel() {
   router.push(`/workspace/${projectId.value}/characters/${props.charId}/model`)
 }
@@ -92,6 +97,7 @@ const relations = computed(() =>
   })),
 )
 
+/** 说明 fieldsFromState 的局部业务逻辑。 */
 function fieldsFromState(
   rows: DocFieldRow[],
   avatarValue: string,
@@ -105,10 +111,12 @@ function fieldsFromState(
   return fields
 }
 
+/** 说明 fieldsFromRows 的局部业务逻辑。 */
 function fieldsFromRows(): Record<string, string> {
   return fieldsFromState(fieldRows.value, avatar.value)
 }
 
+/** 保存当前编辑内容到后端或缓存。 */
 async function saveFieldsForCharacter(charId: string, fields: Record<string, string>) {
   const saved = await saveNodeFields(projectId.value, charId, fields)
   const savedAvatar = saved.fields.avatar ?? fields.avatar ?? ''
@@ -116,6 +124,7 @@ async function saveFieldsForCharacter(charId: string, fields: Record<string, str
   return saved
 }
 
+/** 说明 flushSaveForCharacter 的局部业务逻辑。 */
 async function flushSaveForCharacter(charId: string) {
   if (!projectId.value || !charId) return
 
@@ -161,6 +170,7 @@ async function flushSaveForCharacter(charId: string) {
   }
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadFields(charId: string, generation: number) {
   const cachedAvatar = avatarCache.get(projectId.value, charId)
   if (cachedAvatar) {
@@ -196,10 +206,12 @@ async function loadFields(charId: string, generation: number) {
   }
 }
 
+/** 打开目标视图或弹层。 */
 function openAvatarPicker() {
   avatarInput.value?.click()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleAvatarChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -229,6 +241,7 @@ async function handleAvatarChange(event: Event) {
   }
 }
 
+/** 说明 scheduleSave 的局部业务逻辑。 */
 function scheduleSave() {
   if (isHydrating.value) return
   if (saveTimer) clearTimeout(saveTimer)
@@ -238,6 +251,7 @@ function scheduleSave() {
   }, SAVE_DEBOUNCE_MS)
 }
 
+/** 持久化当前编辑状态并处理保存队列。 */
 async function persistAvatarFor(charId: string, dataUrl: string) {
   if (!projectId.value || !charId) return
   if (isSaving) {
@@ -277,6 +291,7 @@ async function persistAvatarFor(charId: string, dataUrl: string) {
   }
 }
 
+/** 持久化当前编辑状态并处理保存队列。 */
 async function persistAll() {
   const charId = props.charId
   if (!charId) return
@@ -317,6 +332,7 @@ async function persistAll() {
   }
 }
 
+/** 说明 hydrate 的局部业务逻辑。 */
 async function hydrate() {
   const charId = props.charId
   if (!node.value || node.value.id !== charId) return
@@ -331,6 +347,7 @@ async function hydrate() {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleDelete() {
   const charTitle = title.value.trim() || node.value?.title || '这个角色'
   const confirmed = window.confirm(`删除“${charTitle}”？相关关系边也会一并移除。`)

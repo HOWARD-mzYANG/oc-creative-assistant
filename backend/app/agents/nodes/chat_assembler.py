@@ -63,6 +63,7 @@ def _build_small_talk_brief(state: AgentState) -> str:
 
 
 def _assemble_small_talk(state: AgentState) -> ChatAssemblerOutput:
+    """为闲聊意图生成轻量回复，避免把完整项目上下文注入闲聊 prompt。"""
     user_message = state.get("user_message", "")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     llm_model = get_llm_settings().model
@@ -103,6 +104,7 @@ def _assemble_small_talk(state: AgentState) -> ChatAssemblerOutput:
 def _build_reply_messages(
     state: AgentState, output: Any, primary: str
 ) -> list[BaseMessage]:
+    """把上游 agent 输出、记忆块和边界警告组装成最终回复模型消息。"""
     user_message = state.get("user_message", "")
     warnings = state.get("boundary_warnings") or []
     warning_block = (
@@ -174,6 +176,7 @@ def _derive_cited_node_ids(output: Any) -> list[str]:
 
 
 def _has_chinese(text: str) -> bool:
+    """判断文本中是否包含中文字符，用于选择本地化的降级文案。"""
     return any("\u4e00" <= char <= "\u9fff" for char in text)
 
 
@@ -198,6 +201,14 @@ def _derive_staging_summary(state: AgentState, output: Any) -> str:
 
 
 def chat_assembler_node(state: AgentState) -> dict[str, Any]:
+    """根据识别到的意图选择回复组装路径，并返回 LangGraph 节点输出。
+
+    参数：
+        state: 当前 agent 图状态，包含意图、上游结构化结果、记忆上下文和流式配置。
+
+    返回：
+        带 `assembler_output` 的状态增量，供后续持久化和 API 流式输出使用。
+    """
     intent = state.get("intent")
     primary = intent.primary if intent is not None else ""
 

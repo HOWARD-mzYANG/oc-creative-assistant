@@ -33,6 +33,7 @@ def _build_provider(settings: LlmSettings) -> LlmProvider:
 
 @lru_cache(maxsize=1)
 def get_llm_provider() -> LlmProvider:
+    """获取主 agent 使用的单例 LLM provider。"""
     return _build_provider(get_llm_settings())
 
 

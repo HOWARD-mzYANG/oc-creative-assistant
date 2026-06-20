@@ -26,6 +26,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
+/** 说明 labelOf 的局部业务逻辑。 */
 function labelOf(type: CreativeNodeType): string {
   return ({character:'角色',worldbuilding:'世界观',plot:'故事节点',idea:'想法',research:'资料',structure:'结构'} as Record<string,string>)[type] ?? type
 }

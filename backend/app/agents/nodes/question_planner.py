@@ -25,6 +25,14 @@ _SYSTEM_PROMPT = load_prompt("question_planner")
 
 
 def question_planner_node(state: AgentState) -> dict[str, Any]:
+    """规划下一步自然追问，并把提示写入 `next_question_hint`。
+
+    参数：
+        state: 当前 agent 图状态，包含最近对话、项目 seed、引用节点和待补字段。
+
+    返回：
+        追问提示和规划理由；未启用抽取或模型无结果时返回空字典。
+    """
     if not state.get("extraction_enabled"):
         return {}
 

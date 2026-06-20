@@ -22,18 +22,22 @@ const emit = defineEmits<{
   'edge-deleted': [edgeId: string]
 }>()
 
+/** 说明 forwardNodeUpdated 的局部业务逻辑。 */
 function forwardNodeUpdated(node: CreativeFlowNode) {
   emit('node-updated', node)
 }
 
+/** 说明 forwardNodeDeleted 的局部业务逻辑。 */
 function forwardNodeDeleted(nodeId: string) {
   emit('node-deleted', nodeId)
 }
 
+/** 说明 forwardEdgeUpdated 的局部业务逻辑。 */
 function forwardEdgeUpdated(edge: CreativeFlowEdge) {
   emit('edge-updated', edge)
 }
 
+/** 说明 forwardEdgeDeleted 的局部业务逻辑。 */
 function forwardEdgeDeleted(edgeId: string) {
   emit('edge-deleted', edgeId)
 }

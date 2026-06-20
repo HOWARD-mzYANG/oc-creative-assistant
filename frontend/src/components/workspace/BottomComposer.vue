@@ -25,10 +25,12 @@ const webSearchTitle = computed(() => {
   return '联网搜索：自动判断（点击切换）'
 })
 
+/** 切换当前界面状态。 */
 function toggleCollapsed() {
   composer.setCollapsed(!collapsed.value)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleSend() {
   const message = input.value.trim()
   const quotedIds = references.value.map((r) => r.id)

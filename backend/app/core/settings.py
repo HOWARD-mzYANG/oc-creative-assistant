@@ -37,6 +37,7 @@ def _get_bool(name: str, default: bool = False) -> bool:
 
 
 def _get_int(name: str, default: int) -> int:
+    """读取整数环境变量，缺失或非法时回退到默认值。"""
     raw = os.getenv(name)
     if raw is None or not raw.strip():
         return default
@@ -82,6 +83,7 @@ class IndexingSettings:
 
 
 def get_embedding_settings() -> EmbeddingSettings:
+    """读取 Embedding 服务配置，并返回不可变设置对象。"""
     return EmbeddingSettings(
         base_url=os.getenv("OC_EMBEDDING_BASE_URL"),
         api_key=os.getenv("OC_EMBEDDING_API_KEY"),
@@ -91,6 +93,7 @@ def get_embedding_settings() -> EmbeddingSettings:
 
 
 def get_indexing_settings() -> IndexingSettings:
+    """读取索引同步调试开关配置。"""
     return IndexingSettings(debug_log=_get_bool("OC_INDEXING_DEBUG_LOG", False))
 
 
@@ -111,12 +114,14 @@ class LlmSettings:
 
     @property
     def is_configured(self) -> bool:
+        """判断当前 LLM provider 是否具备可调用的最低配置。"""
         if self.provider == "mock":
             return True
         return bool(self.base_url and self.api_key and self.model)
 
 
 def get_llm_settings() -> LlmSettings:
+    """读取主 agent LLM 配置及结构化输出策略。"""
     structured_methods = _get_csv(
         "OC_LLM_STRUCTURED_METHODS",
         _get_csv(
@@ -187,10 +192,12 @@ class WebSearchSettings:
 
     @property
     def is_configured(self) -> bool:
+        """判断联网搜索服务是否配置了可用 API key。"""
         return bool(self.api_key)
 
 
 def get_web_search_settings() -> WebSearchSettings:
+    """读取联网搜索 provider、API key 和超时配置。"""
     return WebSearchSettings(
         provider=os.getenv("OC_WEB_SEARCH_PROVIDER", "tavily").strip().lower(),
         api_key=os.getenv("OC_WEB_SEARCH_API_KEY") or None,
@@ -207,10 +214,12 @@ class RoleFinetuneSettings:
 
     @property
     def is_configured(self) -> bool:
+        """判断外部角色微调服务是否配置了基础 URL。"""
         return bool(self.base_url)
 
 
 def get_role_finetune_settings() -> RoleFinetuneSettings:
+    """读取可选的角色微调服务配置。"""
     base_url = os.getenv("OC_ROLE_FINETUNE_BASE_URL")
     return RoleFinetuneSettings(
         base_url=base_url.rstrip("/") if base_url else None,
@@ -240,6 +249,7 @@ class AgentSettings:
 
 
 def get_agent_settings() -> AgentSettings:
+    """读取 LangGraph checkpoint、上下文预算和摘要压缩水位配置。"""
     return AgentSettings(
         checkpointer_db_path=DATA_DIR / "langgraph_checkpoint.sqlite3",
         context_token_cap=_get_int("OC_AGENT_CONTEXT_TOKEN_CAP", 6000),
@@ -257,4 +267,5 @@ class AppSettings:
 
 
 def get_app_settings() -> AppSettings:
+    """读取应用级运行时开关配置。"""
     return AppSettings(dev_mode=_get_bool("OC_DEV_MODE", False))

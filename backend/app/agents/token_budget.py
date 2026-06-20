@@ -8,6 +8,7 @@ from typing import Any
 
 @lru_cache(maxsize=1)
 def _get_encoder() -> Any | None:
+    """延迟加载 tiktoken 编码器，离线或未安装时返回 None。"""
     try:
         import tiktoken
 
@@ -17,6 +18,7 @@ def _get_encoder() -> Any | None:
 
 
 def _estimated_token_cost(char: str) -> float:
+    """按字符类型估算单字符 token 成本，用作无 tiktoken 时的兜底。"""
     if char.isspace():
         return 0.15
     if ord(char) > 127:
@@ -25,6 +27,7 @@ def _estimated_token_cost(char: str) -> float:
 
 
 def _estimate_tokens(text: str) -> int:
+    """使用字符成本估算整段文本的 token 数，并保证至少返回 1。"""
     return max(1, int(sum(_estimated_token_cost(char) for char in text)))
 
 

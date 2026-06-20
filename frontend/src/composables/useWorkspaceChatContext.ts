@@ -29,9 +29,11 @@ export function provideWorkspaceChatContext() {
   const canvasFocusRefs = ref<CanvasFocusRef[]>([])
 
   const graphRefreshRegistry: GraphRefreshRegistry = {
+    /** 封装 register 对应的组合式状态和操作。 */
     register(fn) {
       refreshFn = fn
     },
+    /** 封装 trigger 对应的组合式状态和操作。 */
     async trigger() {
       if (refreshFn) {
         await refreshFn()
@@ -45,11 +47,13 @@ export function provideWorkspaceChatContext() {
   provide(WORKSPACE_CANVAS_FOCUS_KEY, canvasFocusRefs)
   provide(WORKSPACE_GRAPH_REFRESH_KEY, graphRefreshRegistry)
 
+  /** 封装 setCanvasFocus 对应的组合式状态和操作。 */
   function setCanvasFocus(refs: CanvasFocusRef[]) {
     canvasFocusRefs.value = refs
     selectedNodeIds.value = refs.map((ref) => ref.id)
   }
 
+  /** 封装 clearCanvasFocus 对应的组合式状态和操作。 */
   function clearCanvasFocus() {
     canvasFocusRefs.value = []
     selectedNodeIds.value = []
@@ -64,22 +68,27 @@ export function provideWorkspaceChatContext() {
   }
 }
 
+/** 封装 injectWorkspaceSelectedNodeIds 对应的组合式状态和操作。 */
 export function injectWorkspaceSelectedNodeIds() {
   return inject(WORKSPACE_SELECTED_NODE_IDS_KEY, ref<string[]>([]))
 }
 
+/** 封装 injectWorkspaceCanvasFocus 对应的组合式状态和操作。 */
 export function injectWorkspaceCanvasFocus() {
   return inject(WORKSPACE_CANVAS_FOCUS_KEY, ref<CanvasFocusRef[]>([]))
 }
 
+/** 封装 injectSetCanvasFocus 对应的组合式状态和操作。 */
 export function injectSetCanvasFocus() {
   const focus = inject(WORKSPACE_CANVAS_FOCUS_KEY, null)
   const selected = inject(WORKSPACE_SELECTED_NODE_IDS_KEY, null)
   return {
+    /** 封装 setCanvasFocus 对应的组合式状态和操作。 */
     setCanvasFocus(refs: CanvasFocusRef[]) {
       if (focus) focus.value = refs
       if (selected) selected.value = refs.map((ref) => ref.id)
     },
+    /** 封装 clearCanvasFocus 对应的组合式状态和操作。 */
     clearCanvasFocus() {
       if (focus) focus.value = []
       if (selected) selected.value = []
@@ -87,6 +96,7 @@ export function injectSetCanvasFocus() {
   }
 }
 
+/** 封装 injectWorkspaceGraphRefresh 对应的组合式状态和操作。 */
 export function injectWorkspaceGraphRefresh() {
   return inject(WORKSPACE_GRAPH_REFRESH_KEY, null)
 }

@@ -17,6 +17,7 @@ const MAX_COLUMNS = 10
 const MAX_ROW_RADIUS = 10
 const COMPONENT_GAP_ROWS = 1
 
+/** 执行 rowOffsets 对应的工具转换或计算。 */
 function rowOffsets(radius: number) {
   const offsets = [0]
   for (let value = 1; value <= radius; value += 1) {
@@ -28,6 +29,7 @@ function rowOffsets(radius: number) {
   return offsets
 }
 
+/** 执行 overlaps 对应的工具转换或计算。 */
 function overlaps(candidate: CanvasPoint, node: CreativeFlowNode) {
   return (
     candidate.x < node.position.x + NODE_WIDTH + NODE_GAP_X &&
@@ -37,10 +39,12 @@ function overlaps(candidate: CanvasPoint, node: CreativeFlowNode) {
   )
 }
 
+/** 执行 isFree 对应的工具转换或计算。 */
 function isFree(candidate: CanvasPoint, nodes: CreativeFlowNode[]) {
   return nodes.every((node) => !overlaps(candidate, node))
 }
 
+/** 执行 findFreeNodePosition 对应的工具转换或计算。 */
 export function findFreeNodePosition(
   nodes: CreativeFlowNode[],
   preferred: CanvasPoint = { x: DEFAULT_X, y: DEFAULT_Y },
@@ -66,6 +70,7 @@ export function findFreeNodePosition(
   }
 }
 
+/** 执行 arrangeNodesInGrid 对应的工具转换或计算。 */
 export function arrangeNodesInGrid(nodes: CreativeFlowNode[]): CreativeFlowNode[] {
   if (nodes.length <= 1) {
     return nodes.map((node) => ({ ...node, position: { ...node.position } }))
@@ -88,10 +93,12 @@ export function arrangeNodesInGrid(nodes: CreativeFlowNode[]): CreativeFlowNode[
   }))
 }
 
+/** 执行 sortByCurrentPosition 对应的工具转换或计算。 */
 function sortByCurrentPosition(a: CreativeFlowNode, b: CreativeFlowNode) {
   return a.position.y - b.position.y || a.position.x - b.position.x || a.id.localeCompare(b.id)
 }
 
+/** 执行 buildDirectedAdjacency 对应的工具转换或计算。 */
 function buildDirectedAdjacency(nodes: CreativeFlowNode[], edges: CreativeFlowEdge[]) {
   const nodeIds = new Set(nodes.map((node) => node.id))
   const outgoing = new Map<string, string[]>()
@@ -121,6 +128,7 @@ function buildDirectedAdjacency(nodes: CreativeFlowNode[], edges: CreativeFlowEd
   return { outgoing, incoming }
 }
 
+/** 执行 buildPrimaryForest 对应的工具转换或计算。 */
 function buildPrimaryForest(
   nodes: CreativeFlowNode[],
   edges: CreativeFlowEdge[],
@@ -139,6 +147,7 @@ function buildPrimaryForest(
   const rootCandidates = sortedNodes.filter((node) => (incoming.get(node.id)?.length ?? 0) === 0)
   const traversalSeeds = rootCandidates.length > 0 ? rootCandidates : sortedNodes
 
+  /** 执行 visit 对应的工具转换或计算。 */
   function visit(nodeId: string, path: Set<string>) {
     const childIds = outgoing.get(nodeId) ?? []
     for (const childId of childIds) {
@@ -173,6 +182,7 @@ function buildPrimaryForest(
   return { roots, childrenByParent }
 }
 
+/** 执行 arrangeNodesAsHierarchy 对应的工具转换或计算。 */
 export function arrangeNodesAsHierarchy(
   nodes: CreativeFlowNode[],
   edges: CreativeFlowEdge[],
@@ -194,6 +204,7 @@ export function arrangeNodesAsHierarchy(
   const spanCache = new Map<string, number>()
   const placed = new Map<string, CanvasPoint>()
 
+  /** 执行 subtreeSpan 对应的工具转换或计算。 */
   function subtreeSpan(nodeId: string): number {
     const cached = spanCache.get(nodeId)
     if (cached !== undefined) {
@@ -209,6 +220,7 @@ export function arrangeNodesAsHierarchy(
     return span
   }
 
+  /** 执行 place 对应的工具转换或计算。 */
   function place(nodeId: string, depth: number, topRow: number) {
     const childIds = forest.childrenByParent.get(nodeId) ?? []
     if (childIds.length === 0) {

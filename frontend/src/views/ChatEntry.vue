@@ -37,21 +37,25 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
 
+/** 说明 enterChat 的局部业务逻辑。 */
 function enterChat(): void {
   if (!selectedId.value) return
   router.push(`/chat/${selectedId.value}`)
 }
 
+/** 切换当前界面状态。 */
 function toggleProjectMenu(): void {
   if (projects.value.length === 0) return
   isProjectMenuOpen.value = !isProjectMenuOpen.value
 }
 
+/** 选择目标对象并同步当前状态。 */
 function selectProject(projectId: string): void {
   selectedId.value = projectId
   isProjectMenuOpen.value = false
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleDocumentPointerDown(event: PointerEvent): void {
   const target = event.target
   if (!(target instanceof Node)) return
@@ -60,6 +64,7 @@ function handleDocumentPointerDown(event: PointerEvent): void {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleCreate(): Promise<void> {
   const name = newName.value.trim()
   if (!name) return

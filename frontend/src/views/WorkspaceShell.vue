@@ -58,6 +58,7 @@ const rightResize = usePanelResize({
 
 const isResizing = computed(() => leftResize.isDragging.value || rightResize.isDragging.value)
 
+/** 说明 refreshProjectGraphs 的局部业务逻辑。 */
 async function refreshProjectGraphs() {
   await triggerGraphRefresh()
   const graphIds = [

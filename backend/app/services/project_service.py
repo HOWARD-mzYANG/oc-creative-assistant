@@ -35,6 +35,7 @@ def _latest_seed_orm(session, project_id: str) -> ProjectSeedORM | None:
 
 
 def _seed_to_payload(seed: ProjectSeedORM | None) -> ProjectSeedPayload | None:
+    """把最新 seed ORM 记录转换为项目详情中的可选 payload。"""
     if seed is None:
         return None
     return ProjectSeedPayload(
@@ -48,6 +49,7 @@ def _seed_to_payload(seed: ProjectSeedORM | None) -> ProjectSeedPayload | None:
 
 
 def _project_to_detail(session, project: ProjectORM) -> ProjectDetailPayload:
+    """组装项目详情 payload，包含子图 ID 和最新 seed 快照。"""
     return ProjectDetailPayload(
         id=project.id,
         name=project.name,

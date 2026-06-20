@@ -94,6 +94,7 @@ _SIMULATION_FRAGMENTS = (
 
 
 def _looks_like_project_query(message: str) -> bool:
+    """用关键词判断消息是否在询问项目或画布内容。"""
     text = message.strip().lower()
     raw = message.strip()
     return any(frag in raw or frag in text for frag in _PROJECT_QUERY_FRAGMENTS)
@@ -139,6 +140,7 @@ def _coerce_substantive_intent(
     intent: IntentClassification,
     user_message: str,
 ) -> IntentClassification:
+    """当 LLM 把明确创作请求误判为闲聊时，用启发式意图覆盖。"""
     if intent.primary != "small_talk":
         return intent
     guessed = _guess_intent_from_message(user_message)

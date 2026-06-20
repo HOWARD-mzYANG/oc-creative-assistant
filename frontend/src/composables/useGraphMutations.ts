@@ -24,6 +24,7 @@ export function useGraphMutations(options: Options) {
   const { graphSnapshot, selectedNodeId, selectedEdgeId, setGraphSnapshot, scheduleAutoSave } = options
   const { recordHistory, undo, redo } = options
 
+  /** 封装 handleNodeUpdated 对应的组合式状态和操作。 */
   function handleNodeUpdated(updatedNode: CreativeFlowNode) {
     const nextSnapshot: CreativeGraphSnapshot = {
       nodes: graphSnapshot.value.nodes.map((node) => (node.id === updatedNode.id ? updatedNode : node)),
@@ -33,6 +34,7 @@ export function useGraphMutations(options: Options) {
     scheduleAutoSave(FORM_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 handleEdgeUpdated 对应的组合式状态和操作。 */
   function handleEdgeUpdated(updatedEdge: CreativeFlowEdge) {
     const nextSnapshot: CreativeGraphSnapshot = {
       nodes: graphSnapshot.value.nodes,
@@ -42,6 +44,7 @@ export function useGraphMutations(options: Options) {
     scheduleAutoSave(FORM_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 handleNodeDeleted 对应的组合式状态和操作。 */
   function handleNodeDeleted(nodeId: string) {
     const node = graphSnapshot.value.nodes.find((item) => item.id === nodeId)
     if (!node) {
@@ -62,6 +65,7 @@ export function useGraphMutations(options: Options) {
     scheduleAutoSave(QUICK_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 handleEdgeDeleted 对应的组合式状态和操作。 */
   function handleEdgeDeleted(edgeId: string) {
     recordHistory?.()
     const nextSnapshot: CreativeGraphSnapshot = {
@@ -73,6 +77,7 @@ export function useGraphMutations(options: Options) {
     scheduleAutoSave(QUICK_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 isTypingTarget 对应的组合式状态和操作。 */
   function isTypingTarget(target: EventTarget | null) {
     if (!(target instanceof HTMLElement)) {
       return false
@@ -80,6 +85,7 @@ export function useGraphMutations(options: Options) {
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
   }
 
+  /** 封装 handleGlobalKeydown 对应的组合式状态和操作。 */
   function handleGlobalKeydown(event: KeyboardEvent) {
     if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z')) {
       if (isTypingTarget(event.target)) return

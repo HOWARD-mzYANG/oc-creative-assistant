@@ -15,10 +15,12 @@ const projectStore = useProjectStore()
 const ocInput = ref<HTMLInputElement | null>(null)
 const menuOpen = ref(false)
 
+/** 说明 currentProjectId 的局部业务逻辑。 */
 function currentProjectId(): string {
   return String(route.params.projectId || projectStore.detail?.id || '')
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 async function onExportOc() {
   const projectId = currentProjectId()
   if (!projectId) return
@@ -30,6 +32,7 @@ async function onExportOc() {
   URL.revokeObjectURL(a.href)
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 async function onExportPdf() {
   const projectId = currentProjectId()
   if (!projectId) return
@@ -37,12 +40,14 @@ async function onExportPdf() {
   await openProjectPdf(data)
 }
 
+/** 根据用户选择执行对应操作。 */
 function choose(format: 'oc' | 'pdf') {
   menuOpen.value = false
   if (format === 'oc') void onExportOc()
   else void onExportPdf()
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 async function onImport(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]

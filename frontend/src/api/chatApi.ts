@@ -245,6 +245,7 @@ export interface AppliedEntityDto {
  */
 export type WebSearchMode = 'auto' | 'on' | 'off'
 
+/** 调用后端接口，执行 streamChat 对应的请求。 */
 export async function streamChat(
   sessionId: string,
   userMessage: string,

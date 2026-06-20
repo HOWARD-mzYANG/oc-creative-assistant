@@ -25,11 +25,13 @@ export const useCenterStageStore = defineStore('centerStage', {
     detailNode: null as DetailNodeSnapshot | null,
   }),
   actions: {
+    /** 维护 store 中 openDetail 对应的状态变更。 */
     openDetail(nodeId: string, node?: DetailNodeSnapshot) {
       this.mode = 'detail'
       this.detailNodeId = nodeId
       this.detailNode = node ?? null
     },
+    /** 维护 store 中 returnToCanvas 对应的状态变更。 */
     returnToCanvas() {
       this.mode = 'canvas'
       this.detailNodeId = null

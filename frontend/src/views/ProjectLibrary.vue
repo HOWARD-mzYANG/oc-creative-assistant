@@ -24,10 +24,12 @@ onMounted(() => {
   library.fetchProjects()
 })
 
+/** 打开目标视图或弹层。 */
 function openProject(projectId: string): void {
   router.push(`/workspace/${projectId}`)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleCreate(): Promise<void> {
   const name = newName.value.trim()
   if (!name) return
@@ -41,11 +43,13 @@ async function handleCreate(): Promise<void> {
   router.push(`/workspace/${detail.id}`)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleDelete(projectId: string, event: MouseEvent): Promise<void> {
   event.stopPropagation()
   await library.removeProject(projectId)
 }
 
+/** 格式化数据为界面展示所需的文本。 */
 function formatTime(value?: string | null): string {
   if (!value) return ''
   const date = new Date(value)

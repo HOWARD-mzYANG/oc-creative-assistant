@@ -46,6 +46,7 @@ export function useGraphPersistence(
   const canUndo = computed(() => undoStack.value.length > 0)
   const canRedo = computed(() => redoStack.value.length > 0)
 
+  /** 封装 cloneSnapshot 对应的组合式状态和操作。 */
   function cloneSnapshot(s: CreativeGraphSnapshot): CreativeGraphSnapshot {
     return JSON.parse(JSON.stringify({ nodes: s.nodes, edges: s.edges }))
   }
@@ -57,6 +58,7 @@ export function useGraphPersistence(
     redoStack.value = []
   }
 
+  /** 封装 undo 对应的组合式状态和操作。 */
   function undo() {
     const prev = undoStack.value.pop()
     if (!prev) return
@@ -65,6 +67,7 @@ export function useGraphPersistence(
     scheduleAutoSave(CANVAS_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 redo 对应的组合式状态和操作。 */
   function redo() {
     const next = redoStack.value.pop()
     if (!next) return
@@ -73,6 +76,7 @@ export function useGraphPersistence(
     scheduleAutoSave(CANVAS_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 setGraphSnapshot 对应的组合式状态和操作。 */
   function setGraphSnapshot(snapshot: CreativeGraphSnapshot, shouldPushToCanvas = false) {
     graphSnapshot.value = snapshot
     graphNodes.value = snapshot.nodes
@@ -82,6 +86,7 @@ export function useGraphPersistence(
     }
   }
 
+  /** 封装 persistGraph 对应的组合式状态和操作。 */
   async function persistGraph(refreshFromResponse = false) {
     if (!projectId.value) {
       return
@@ -111,6 +116,7 @@ export function useGraphPersistence(
     }
   }
 
+  /** 封装 scheduleAutoSave 对应的组合式状态和操作。 */
   function scheduleAutoSave(delayMs = CANVAS_AUTO_SAVE_DELAY_MS) {
     if (!isGraphReady.value || !projectId.value) {
       return
@@ -124,6 +130,7 @@ export function useGraphPersistence(
     }, delayMs)
   }
 
+  /** 封装 clearAutoSave 对应的组合式状态和操作。 */
   function clearAutoSave() {
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer)
@@ -131,6 +138,7 @@ export function useGraphPersistence(
     }
   }
 
+  /** 封装 loadGraph 对应的组合式状态和操作。 */
   async function loadGraph(): Promise<{ initialNodeId: string }> {
     try {
       saveState.value = '加载中…'
@@ -153,12 +161,14 @@ export function useGraphPersistence(
     }
   }
 
+  /** 封装 handleGraphChanged 对应的组合式状态和操作。 */
   function handleGraphChanged(snapshot: CreativeGraphSnapshot) {
     recordHistory()
     setGraphSnapshot(snapshot)
     scheduleAutoSave(CANVAS_AUTO_SAVE_DELAY_MS)
   }
 
+  /** 封装 handleSaveGraph 对应的组合式状态和操作。 */
   async function handleSaveGraph() {
     clearAutoSave()
     await persistGraph(true)

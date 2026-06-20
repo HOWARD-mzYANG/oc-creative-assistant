@@ -40,6 +40,7 @@ const relatedMemoryItems = ref<RagMergedContextItemDto[]>([])
 const relatedMemoryError = ref('')
 const isRelatedMemoryLoading = ref(false)
 
+/** 关闭目标视图或弹层。 */
 function closeAllSelects(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (!target.closest('.custom-select-container')) {
@@ -83,10 +84,12 @@ function summarizeContent(content: string) {
   return content.length > 72 ? `${content.slice(0, 72)}...` : content
 }
 
+/** 获取指定数据或派生状态。 */
 function getNodeTypeLabel(type: string) {
   return nodeTypeOptions.find((option) => option.type === type)?.label ?? type
 }
 
+/** 获取指定数据或派生状态。 */
 function getMemorySourceLabel(source: string) {
   if (source === 'both') {
     return '图关系 + 语义'
@@ -105,6 +108,7 @@ function handleCreateNode(nodeType: CreativeNodeType) {
   emit('createNode', nodeType)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleSelectNode(nodeId: string) {
   emit('nodeSelected', nodeId)
 }

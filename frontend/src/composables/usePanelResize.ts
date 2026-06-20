@@ -1,5 +1,6 @@
 import { onBeforeUnmount, ref } from 'vue'
 
+/** 封装 clamp 对应的组合式状态和操作。 */
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
 /**
@@ -17,6 +18,7 @@ export function usePanelResize(options: {
   const isDragging = ref(false)
   let removeListeners: (() => void) | null = null
 
+  /** 封装 stopDrag 对应的组合式状态和操作。 */
   function stopDrag() {
     isDragging.value = false
     document.body.style.cursor = ''
@@ -25,12 +27,14 @@ export function usePanelResize(options: {
     removeListeners = null
   }
 
+  /** 封装 startDrag 对应的组合式状态和操作。 */
   function startDrag(event: MouseEvent) {
     event.preventDefault()
     isDragging.value = true
     const startX = event.clientX
     const startWidth = options.getWidth()
 
+    /** 封装 onMove 对应的组合式状态和操作。 */
     const onMove = (moveEvent: MouseEvent) => {
       const delta = (moveEvent.clientX - startX) * options.direction
       options.setWidth(clamp(startWidth + delta, options.min, options.max))

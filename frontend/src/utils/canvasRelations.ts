@@ -32,10 +32,12 @@ const relationEdgeStyles: Record<CreativeRelationType, RelationEdgeStyle> = {
   develops_into: { color: '#a855f7', labelBg: '#faf5ff' },
 }
 
+/** 执行 getRelationLabel 对应的工具转换或计算。 */
 export function getRelationLabel(relationType: CreativeRelationType): string {
   return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? '相关'
 }
 
+/** 执行 getRelationStyle 对应的工具转换或计算。 */
 export function getRelationStyle(relationType: CreativeRelationType): RelationEdgeStyle {
   return relationEdgeStyles[relationType] ?? relationEdgeStyles.relates_to
 }

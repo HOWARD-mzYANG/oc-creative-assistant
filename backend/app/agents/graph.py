@@ -104,6 +104,7 @@ def _with_progress(node_name: str, node: AgentNode) -> AgentNode:
     """给 LangGraph 节点增加开始事件和耗时日志。"""
 
     def wrapped(state: AgentState) -> dict[str, Any]:
+        """执行被包装的图节点，并在前后写入进度事件和耗时日志。"""
         try:
             writer = get_stream_writer()
         except Exception:
@@ -174,6 +175,11 @@ def _route_to_agent(state: AgentState) -> str:
 
 
 def _build_graph() -> StateGraph:
+    """创建并连线完整的 LangGraph StateGraph。
+
+    返回：
+        已注册节点、条件路由和终止边的未编译 `StateGraph`，供单例入口绑定 checkpointer。
+    """
     builder = StateGraph(AgentState)
 
     builder.add_node("load_context", _with_progress("load_context", load_context_node))

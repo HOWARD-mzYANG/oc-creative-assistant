@@ -12,8 +12,10 @@ const RELATION_LABEL: Record<string, string> = {
     relates_to: '相关',
 }
 
+/** 执行 byOrder 对应的工具转换或计算。 */
 const byOrder = (a: OcNode, b: OcNode) => a.sort_order - b.sort_order
 
+/** 执行 esc 对应的工具转换或计算。 */
 function esc(s: unknown): string {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -21,6 +23,7 @@ function esc(s: unknown): string {
     .replace(/>/g, '&gt;')
 }
 
+/** 执行 fieldsHtml 对应的工具转换或计算。 */
 function fieldsHtml(node: OcNode): string {
   const fields = node.meta?.fields
   if (!fields || Object.keys(fields).length === 0) return ''
@@ -30,16 +33,19 @@ function fieldsHtml(node: OcNode): string {
   return `<table class="fields">${rows}</table>`
 }
 
+/** 执行 contentHtml 对应的工具转换或计算。 */
 function contentHtml(node: OcNode): string {
   return node.content ? `<div class="content">${esc(node.content)}</div>` : ''
 }
 
+/** 执行 tagsHtml 对应的工具转换或计算。 */
 function tagsHtml(node: OcNode): string {
   const tags = node.meta?.tags
   if (!tags || tags.length === 0) return ''
   return `<div class="tags">${tags.map((t) => `<span>${esc(t)}</span>`).join('')}</div>`
 }
 
+/** 执行 storySection 对应的工具转换或计算。 */
 function storySection(nodes: OcNode[], edges: OcEdge[]): string {
   const plots = nodes.filter((n) => n.node_type === 'plot').sort(byOrder)
   if (plots.length === 0) return ''
@@ -66,6 +72,7 @@ function storySection(nodes: OcNode[], edges: OcEdge[]): string {
   return `<h2 class="board">故事</h2>${items}`
 }
 
+/** 执行 charactersSection 对应的工具转换或计算。 */
 function charactersSection(nodes: OcNode[]): string {
   const chars = nodes.filter((n) => n.node_type === 'character').sort(byOrder)
   if (chars.length === 0) return ''
@@ -78,6 +85,7 @@ function charactersSection(nodes: OcNode[]): string {
   return `<h2 class="board">角色</h2>${items}`
 }
 
+/** 执行 worldSection 对应的工具转换或计算。 */
 function worldSection(nodes: OcNode[], edges: OcEdge[]): string {
   const worlds = nodes.filter((n) => n.node_type === 'worldbuilding')
   if (worlds.length === 0) return ''
@@ -95,6 +103,7 @@ function worldSection(nodes: OcNode[], edges: OcEdge[]): string {
   }
   for (const arr of childrenByParent.values()) arr.sort(byOrder)
 
+  /** 执行 walk 对应的工具转换或计算。 */
   function walk(parentKey: string | null, depth: number): string {
     const children = childrenByParent.get(parentKey) || []
     return children

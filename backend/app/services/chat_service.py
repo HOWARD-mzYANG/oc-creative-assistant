@@ -54,6 +54,7 @@ from app.services.chat_repository import (
 # ---- ORM → DTO ----
 
 def _session_to_payload(record: ChatSessionORM) -> ChatSessionPayload:
+    """把聊天会话 ORM 记录转换为 API DTO。"""
     return ChatSessionPayload(
         id=record.id,
         project_id=record.project_id,
@@ -65,6 +66,7 @@ def _session_to_payload(record: ChatSessionORM) -> ChatSessionPayload:
 
 
 def _message_to_payload(record: ChatMessageORM) -> ChatMessagePayload:
+    """把聊天消息 ORM 记录转换为 API DTO。"""
     return ChatMessagePayload(
         id=record.id,
         session_id=record.session_id,
@@ -92,6 +94,7 @@ def _display_payload_for_staging(record: AgentStagingORM, db) -> dict[str, Any]:
 
 
 def _staging_to_payload(record: AgentStagingORM, db) -> AgentStagingPayload:
+    """把暂存变更 ORM 记录转换为前端可展示的 API DTO。"""
     return AgentStagingPayload(
         id=record.id,
         session_id=record.session_id,

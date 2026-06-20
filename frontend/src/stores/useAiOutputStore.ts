@@ -20,6 +20,7 @@ export const useAiOutputStore = defineStore('aiOutput', {
     outputs: [] as AiOutput[],
   }),
   actions: {
+    /** 维护 store 中 push 对应的状态变更。 */
     push(output: Omit<AiOutput, 'id' | 'timestamp' | 'collapsed'>) {
       this.outputs.push({
         ...output,
@@ -28,10 +29,12 @@ export const useAiOutputStore = defineStore('aiOutput', {
         collapsed: false,
       })
     },
+    /** 维护 store 中 toggleCollapse 对应的状态变更。 */
     toggleCollapse(id: string) {
       const o = this.outputs.find((x) => x.id === id)
       if (o) o.collapsed = !o.collapsed
     },
+    /** 维护 store 中 clear 对应的状态变更。 */
     clear() {
       this.outputs = []
     },

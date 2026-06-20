@@ -28,6 +28,7 @@ interface FlatRow {
   isCollapsed: boolean
 }
 
+/** 说明 flatten 的局部业务逻辑。 */
 function flatten(tree: WorldTreeNode, depth: number, rows: FlatRow[]) {
   rows.push({
     id: tree.id,
@@ -50,6 +51,7 @@ const rows = computed(() => {
   return list
 })
 
+/** 切换当前界面状态。 */
 function toggleCollapse(id: string, event: MouseEvent) {
   event.stopPropagation()
   const next = new Set(collapsed.value)
@@ -58,10 +60,12 @@ function toggleCollapse(id: string, event: MouseEvent) {
   collapsed.value = next
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onHandlePointerDown(id: string) {
   dragReadyId.value = id
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onDragStart(id: string, event: DragEvent) {
   if (dragReadyId.value !== id) {
     event.preventDefault()
@@ -77,12 +81,14 @@ function onDragStart(id: string, event: DragEvent) {
   }
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onDragEnd() {
   dragReadyId.value = null
   draggedId.value = null
   dropHint.value = null
 }
 
+/** 解析输入数据并返回可用的业务结果。 */
 function resolveDraggedId(event: DragEvent): string | null {
   const fromState = draggedId.value
   if (fromState) return fromState
@@ -92,6 +98,7 @@ function resolveDraggedId(event: DragEvent): string | null {
   return fromTransfer || null
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onListDragLeave(event: DragEvent) {
   const next = event.relatedTarget as Node | null
   const current = event.currentTarget as HTMLElement
@@ -99,12 +106,14 @@ function onListDragLeave(event: DragEvent) {
   dropHint.value = null
 }
 
+/** 解析输入数据并返回可用的业务结果。 */
 function resolveDropMode(event: DragEvent, rowElement: HTMLElement): 'child' | 'before' {
   const rect = rowElement.getBoundingClientRect()
   const relativeY = event.clientY - rect.top
   return relativeY < rect.height * 0.35 ? 'before' : 'child'
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onRowDragOver(id: string, event: DragEvent) {
   if (!draggedId.value || draggedId.value === id) return
   event.preventDefault()
@@ -113,6 +122,7 @@ function onRowDragOver(id: string, event: DragEvent) {
   dropHint.value = { id, mode: resolveDropMode(event, rowElement) }
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onRootDragOver(event: DragEvent) {
   if (!draggedId.value) return
   event.preventDefault()
@@ -120,6 +130,7 @@ function onRootDragOver(event: DragEvent) {
   dropHint.value = 'root'
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onRowDrop(id: string, event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
@@ -138,6 +149,7 @@ function onRowDrop(id: string, event: DragEvent) {
   onDragEnd()
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onRootDrop(event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
@@ -150,6 +162,7 @@ function onRootDrop(event: DragEvent) {
   onDragEnd()
 }
 
+/** 说明 rowDropClass 的局部业务逻辑。 */
 function rowDropClass(id: string) {
   if (!dropHint.value || dropHint.value === 'root') return null
   if (dropHint.value.id !== id) return null

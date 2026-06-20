@@ -93,6 +93,7 @@ def resolve_web_search_enabled(message: str, mode: str) -> bool:
 
 
 def web_search_mode_label(mode: str) -> str:
+    """把前端 web search 模式值转换为 trace 中展示的短标签。"""
     normalized = (mode or "auto").strip().lower()
     if normalized == "on":
         return "force on"
@@ -116,6 +117,7 @@ def looks_like_web_query(message: str) -> bool:
 
 
 def hits_to_sources(hits: list[WebSearchHit], *, limit: int = MAX_WEB_SOURCE_CARDS) -> list[WebSourceItem]:
+    """把搜索命中结果转换为前端来源卡片，并按 URL 去重限量。"""
     sources: list[WebSourceItem] = []
     seen: set[str] = set()
     for hit in hits:
@@ -136,6 +138,7 @@ def hits_to_sources(hits: list[WebSearchHit], *, limit: int = MAX_WEB_SOURCE_CAR
 
 
 def _host_label(url: str) -> str:
+    """从 URL 提取可读域名，作为缺失标题时的回退标签。"""
     try:
         host = urlparse(url).netloc or url
     except ValueError:
@@ -144,6 +147,7 @@ def _host_label(url: str) -> str:
 
 
 def merge_web_sources(*groups: list[WebSourceItem], limit: int = MAX_WEB_SOURCE_CARDS) -> list[WebSourceItem]:
+    """合并多组来源卡片，按 URL 去重并保留先出现的来源。"""
     merged: list[WebSourceItem] = []
     seen: set[str] = set()
     for group in groups:

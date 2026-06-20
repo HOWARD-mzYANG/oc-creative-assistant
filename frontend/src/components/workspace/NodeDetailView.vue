@@ -52,6 +52,7 @@ const fieldRows = ref<FieldRow[]>([])
 const typeLabel = computed(() => TYPE_LABEL[detailNode.value?.nodeType ?? ''] ?? '笔记')
 const isPlot = computed(() => detailNode.value?.nodeType === 'plot')
 
+/** 加载数据并同步到当前视图状态。 */
 function loadFromSnapshot() {
   const node = detailNode.value
   title.value = node?.title ?? ''
@@ -60,6 +61,7 @@ function loadFromSnapshot() {
   status.value = node?.status ?? 'draft'
 }
 
+/** 说明 hydrate 的局部业务逻辑。 */
 async function hydrate() {
   isHydrating.value = true
   loadFromSnapshot()
@@ -67,6 +69,7 @@ async function hydrate() {
   isHydrating.value = false
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadFields() {
   try {
     const result = await getNodeFields(projectId, props.nodeId)
@@ -76,13 +79,16 @@ async function loadFields() {
   }
 }
 
+/** 新增一项数据并同步当前编辑状态。 */
 function addField() {
   fieldRows.value.push({ key: '', value: '' })
 }
+/** 移除指定数据并更新本地状态。 */
 function removeField(index: number) {
   fieldRows.value.splice(index, 1)
 }
 
+/** 说明 scheduleSave 的局部业务逻辑。 */
 function scheduleSave() {
   if (isHydrating.value) return
   if (saveTimer) clearTimeout(saveTimer)
@@ -91,6 +97,7 @@ function scheduleSave() {
   }, SAVE_DEBOUNCE_MS)
 }
 
+/** 持久化当前编辑状态并处理保存队列。 */
 async function persist() {
   if (isSaving) {
     saveQueued = true

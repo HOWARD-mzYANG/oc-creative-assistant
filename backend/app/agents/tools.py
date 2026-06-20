@@ -43,6 +43,7 @@ _NODE_TYPE_FILTER = {
 
 
 def _node_content_preview(node: NodeORM, limit: int = 120) -> str:
+    """生成节点短预览文本，优先合并正文和前几个结构化字段。"""
     text = (node.content or "").strip()
     fields = db_fields_to_api(node.meta)
     if fields:
@@ -88,6 +89,7 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
     search_cache: dict[str, str] = {}
 
     def _cache_key(query: str) -> str:
+        """把同义词序不同的查询归一成同一个本轮缓存键。"""
         # 与词序无关 + 去重 + 忽略大小写；top_k 不进键，取最大 top_k 服务所有调用方。
         tokens = sorted(set(query.strip().lower().split()))
         return " ".join(tokens)
@@ -310,6 +312,7 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
         capped = max(1, min(int(limit), 300))
 
         def visit(node: NodeORM, depth: int) -> None:
+            """按树顺序把世界观节点展开到 rows。"""
             if len(rows) >= capped:
                 return
             rows.append({
@@ -365,6 +368,7 @@ def make_project_tools(project_id: str, *, include_web_search: bool = True) -> l
         rows: list[dict[str, object]] = []
 
         def visit(node: NodeORM, current_depth: int) -> None:
+            """从指定世界观根节点向下收集子树行。"""
             rows.append({
                 "id": node.id,
                 "title": node.title,

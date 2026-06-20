@@ -12,6 +12,7 @@ export function useIndexingStatus() {
   const indexingAlert = ref('')
   const indexState = ref('向量索引未检查')
 
+  /** 封装 simplifyError 对应的组合式状态和操作。 */
   function simplifyError(error?: string | null) {
     if (!error) {
       return '请检查 backend/.env 中的 embedding 配置。'
@@ -28,6 +29,7 @@ export function useIndexingStatus() {
     return error.length > 120 ? `${error.slice(0, 120)}...` : error
   }
 
+  /** 封装 formatState 对应的组合式状态和操作。 */
   function formatState(indexing?: IndexingStatusDto) {
     if (!indexing || indexing.status === 'not_checked') {
       return '向量索引未检查'
@@ -40,6 +42,7 @@ export function useIndexingStatus() {
       : `向量索引不完整 ${indexing.indexed_nodes}/${indexing.expected_nodes}`
   }
 
+  /** 封装 formatAlert 对应的组合式状态和操作。 */
   function formatAlert(indexing: IndexingStatusDto) {
     const problem = simplifyError(indexing.error)
     const missingCount = indexing.missing_node_ids.length
@@ -47,6 +50,7 @@ export function useIndexingStatus() {
     return `SQLite 已保存，但向量索引${indexing.status === 'failed' ? '失败' : '不完整'}。${problem} ${missingText}`.trim()
   }
 
+  /** 封装 applyIndexingStatus 对应的组合式状态和操作。 */
   function applyIndexingStatus(indexing?: IndexingStatusDto) {
     indexingStatus.value = indexing
     indexState.value = formatState(indexing)
@@ -57,6 +61,7 @@ export function useIndexingStatus() {
     indexingAlert.value = formatAlert(indexing)
   }
 
+  /** 封装 dismissAlert 对应的组合式状态和操作。 */
   function dismissAlert() {
     indexingAlert.value = ''
   }
