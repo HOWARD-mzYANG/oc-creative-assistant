@@ -35,6 +35,7 @@ _SYSTEM_PROMPT = load_prompt("summary_compress")
 
 
 def _format_messages_for_prompt(messages: list[ChatMessageORM]) -> str:
+    """把待压缩的历史消息格式化为 summary prompt 的对话片段。"""
     lines: list[str] = []
     for record in messages:
         content = (record.content or "").strip()
@@ -43,6 +44,14 @@ def _format_messages_for_prompt(messages: list[ChatMessageORM]) -> str:
 
 
 def summary_compress_node(state: AgentState) -> dict[str, Any]:
+    """按高水位策略压缩会话历史，并更新会话摘要与核心事实。
+
+    参数：
+        state: 当前 agent 图状态，至少包含可选的 `session_id`。
+
+    返回：
+        新摘要和核心事实；未达到压缩条件或压缩失败时返回空字典。
+    """
     session_id = state.get("session_id", "")
     if not session_id:
         return {}

@@ -19,10 +19,12 @@ const FOREST_GAP_UNITS = Math.max(1, Math.round(FOREST_GAP / NODE_X_GAP))
 const LAYOUT_ORIGIN_X = 80
 const LAYOUT_ORIGIN_Y = 60
 
+/** 执行 unitToX 对应的工具转换或计算。 */
 function unitToX(unit: number): number {
   return LAYOUT_ORIGIN_X + unit * NODE_X_GAP
 }
 
+/** 执行 siblingSort 对应的工具转换或计算。 */
 function siblingSort(a: CreativeFlowNode, b: CreativeFlowNode): number {
   return (a.data.sortOrder ?? 0) - (b.data.sortOrder ?? 0)
 }
@@ -41,6 +43,7 @@ export function buildWorldForest(nodes: CreativeFlowNode[]): WorldTreeNode[] {
     childrenByParent.set(bucketKey, bucket)
   }
 
+  /** 执行 toTree 对应的工具转换或计算。 */
   function toTree(node: CreativeFlowNode): WorldTreeNode {
     const childNodes = (childrenByParent.get(node.id) ?? []).slice().sort(siblingSort)
     return {
@@ -67,11 +70,13 @@ export function layoutWorldForest(forest: WorldTreeNode[]): Map<string, { x: num
   return positions
 }
 
+/** 执行 measureTreeWidth 对应的工具转换或计算。 */
 function measureTreeWidth(tree: WorldTreeNode): number {
   if (tree.children.length === 0) return 1
   return tree.children.reduce((sum, child) => sum + measureTreeWidth(child), 0)
 }
 
+/** 执行 placeTree 对应的工具转换或计算。 */
 function placeTree(
   tree: WorldTreeNode,
   leftUnit: number,
@@ -157,6 +162,7 @@ export function hierarchyToTreeCanvasEdges(nodes: CreativeFlowNode[]): CreativeF
   })
 }
 
+/** 执行 applyTreeLayout 对应的工具转换或计算。 */
 export function applyTreeLayout(nodes: CreativeFlowNode[]): CreativeFlowNode[] {
   const forest = buildWorldForest(nodes)
   const positions = layoutWorldForest(forest)
@@ -184,6 +190,7 @@ export function applyTreeLayout(nodes: CreativeFlowNode[]): CreativeFlowNode[] {
   })
 }
 
+/** 执行 buildWorldSaveSnapshot 对应的工具转换或计算。 */
 export function buildWorldSaveSnapshot(nodes: CreativeFlowNode[]): CreativeGraphSnapshot {
   return {
     nodes,
@@ -191,12 +198,14 @@ export function buildWorldSaveSnapshot(nodes: CreativeFlowNode[]): CreativeGraph
   }
 }
 
+/** 执行 nextWorldSortOrder 对应的工具转换或计算。 */
 export function nextWorldSortOrder(nodes: CreativeFlowNode[], parentId: string | null): number {
   const siblings = nodes.filter((node) => (node.data.parentId ?? null) === parentId)
   if (siblings.length === 0) return 0
   return Math.max(...siblings.map((node) => node.data.sortOrder ?? 0)) + 1
 }
 
+/** 执行 wouldCreateWorldCycle 对应的工具转换或计算。 */
 export function wouldCreateWorldCycle(
   nodes: CreativeFlowNode[],
   nodeId: string,
@@ -222,6 +231,7 @@ export type WorldMoveTarget =
   | { type: 'child'; parentId: string }
   | { type: 'before'; siblingId: string }
 
+/** 执行 renumberSiblingSortOrders 对应的工具转换或计算。 */
 function renumberSiblingSortOrders(
   nodes: CreativeFlowNode[],
   parentId: string | null,

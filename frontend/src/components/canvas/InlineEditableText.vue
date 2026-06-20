@@ -21,6 +21,7 @@ const editing = ref(false)
 const draft = ref('')
 const inputEl = ref<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
+/** 说明 enterEdit 的局部业务逻辑。 */
 async function enterEdit() {
   draft.value = props.modelValue
   editing.value = true
@@ -29,6 +30,7 @@ async function enterEdit() {
   if (inputEl.value instanceof HTMLInputElement) inputEl.value.select()
 }
 
+/** 保存当前编辑内容到后端或缓存。 */
 function save() {
   if (!editing.value) return
   editing.value = false
@@ -38,6 +40,7 @@ function save() {
   }
 }
 
+/** 取消当前临时编辑状态。 */
 function cancel() {
   draft.value = props.modelValue
   editing.value = false

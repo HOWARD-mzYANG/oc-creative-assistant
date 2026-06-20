@@ -65,6 +65,14 @@ def _to_staging_items(changes: list[ProposedChange]) -> list[AgentStagingCreateI
 
 
 def persistence_hub_node(state: AgentState) -> dict[str, Any]:
+    """持久化本轮用户消息、助手回复和候选画布变更。
+
+    参数：
+        state: 当前 agent 图状态，包含 session、项目、用户输入和 assembler 输出。
+
+    返回：
+        写入后的消息 ID、staging 批次信息，以及自动应用时产生的卡片列表。
+    """
     session_id = state.get("session_id", "")
     project_id = state.get("project_id", "")
     user_message = state.get("user_message", "").strip()

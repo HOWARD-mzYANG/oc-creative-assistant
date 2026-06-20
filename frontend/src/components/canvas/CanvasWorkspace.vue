@@ -65,6 +65,7 @@ const selectedRelationType = ref<CreativeRelationType>(DEFAULT_RELATION_TYPE)
 const isRelationSelectOpen = ref(false)
 const skipNextFocus = ref(false)
 
+/** 关闭目标视图或弹层。 */
 function closeAllSelects(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (!target.closest('.custom-select-container')) {
@@ -78,18 +79,21 @@ function closeAllSelects(e: MouseEvent) {
   }
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onFlowShellMouseDown(event: MouseEvent) {
   if (event.button !== 1) return
   event.preventDefault()
   isMiddleMouseDown.value = true
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onFlowShellMouseUp(event: MouseEvent) {
   if (event.button === 1) {
     isMiddleMouseDown.value = false
   }
 }
 
+/** 清空当前状态或选择。 */
 function clearMiddleMousePan() {
   isMiddleMouseDown.value = false
 }
@@ -194,14 +198,17 @@ const edgeRelationMenu = ref<{
   relationType: CreativeRelationType
 }>({ show: false, x: 0, y: 0, edgeId: '', relationType: DEFAULT_RELATION_TYPE })
 
+/** 关闭目标视图或弹层。 */
 function closeEdgeRelationMenu() {
   edgeRelationMenu.value.show = false
 }
 
+/** 关闭目标视图或弹层。 */
 function closeContextMenu() {
   contextMenu.value.show = false
 }
 
+/** 说明 pointerFromEvent 的局部业务逻辑。 */
 function pointerFromEvent(event: MouseEvent | TouchEvent): { x: number; y: number } {
   if (event instanceof MouseEvent) {
     return { x: event.clientX, y: event.clientY }
@@ -221,6 +228,7 @@ function clampMenuPosition(x: number, y: number): { x: number; y: number } {
   }
 }
 
+/** 打开目标视图或弹层。 */
 function openContextMenu(
   event: MouseEvent | TouchEvent,
   type: 'blank' | 'node' | 'edge',
@@ -277,27 +285,32 @@ onNodeDoubleClick(({ node }) => {
   })
 })
 
+/** 处理对应的用户交互或组件事件。 */
 function handleEdgeRelationSelect(relationType: CreativeRelationType) {
   if (!edgeRelationMenu.value.edgeId) return
   updateEdgeRelation(edgeRelationMenu.value.edgeId, relationType)
   closeEdgeRelationMenu()
 }
 
+/** 说明 nodeRef 的局部业务逻辑。 */
 function nodeRef(nodeId: string) {
   return nodes.value.find((node) => node.id === nodeId)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuCreate(type: CreativeNodeType) {
   const pos = screenToFlowCoordinate({ x: contextMenu.value.x, y: contextMenu.value.y })
   handleCreateNode(type, { x: pos.x, y: pos.y })
   closeContextMenu()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuEdit() {
   if (contextMenu.value.nodeId) centerStage.openDetail(contextMenu.value.nodeId)
   closeContextMenu()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuDuplicate() {
   const src = nodeRef(contextMenu.value.nodeId)
   if (src) {
@@ -316,11 +329,13 @@ function handleMenuDuplicate() {
   closeContextMenu()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuRemove() {
   if (contextMenu.value.nodeId) removeNode(contextMenu.value.nodeId)
   closeContextMenu()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuRemoveClick() {
   if (contextMenu.value.type === 'edge') {
     handleMenuEdgeRemove()
@@ -329,11 +344,13 @@ function handleMenuRemoveClick() {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuEdgeRemove() {
   if (contextMenu.value.edgeId) removeEdge(contextMenu.value.edgeId)
   closeContextMenu()
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuEdgeChangeRelation() {
   const { edgeId, x, y } = contextMenu.value
   if (!edgeId) return
@@ -345,10 +362,12 @@ function handleMenuEdgeChangeRelation() {
   })
 }
 
+/** 说明 quoteNodes 的局部业务逻辑。 */
 function quoteNodes(refs: { id: string; type: string; title: string }[]) {
   if (refs.length) composer.addReferences(refs)
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleMenuQuote() {
   const selected = getSelectedNodes.value
   if (selected.length > 1) {
@@ -436,6 +455,7 @@ function handleSelectionChange(params: { nodes: { id: string }[] }) {
   emit('nodeSelected', primary.id)
 }
 
+/** 说明 syncEdgePresentation 的局部业务逻辑。 */
 function syncEdgePresentation(highlighted = new Set(props.highlightedEdgeIds)) {
   const selectedId = props.selectedEdgeId ?? ''
   edges.value = edges.value.map((edge) =>
@@ -455,10 +475,12 @@ function handleFitView() {
   void fitView({ padding: 0.2, duration: 260 })
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleZoomIn() {
   void zoomIn({ duration: 180 })
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleZoomOut() {
   void zoomOut({ duration: 180 })
 }

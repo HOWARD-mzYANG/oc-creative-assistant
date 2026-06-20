@@ -279,9 +279,11 @@ async def stream_role_material_brief(
     loop = asyncio.get_running_loop()
 
     def _put(event: dict[str, Any]) -> None:
+        """从后台线程安全地把 SSE 事件投递回 asyncio 队列。"""
         loop.call_soon_threadsafe(queue.put_nowait, event)
 
     def _on_trace(item) -> None:
+        """把资料 agent 的 trace item 转换为前端 SSE 事件。"""
         _put(
             {
                 "type": "trace_item",
@@ -292,6 +294,7 @@ async def stream_role_material_brief(
         )
 
     def _run_agent() -> None:
+        """在线程中运行同步资料 agent，并把完成或错误事件写入队列。"""
         try:
             brief, _trace = build_role_material_brief_with_trace(snapshot, on_trace=_on_trace)
             _put({"type": "material_brief", "brief": brief.model_dump(mode="json")})

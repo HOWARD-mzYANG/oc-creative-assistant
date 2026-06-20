@@ -27,6 +27,7 @@ const isRagLoading = ref(false)
 /* 自定义下拉框没有使用原生 select，因此组件需要自行跟踪展开状态，并在外部点击时收起。 */
 const isNodeStatusSelectOpen = ref(false)
 
+/** 关闭目标视图或弹层。 */
 function closeAllSelects(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (!target.closest('.custom-select-container')) {
@@ -50,6 +51,7 @@ const STATUS_LABELS: Record<CreativeNodeData['status'], string> = {
 }
 const NODE_STATUS_OPTIONS: CreativeNodeData['status'][] = ['draft', 'synced', 'outdated']
 
+/** 更新指定业务对象并同步相关视图。 */
 function updateNodeData(partial: Partial<CreativeNodeData>) {
   emit('node-updated', {
     ...props.selectedNode,
@@ -60,6 +62,7 @@ function updateNodeData(partial: Partial<CreativeNodeData>) {
   })
 }
 
+/** 更新指定业务对象并同步相关视图。 */
 function updateNodeTags(rawValue: string) {
   const tags = rawValue
     .split(',')
@@ -68,6 +71,7 @@ function updateNodeTags(rawValue: string) {
   updateNodeData({ tags })
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleDeleteNode() {
   emit('node-deleted', props.selectedNode.id)
 }
@@ -119,6 +123,7 @@ function runAgentMock(type: 'inspiration' | 'research' | 'structure') {
   )
 }
 
+/** 说明 summarizeContent 的局部业务逻辑。 */
 function summarizeContent(content: string) {
   return content.length > 120 ? `${content.slice(0, 120)}...` : content
 }

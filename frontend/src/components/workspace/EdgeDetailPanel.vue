@@ -25,6 +25,7 @@ const emit = defineEmits<{
 
 const isEdgeRelationSelectOpen = ref(false)
 
+/** 关闭目标视图或弹层。 */
 function closeAllSelects(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (!target.closest('.custom-select-container')) {
@@ -48,10 +49,12 @@ const targetNodeTitle = computed(
   () => props.nodes.find((node) => node.id === props.selectedEdge.target)?.data.title ?? props.selectedEdge.target,
 )
 
+/** 获取指定数据或派生状态。 */
 function getRelationLabel(relationType: CreativeRelationType) {
   return RELATION_TYPE_OPTIONS.find((option) => option.value === relationType)?.label ?? '相关'
 }
 
+/** 更新指定业务对象并同步相关视图。 */
 function updateEdge(partial: Partial<CreativeFlowEdge['data']>) {
   const data = {
     ...props.selectedEdge.data,
@@ -65,6 +68,7 @@ function updateEdge(partial: Partial<CreativeFlowEdge['data']>) {
   })
 }
 
+/** 更新指定业务对象并同步相关视图。 */
 function updateEdgeRelation(relationType: CreativeRelationType) {
   updateEdge({
     relationType,
@@ -72,6 +76,7 @@ function updateEdgeRelation(relationType: CreativeRelationType) {
   })
 }
 
+/** 说明 reverseSelectedEdge 的局部业务逻辑。 */
 function reverseSelectedEdge() {
   emit('edge-updated', {
     ...props.selectedEdge,

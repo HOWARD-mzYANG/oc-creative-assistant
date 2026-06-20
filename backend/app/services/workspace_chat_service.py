@@ -15,6 +15,7 @@ from app.agents.workspace_inspiration import generate_workspace_output
 
 
 def _sse(data: dict[str, Any]) -> str:
+    """把工作区聊天事件编码为 SSE 数据帧。"""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 

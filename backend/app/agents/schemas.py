@@ -31,6 +31,7 @@ class _LlmStructuredOutput(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _coerce_stringified_json(cls, data: Any) -> Any:
+        """把兼容服务二次序列化的 JSON 字符串还原为 list/dict。"""
         if not isinstance(data, dict):
             return data
 

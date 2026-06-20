@@ -33,10 +33,12 @@ class CanvasPosition:
 
 
 def _row_offsets(radius: int) -> list[int]:
+    """生成从中心行向上下交替扩展的行偏移序列。"""
     return [0, *range(1, radius + 1), *range(-1, -radius - 1, -1)]
 
 
 def _overlaps(candidate: CanvasPosition, node: NodeORM) -> bool:
+    """判断候选位置与已有节点占位矩形是否重叠。"""
     return (
         candidate.x < node.position_x + NODE_WIDTH + NODE_GAP_X
         and candidate.x + NODE_WIDTH + NODE_GAP_X > node.position_x
@@ -46,6 +48,7 @@ def _overlaps(candidate: CanvasPosition, node: NodeORM) -> bool:
 
 
 def _is_free(candidate: CanvasPosition, nodes: list[NodeORM]) -> bool:
+    """判断候选位置是否避开了所有已有节点。"""
     return all(not _overlaps(candidate, node) for node in nodes)
 
 
@@ -55,6 +58,7 @@ def _nodes_for_layout(
     project_id: str,
     graph_id: str | None,
 ) -> list[NodeORM]:
+    """读取参与目标子图布局碰撞检测的节点集合。"""
     statement = select(NodeORM).where(NodeORM.project_id == project_id)
     if graph_id is None:
         statement = statement.where(NodeORM.graph_id.is_(None))
@@ -64,6 +68,7 @@ def _nodes_for_layout(
 
 
 def _base_position(nodes: list[NodeORM], anchor: NodeORM | None) -> CanvasPosition:
+    """计算新节点搜索的起始位置，优先锚定到指定节点右侧。"""
     if anchor is not None:
         return CanvasPosition(anchor.position_x + STEP_X, anchor.position_y)
 

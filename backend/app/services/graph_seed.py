@@ -552,6 +552,7 @@ _TYPE_LABEL_BY_NODE_TYPE = {
 
 
 def _coerce_tags(meta: dict[str, Any]) -> list[str]:
+    """从默认快照 meta 中安全提取字符串标签列表。"""
     tags = meta.get("tags", [])
     if not isinstance(tags, list):
         return []
@@ -559,11 +560,13 @@ def _coerce_tags(meta: dict[str, Any]) -> list[str]:
 
 
 def _coerce_sort_order(meta: dict[str, Any]) -> int:
+    """从默认快照 meta 中读取同级排序值，非法时回退为 0。"""
     value = meta.get("sortOrder", 0)
     return value if isinstance(value, int) else 0
 
 
 def _node_from_snapshot(raw: dict[str, Any]) -> NodePayload:
+    """把默认项目快照中的节点字典转换为 API 节点 payload。"""
     node_type = str(raw.get("node_type") or "plot")
     meta = raw.get("meta") if isinstance(raw.get("meta"), dict) else {}
     parent_id = meta.get("parentId")
@@ -588,6 +591,7 @@ def _node_from_snapshot(raw: dict[str, Any]) -> NodePayload:
 
 
 def _edge_from_snapshot(index: int, raw: dict[str, Any]) -> EdgePayload:
+    """把默认项目快照中的边字典转换为 API 边 payload。"""
     return EdgePayload(
         id=f"edge-default-{index:02d}",
         source=str(raw["source"]),

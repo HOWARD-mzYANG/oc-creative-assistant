@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 export const useNodeNavStore = defineStore('nodeNav', {
   state: () => ({ pendingNodeId: '' }),
   actions: {
+    /** 维护 store 中 request 对应的状态变更。 */
     request(nodeId: string) {
       this.pendingNodeId = nodeId
     },

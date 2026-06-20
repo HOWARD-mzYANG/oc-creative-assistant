@@ -15,35 +15,42 @@ const emit = defineEmits<{ blur: [] }>()
 const valueEls = new Map<number, HTMLTextAreaElement>()
 const nameEls = new Map<number, HTMLInputElement>()
 
+/** 设置指定状态或缓存数据。 */
 function setValueRef(index: number, el: unknown) {
   if (el instanceof HTMLTextAreaElement) valueEls.set(index, el)
   else valueEls.delete(index)
 }
 
+/** 设置指定状态或缓存数据。 */
 function setNameRef(index: number, el: unknown) {
   if (el instanceof HTMLInputElement) nameEls.set(index, el)
   else nameEls.delete(index)
 }
 
+/** 说明 resizeAll 的局部业务逻辑。 */
 async function resizeAll() {
   await nextTick()
   nameEls.forEach(autoResizeInput)
   valueEls.forEach(autoResizeTextarea)
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onNameInput(event: Event) {
   autoResizeInput(event.target as HTMLInputElement)
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onValueInput(event: Event) {
   autoResizeTextarea(event.target as HTMLTextAreaElement)
 }
 
+/** 新增一项数据并同步当前编辑状态。 */
 function addField() {
   rows.value.push({ key: '', value: '' })
   void resizeAll()
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onBlur() {
   emit('blur')
 }

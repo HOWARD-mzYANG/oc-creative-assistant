@@ -35,6 +35,7 @@ const verb = props.item.change_type === 'update_node' ? '已更新' : '已添加
 const icon = props.item.change_type === 'update_node' ? '✏️' : '✅'
 const typeLabel = NODE_TYPE_LABELS[props.item.node_type] ?? props.item.node_type
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleSave() {
   saveState.value = '保存中…'
   try {
@@ -45,6 +46,7 @@ async function handleSave() {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleRemove() {
   removed.value = true
   if (props.item.change_type === 'update_node') {

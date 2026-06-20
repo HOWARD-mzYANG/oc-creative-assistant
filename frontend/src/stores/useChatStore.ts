@@ -69,6 +69,7 @@ export const useChatStore = defineStore('chat', () => {
   const lastAgent = ref('')
   const error = ref('')
 
+  /** 维护 store 中 _stagingItemToApplied 对应的状态变更。 */
   function _stagingItemToApplied(item: AgentStagingItemDto): AppliedEntityDto | null {
     if (item.change_type !== 'create_node' && item.change_type !== 'update_node') return null
     if (!item.target_id) return null
@@ -84,6 +85,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** 维护 store 中 _pushApplied 对应的状态变更。 */
   function _pushApplied(target: AppliedEntityDto[], item: AppliedEntityDto) {
     if (!target.some((a) => a.node_id === item.node_id)) target.push(item)
   }
@@ -112,6 +114,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** 维护 store 中 _toMessage 对应的状态变更。 */
   function _toMessage(dto: ChatMessageDto): ChatMessage {
     return {
       id: dto.id,
@@ -181,10 +184,12 @@ export const useChatStore = defineStore('chat', () => {
 
   let onGraphMutated: (() => void | Promise<void>) | null = null
 
+  /** 维护 store 中 setGraphMutatedHandler 对应的状态变更。 */
   function setGraphMutatedHandler(handler: (() => void | Promise<void>) | null) {
     onGraphMutated = handler
   }
 
+  /** 维护 store 中 notifyGraphMutated 对应的状态变更。 */
   async function notifyGraphMutated() {
     if (onGraphMutated) await onGraphMutated()
   }
@@ -229,6 +234,7 @@ export const useChatStore = defineStore('chat', () => {
     let graphRefreshQueued = false
     let graphRefreshPromise: Promise<void> | null = null
 
+    /** 维护 store 中 queueGraphRefresh 对应的状态变更。 */
     function queueGraphRefresh() {
       if (!shouldAutoApply) return
       graphRefreshRequested = true
@@ -249,6 +255,7 @@ export const useChatStore = defineStore('chat', () => {
       })
     }
 
+    /** 维护 store 中 drainGraphRefresh 对应的状态变更。 */
     async function drainGraphRefresh() {
       while (graphRefreshPromise) {
         await graphRefreshPromise

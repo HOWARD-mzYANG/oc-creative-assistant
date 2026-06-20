@@ -229,6 +229,7 @@ def _payload_anchor_node_id(payload: dict[str, Any]) -> str | None:
 
 
 def _valid_project_node_id(db: Session, project_id: str, raw_id: str | None) -> str | None:
+    """校验节点 ID 属于目标项目，返回规范 ID 或 None。"""
     if not raw_id:
         return None
     node = db.get(NodeORM, raw_id)

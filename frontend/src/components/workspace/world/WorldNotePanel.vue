@@ -31,6 +31,7 @@ let isSaving = false
 let saveQueued = false
 let loadGeneration = 0
 
+/** 说明 fieldsToContent 的局部业务逻辑。 */
 function fieldsToContent(rows: DocFieldRow[]): string {
   const fields = rowsToFields(rows)
   const keyed = Object.entries(fields)
@@ -41,6 +42,7 @@ function fieldsToContent(rows: DocFieldRow[]): string {
   return firstValue ?? ''
 }
 
+/** 说明 rowsToFields 的局部业务逻辑。 */
 function rowsToFields(rows: DocFieldRow[]): Record<string, string> {
   const fields: Record<string, string> = {}
   for (const row of rows) {
@@ -51,19 +53,23 @@ function rowsToFields(rows: DocFieldRow[]): Record<string, string> {
   return fields
 }
 
+/** 说明 fallbackRows 的局部业务逻辑。 */
 function fallbackRows(node: CreativeFlowNode): DocFieldRow[] {
   if (node.data.content.trim()) return [{ key: '', value: node.data.content }]
   return [{ key: '', value: '' }]
 }
 
+/** 判断目标数据是否包含所需内容。 */
 function hasRowContent(rows: DocFieldRow[]): boolean {
   return rows.some((row) => row.key.trim() || row.value.trim())
 }
 
+/** 说明 applyRows 的局部业务逻辑。 */
 function applyRows(rows: DocFieldRow[]) {
   fieldRows.value = rows.map((row) => ({ ...row }))
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadFields(node: CreativeFlowNode, generation: number) {
   if (!props.projectId) {
     applyRows(fallbackRows(node))
@@ -133,6 +139,7 @@ watch(
   { immediate: true },
 )
 
+/** 说明 scheduleSave 的局部业务逻辑。 */
 function scheduleSave() {
   if (!props.node || !props.projectId || isHydrating.value) return
   if (saveTimer) clearTimeout(saveTimer)
@@ -142,6 +149,7 @@ function scheduleSave() {
   }, SAVE_DEBOUNCE_MS)
 }
 
+/** 说明 flushSave 的局部业务逻辑。 */
 function flushSave() {
   if (saveTimer) {
     clearTimeout(saveTimer)
@@ -150,6 +158,7 @@ function flushSave() {
   void persistAll()
 }
 
+/** 持久化当前编辑状态并处理保存队列。 */
 async function persistAll() {
   if (!props.node || !props.projectId || isHydrating.value) return
   if (isSaving) {

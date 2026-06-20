@@ -12,6 +12,7 @@ const editingId = ref<string | null>(null)
 const editingTitle = ref('')
 const editInput = ref<HTMLInputElement | null>(null)
 
+/** 切换当前界面状态。 */
 function toggleMenu(id: string, event: MouseEvent) {
   if (menuOpenId.value === id) {
     menuOpenId.value = null
@@ -22,10 +23,12 @@ function toggleMenu(id: string, event: MouseEvent) {
   menuOpenId.value = id
 }
 
+/** 关闭目标视图或弹层。 */
 function closeMenu() {
   menuOpenId.value = null
 }
 
+/** 启动当前流程或后台轮询。 */
 async function startRename(s: { id: string; title: string }) {
   closeMenu()
   editingId.value = s.id
@@ -35,6 +38,7 @@ async function startRename(s: { id: string; title: string }) {
   editInput.value?.select()
 }
 
+/** 提交当前临时编辑结果。 */
 function commitRename() {
   const id = editingId.value
   if (!id) return
@@ -44,19 +48,23 @@ function commitRename() {
   if (title && title !== current?.title) void chat.renameSession(id, title)
 }
 
+/** 取消当前临时编辑状态。 */
 function cancelRename() {
   editingId.value = null
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onTitleClick(s: { id: string; title: string }) {
   if (s.id === sessionId.value) startRename(s)
   else void chat.switchSession(s.id)
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onNewChat() {
   void chat.newSession()
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 async function onDeleteSession(id: string) {
   closeMenu()
   if (!window.confirm('删除这段对话及其历史记录吗？')) return

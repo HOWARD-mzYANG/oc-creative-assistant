@@ -42,6 +42,7 @@ watch(
   { immediate: true },
 )
 
+/** 读取指定资源并返回前端可用数据。 */
 async function readAvatar(nodeId: string): Promise<string> {
   try {
     const result = await getNodeFields(projectId.value, nodeId)
@@ -51,10 +52,12 @@ async function readAvatar(nodeId: string): Promise<string> {
   }
 }
 
+/** 说明 avatarFor 的局部业务逻辑。 */
 function avatarFor(nodeId: string): string {
   return avatarByCharacterId.value[nodeId] || avatarCache.get(projectId.value, nodeId)
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadAvatars(nodeIds: string[]) {
   if (!nodeIds.length) {
     avatarByCharacterId.value = avatarCache.snapshot(projectId.value)
@@ -93,10 +96,12 @@ watch(
   { immediate: true },
 )
 
+/** 打开目标视图或弹层。 */
 function openCharacter(charId: string) {
   router.push(`/workspace/${projectId.value}/characters/${charId}`)
 }
 
+/** 说明 characterInitials 的局部业务逻辑。 */
 function characterInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
@@ -109,6 +114,7 @@ function extraTags(tags: string[] | undefined): string[] {
   return (tags ?? []).filter((tag) => tag.toLowerCase() !== 'character')
 }
 
+/** 打开目标视图或弹层。 */
 function openCreate() {
   createName.value = ''
   createSummary.value = ''
@@ -116,11 +122,13 @@ function openCreate() {
   createOpen.value = true
 }
 
+/** 关闭目标视图或弹层。 */
 function closeCreate() {
   if (isCreating.value) return
   createOpen.value = false
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleCreate() {
   const graphId = characterGraphId.value
   const name = createName.value.trim()

@@ -40,10 +40,12 @@ const pickableCharacters = computed(() =>
   allCharacters.value.filter((node) => !linkedIds.value.has(node.id)),
 )
 
+/** 关闭目标视图或弹层。 */
 function closePicker() {
   pickerOpen.value = false
 }
 
+/** 响应对应的 DOM 或组件事件。 */
 function onDocumentClick(event: MouseEvent) {
   if (!pickerOpen.value) return
   const target = event.target as HTMLElement
@@ -52,6 +54,7 @@ function onDocumentClick(event: MouseEvent) {
   }
 }
 
+/** 读取指定资源并返回前端可用数据。 */
 async function readAvatar(nodeId: string): Promise<string> {
   try {
     const result = await getNodeFields(props.projectId, nodeId)
@@ -61,6 +64,7 @@ async function readAvatar(nodeId: string): Promise<string> {
   }
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadCharacterAvatars(nodeIds?: string[]) {
   const graphId = characterGraphId.value
   if (!graphId) {
@@ -89,6 +93,7 @@ async function loadCharacterAvatars(nodeIds?: string[]) {
   }
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadCast() {
   isLoading.value = true
   try {
@@ -108,10 +113,12 @@ async function loadCast() {
   }
 }
 
+/** 加载数据并同步到当前视图状态。 */
 async function loadCharacters() {
   await loadCharacterAvatars()
 }
 
+/** 说明 linkCharacter 的局部业务逻辑。 */
 async function linkCharacter(characterId: string) {
   const character = allCharacters.value.find((node) => node.id === characterId)
   if (!character) return
@@ -127,20 +134,24 @@ async function linkCharacter(characterId: string) {
   await loadCast()
 }
 
+/** 说明 unlinkCharacter 的局部业务逻辑。 */
 async function unlinkCharacter(edgeId: string) {
   await deleteProjectEdge(props.projectId, edgeId)
   await loadCast()
 }
 
+/** 打开目标视图或弹层。 */
 function openCharacter(characterId: string) {
   router.push(`/workspace/${props.projectId}/characters/${characterId}`)
 }
 
+/** 切换当前界面状态。 */
 function togglePicker() {
   pickerOpen.value = !pickerOpen.value
   if (pickerOpen.value) void loadCharacters()
 }
 
+/** 标记指定对象的状态。 */
 function markAvatarBroken(characterId: string) {
   avatarByCharacterId.value = { ...avatarByCharacterId.value, [characterId]: '' }
   cast.value = cast.value.map((member) =>

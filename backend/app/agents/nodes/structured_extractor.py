@@ -62,6 +62,7 @@ _RELATION_BY_LABEL: dict[str, str] = {
 
 
 def _entity_key(node_type: str, title: str) -> tuple[str, str]:
+    """生成实体去重键，统一节点类型和标题大小写。"""
     return (node_type, title.strip().lower())
 
 
@@ -112,6 +113,14 @@ def _emit_applied(items: list[dict[str, Any]]) -> None:
 
 
 def structured_extractor_node(state: AgentState) -> dict[str, Any]:
+    """从自由对话中抽取实体和关系，并写入 staging 或自动应用。
+
+    参数：
+        state: 当前 agent 图状态，包含会话、项目、最近对话和抽取开关。
+
+    返回：
+        抽取数量、推理说明、待补字段，以及自动应用后的卡片信息。
+    """
     if not state.get("extraction_enabled"):
         return {}
 

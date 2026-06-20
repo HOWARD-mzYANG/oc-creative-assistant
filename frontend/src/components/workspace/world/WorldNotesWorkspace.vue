@@ -42,6 +42,7 @@ const selectedId = ref('')
 let createCount = 0
 let seedTimer: ReturnType<typeof setTimeout> | null = null
 
+/** 说明 scheduleSeedRebuild 的局部业务逻辑。 */
 function scheduleSeedRebuild() {
   const projectId = projectStore.detail?.id
   if (!projectId) return
@@ -76,11 +77,13 @@ const selectedNode = computed(
   () => nodes.value.find((node) => node.id === selectedId.value) ?? null,
 )
 
+/** 提交当前临时编辑结果。 */
 function commitSnapshot(nextNodes: CreativeFlowNode[]) {
   setGraphSnapshot(buildWorldSaveSnapshot(nextNodes))
   scheduleAutoSave(WORLD_GRAPH_SAVE_DELAY_MS)
 }
 
+/** 更新指定业务对象并同步相关视图。 */
 function updateNode(nodeId: string, patch: Partial<CreativeFlowNode['data']>) {
   commitSnapshot(
     nodes.value.map((node) =>
@@ -89,6 +92,7 @@ function updateNode(nodeId: string, patch: Partial<CreativeFlowNode['data']>) {
   )
 }
 
+/** 说明 collectDescendantIds 的局部业务逻辑。 */
 function collectDescendantIds(rootId: string): Set<string> {
   const ids = new Set<string>([rootId])
   let expanded = true
@@ -105,6 +109,7 @@ function collectDescendantIds(rootId: string): Set<string> {
   return ids
 }
 
+/** 创建新的业务对象并同步界面状态。 */
 function createNote(parentId: string | null) {
   createCount += 1
   const node = createCreativeNode('worldbuilding', createCount, { x: 0, y: 0 })
@@ -114,6 +119,7 @@ function createNote(parentId: string | null) {
   selectedId.value = node.id
 }
 
+/** 移动节点并维护层级关系。 */
 function moveNote(draggedId: string, target: WorldMoveTarget) {
   const nextNodes = moveWorldNode(nodes.value, draggedId, target)
   if (!nextNodes) return
@@ -121,6 +127,7 @@ function moveNote(draggedId: string, target: WorldMoveTarget) {
   selectedId.value = draggedId
 }
 
+/** 删除指定业务对象并同步界面状态。 */
 function deleteNote(nodeId: string) {
   const node = nodes.value.find((item) => item.id === nodeId)
   if (!node) return
@@ -137,11 +144,13 @@ function deleteNote(nodeId: string) {
   commitSnapshot(nextNodes)
 }
 
+/** 删除指定业务对象并同步界面状态。 */
 function deleteSelectedNote() {
   if (!selectedId.value) return
   deleteNote(selectedId.value)
 }
 
+/** 说明 tryFocusPending 的局部业务逻辑。 */
 function tryFocusPending() {
   const pendingId = nodeNav.pendingNodeId
   if (!pendingId) return
@@ -151,6 +160,7 @@ function tryFocusPending() {
   worldViewStore.setMode('notes')
 }
 
+/** 重新加载当前视图所需的数据。 */
 async function reload() {
   clearAutoSave()
   await loadGraph()
@@ -176,6 +186,7 @@ async function reload() {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleGraphRefreshNeeded() {
   clearAutoSave()
   await reload()

@@ -23,23 +23,28 @@ export const useComposerStore = defineStore('composer', {
     webSearchMode: 'auto' as WebSearchMode,
   }),
   actions: {
+    /** 维护 store 中 cycleWebSearchMode 对应的状态变更。 */
     cycleWebSearchMode() {
       const order: WebSearchMode[] = ['auto', 'on', 'off']
       const index = order.indexOf(this.webSearchMode)
       this.webSearchMode = order[(index + 1) % order.length]
     },
+    /** 维护 store 中 addReferences 对应的状态变更。 */
     addReferences(refs: QuotedNodeRef[]) {
       const existing = new Set(this.references.map((r) => r.id))
       refs.forEach((r) => {
         if (!existing.has(r.id)) this.references.push(r)
       })
     },
+    /** 维护 store 中 removeReference 对应的状态变更。 */
     removeReference(id: string) {
       this.references = this.references.filter((r) => r.id !== id)
     },
+    /** 维护 store 中 setCollapsed 对应的状态变更。 */
     setCollapsed(value: boolean) {
       this.collapsed = value
     },
+    /** 维护 store 中 clear 对应的状态变更。 */
     clear() {
       this.references = []
       this.input = ''

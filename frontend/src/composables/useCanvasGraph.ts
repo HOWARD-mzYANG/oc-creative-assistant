@@ -39,6 +39,7 @@ export function useCanvasGraph(options: Options) {
   const addNodeCount = ref(0)
   const addEdgeCount = ref(0)
 
+  /** 封装 getGraphSnapshot 对应的组合式状态和操作。 */
   function getGraphSnapshot(): CreativeGraphSnapshot {
     return {
       nodes: options.nodes.value.map((node) => ({
@@ -59,6 +60,7 @@ export function useCanvasGraph(options: Options) {
     }
   }
 
+  /** 封装 emitGraphChanged 对应的组合式状态和操作。 */
   function emitGraphChanged() {
     options.onGraphChanged(getGraphSnapshot())
   }
@@ -82,6 +84,7 @@ export function useCanvasGraph(options: Options) {
     }
   }
 
+  /** 封装 handleCreateNode 对应的组合式状态和操作。 */
   function handleCreateNode(type: CreativeNodeType, position?: { x: number; y: number }) {
     addNodeCount.value += 1
     const preferredPosition = position ?? getNextNodePosition()
@@ -96,6 +99,7 @@ export function useCanvasGraph(options: Options) {
     options.onNodeSelected(node.id)
   }
 
+  /** 封装 handleAutoArrange 对应的组合式状态和操作。 */
   function handleAutoArrange() {
     if (options.nodes.value.length <= 1) return
 
@@ -136,12 +140,14 @@ export function useCanvasGraph(options: Options) {
     emitGraphChanged()
   }
 
+  /** 封装 removeEdge 对应的组合式状态和操作。 */
   function removeEdge(edgeId: string) {
     options.edges.value = options.edges.value.filter((edge) => edge.id !== edgeId)
     emitGraphChanged()
     options.onEdgeSelected('')
   }
 
+  /** 封装 handleClearCanvas 对应的组合式状态和操作。 */
   function handleClearCanvas() {
     const confirmed = window.confirm('确定清空整个画布吗？所有节点和边都会被移除。')
     if (!confirmed) return
@@ -152,6 +158,7 @@ export function useCanvasGraph(options: Options) {
     emitGraphChanged()
   }
 
+  /** 封装 hasDuplicateEdge 对应的组合式状态和操作。 */
   function hasDuplicateEdge(connection: Connection) {
     return options.edges.value.some(
       (edge) =>
@@ -162,6 +169,7 @@ export function useCanvasGraph(options: Options) {
     )
   }
 
+  /** 封装 handleConnect 对应的组合式状态和操作。 */
   function handleConnect(connection: Connection) {
     if (!connection.source || !connection.target || connection.source === connection.target) {
       return
@@ -194,6 +202,7 @@ export function useCanvasGraph(options: Options) {
     options.onEdgeSelected(edge.id)
   }
 
+  /** 封装 handleEdgeUpdate 对应的组合式状态和操作。 */
   function handleEdgeUpdate(payload: { edge: Edge; connection: Connection }) {
     const { edge, connection } = payload
     if (!connection.source || !connection.target || connection.source === connection.target) {
@@ -207,10 +216,12 @@ export function useCanvasGraph(options: Options) {
     emitGraphChanged()
   }
 
+  /** 封装 handleNodeDragStop 对应的组合式状态和操作。 */
   function handleNodeDragStop() {
     emitGraphChanged()
   }
 
+  /** 封装 updateEdgeRelation 对应的组合式状态和操作。 */
   function updateEdgeRelation(edgeId: string, relationType: CreativeRelationType) {
     const label = getRelationLabel(relationType)
     options.edges.value = options.edges.value.map((edge) => {
@@ -229,6 +240,7 @@ export function useCanvasGraph(options: Options) {
     options.onEdgeSelected(edgeId)
   }
 
+  /** 封装 updateEdgeLabel 对应的组合式状态和操作。 */
   function updateEdgeLabel(edgeId: string, label: string) {
     options.edges.value = options.edges.value.map((edge) => {
       if (edge.id !== edgeId) return edge

@@ -23,6 +23,7 @@ _KEY_FACTS_MAX = 16
 
 
 def _truncate(text: str, limit: int) -> str:
+    """裁剪单段上下文文本，避免 prompt 片段超过指定字符上限。"""
     text = text.strip()
     if len(text) <= limit:
         return text
@@ -30,6 +31,7 @@ def _truncate(text: str, limit: int) -> str:
 
 
 def _format_node_body(node: RagCurrentNodePayload, limit: int) -> str:
+    """把当前节点正文和结构化字段合并为可注入 prompt 的单行摘要。"""
     parts: list[str] = []
     content = (node.content or "").strip()
     if content:
@@ -46,6 +48,7 @@ def _format_node_body(node: RagCurrentNodePayload, limit: int) -> str:
 
 
 def _format_recent_messages(messages: list[dict]) -> str:
+    """格式化最近对话消息，作为多层记忆中的短期上下文。"""
     if not messages:
         return "（无）"
     lines: list[str] = []
@@ -57,6 +60,7 @@ def _format_recent_messages(messages: list[dict]) -> str:
 
 
 def _format_merged_context(items: list[RagMergedContextItem]) -> str:
+    """格式化 RAG 合并结果，保留节点来源、标题、类型和裁剪后的内容。"""
     if not items:
         return "（无）"
     return "\n".join(
@@ -67,6 +71,7 @@ def _format_merged_context(items: list[RagMergedContextItem]) -> str:
 
 
 def _format_current_nodes(nodes: list[RagCurrentNodePayload]) -> str:
+    """格式化用户当前引用的节点，支持单节点和多节点两种提示块。"""
     if not nodes:
         return ""
     if len(nodes) == 1:

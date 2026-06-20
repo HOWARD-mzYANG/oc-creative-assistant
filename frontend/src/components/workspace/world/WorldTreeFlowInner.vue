@@ -26,6 +26,7 @@ const flowEdges = ref<Edge[]>([])
 
 const { fitView, onNodesInitialized } = useVueFlow({ id: FLOW_ID })
 
+/** 说明 rebuildGraph 的局部业务逻辑。 */
 function rebuildGraph() {
   const laid = applyTreeLayout(props.nodes)
   flowNodes.value = laid.map((node) => ({
@@ -36,6 +37,7 @@ function rebuildGraph() {
   flowEdges.value = hierarchyToTreeCanvasEdges(laid) as unknown as Edge[]
 }
 
+/** 说明 refit 的局部业务逻辑。 */
 function refit() {
   void nextTick(() => {
     requestAnimationFrame(() => {
@@ -44,6 +46,7 @@ function refit() {
   })
 }
 
+/** 说明 hierarchySignature 的局部业务逻辑。 */
 function hierarchySignature(nodes: CreativeFlowNode[]) {
   return nodes
     .map((node) => `${node.id}:${node.data.parentId ?? ''}:${node.data.sortOrder ?? 0}:${node.data.title}`)

@@ -40,6 +40,7 @@ watch(
   { immediate: true },
 )
 
+/** 说明 fileToScaledDataUrl 的局部业务逻辑。 */
 function fileToScaledDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -68,6 +69,7 @@ function fileToScaledDataUrl(file: File): Promise<string> {
   })
 }
 
+/** 说明 scheduleSave 的局部业务逻辑。 */
 function scheduleSave() {
   if (!detail.value || !name.value.trim() || isHydrating.value) return
   if (saveTimer) clearTimeout(saveTimer)
@@ -76,6 +78,7 @@ function scheduleSave() {
   }, SAVE_DEBOUNCE_MS)
 }
 
+/** 持久化当前编辑状态并处理保存队列。 */
 async function persist() {
   if (!detail.value || !name.value.trim()) return
   if (isSaving) {
@@ -105,6 +108,7 @@ async function persist() {
   }
 }
 
+/** 处理对应的用户交互或组件事件。 */
 async function handleFileChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -124,6 +128,7 @@ async function handleFileChange(event: Event) {
   }
 }
 
+/** 打开目标视图或弹层。 */
 function openCoverPicker() {
   fileInput.value?.click()
 }

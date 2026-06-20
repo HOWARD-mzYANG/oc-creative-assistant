@@ -320,6 +320,7 @@ def _call_material_agent_with_tools(
         ),
     ]
     def _tool_trace_callback(payload: dict[str, str]) -> None:
+        """把 tool_loop 的 trace payload 转换为角色资料整理 trace 项。"""
         _record_trace(
             trace,
             on_trace,

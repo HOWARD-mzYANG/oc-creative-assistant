@@ -52,10 +52,12 @@ const navItems = computed<NavItem[]>(() => [
   { id: 'characters', to: `/workspace/${props.projectId}/characters`, icon: '✦', label: '角色' },
 ])
 
+/** 判断当前状态是否满足条件。 */
 function isNavActive(item: NavItem) {
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
+/** 说明 navIcon 的局部业务逻辑。 */
 function navIcon(item: NavItem) {
   if (item.id === 'world' && isNavActive(item) && worldMode.value === 'canvas') {
     return item.canvasIcon ?? item.icon
@@ -63,11 +65,13 @@ function navIcon(item: NavItem) {
   return item.icon
 }
 
+/** 说明 worldModeLabel 的局部业务逻辑。 */
 function worldModeLabel(item: NavItem) {
   if (item.id !== 'world' || !isNavActive(item)) return ''
   return worldMode.value === 'notes' ? '笔记' : '树'
 }
 
+/** 处理对应的用户交互或组件事件。 */
 function handleNavClick(item: NavItem, event: MouseEvent) {
   if (item.id !== 'world' || !isNavActive(item)) return
   event.preventDefault()
